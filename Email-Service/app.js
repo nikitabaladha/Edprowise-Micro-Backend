@@ -15,6 +15,7 @@ configureServer(app);
 
 connectDB();
 
+// Static paths
 app.use("/Images", express.static(path.resolve("Images")));
 app.use("/Documents", express.static(path.resolve("Documents")));
 
@@ -30,7 +31,7 @@ app.get("/health", (req, res) => {
 });
 
 // Start server
-const PORT = process.env.USER_AND_PROFILE_SERVICE_PORT;
+const PORT = process.env.EMAIL_SERVICE_PORT;
 
 app.listen(PORT, () => {
   console.log(`${process.env.SERVICE_NAME} running on port ${PORT}`);

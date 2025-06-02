@@ -17,6 +17,7 @@ configureServer(app);
 
 const SERVICE_TARGETS = {
   user: process.env.USER_SERVICE_URL,
+  email: process.env.EMAIL_SERVICE_URL,
 };
 
 app.use(
@@ -27,7 +28,22 @@ app.use(
 );
 
 app.use(
+  "/api",
+  proxy(SERVICE_TARGETS.email, {
+    proxyReqPathResolver: (req) => req.originalUrl,
+  })
+);
+
+app.use(
   "/user-and-profile-service",
+  proxy(SERVICE_TARGETS.user, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/user-and-profile-service", ""),
+  })
+);
+
+app.use(
+  "/email-service",
   proxy(SERVICE_TARGETS.user, {
     proxyReqPathResolver: (req) =>
       req.originalUrl.replace("/user-and-profile-service", ""),
