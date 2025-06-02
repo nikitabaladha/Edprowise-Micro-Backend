@@ -1,10 +1,10 @@
-// Microservice-Learning-Backend/api-geteway/app.js
-
+// Edprowise-Micro-Backend\api-geteway\app.js
 import morgan from "morgan";
 import express from "express";
 import proxy from "express-http-proxy";
 import configureServer from "../shared/config/server-config.js";
 import dotenv from "dotenv";
+import path from "path";
 
 dotenv.config();
 
@@ -15,19 +15,22 @@ app.use(morgan("combined"));
 // Apply common server configuration
 configureServer(app);
 
-const userServiceTarget = process.env.USER_SERVICE_URL; // Use correct backend URL
+const SERVICE_TARGETS = {
+  user: process.env.USER_SERVICE_URL,
+};
 
-// Proxy all /user-and-profile-service/* requests
+app.use(
+  "/api",
+  proxy(SERVICE_TARGETS.user, {
+    proxyReqPathResolver: (req) => req.originalUrl,
+  })
+);
+
 app.use(
   "/user-and-profile-service",
-  proxy(userServiceTarget, {
-    proxyReqPathResolver: (req) => {
-      const proxiedPath = req.originalUrl.replace(
-        /^\/user-and-profile-service/,
-        ""
-      );
-      return proxiedPath;
-    },
+  proxy(SERVICE_TARGETS.user, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/user-and-profile-service", ""),
   })
 );
 
@@ -37,5 +40,5 @@ app.get("/health", (req, res) => {
 });
 
 // Start server
-const PORT = process.env.GATEWAY_PORT || 3000;
+const PORT = process.env.GATEWAY_PORT || 3001;
 app.listen(PORT, () => console.log(`API Gateway running on port ${PORT}`));

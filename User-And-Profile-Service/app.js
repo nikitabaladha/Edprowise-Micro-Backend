@@ -1,3 +1,5 @@
+// Edprowise-Micro-Backend\User-And-Profile-Service\app.js
+
 import dotenv from "dotenv";
 import path from "path";
 import express from "express";
@@ -15,8 +17,6 @@ connectDB();
 
 // Static paths
 app.use("/Images", express.static(path.resolve("Images")));
-app.use("/Documents", express.static(path.resolve("Documents")));
-app.use("/DummyImages", express.static(path.resolve("DummyImages")));
 
 // Routes
 routes(app);

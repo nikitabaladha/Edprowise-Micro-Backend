@@ -60,12 +60,10 @@ async function updateById(req, res) {
       contactNo,
       alternateContactNo,
       emailId,
-      // insuranceCharges,
     } = req.body;
 
-    const edprowiseProfileImagePath = "/Images/EdprowiseProfile";
-    const edprowiseProfile = req.files?.edprowiseProfile?.[0]?.filename
-      ? `${edprowiseProfileImagePath}/${req.files.edprowiseProfile[0].filename}`
+    const edprowiseProfile = req.file?.filename
+      ? `/Images/EdprowiseProfile/${req.file.filename}`
       : existingProfile.edprowiseProfile;
 
     const updatedData = {
@@ -85,7 +83,6 @@ async function updateById(req, res) {
       alternateContactNo:
         alternateContactNo || existingProfile.alternateContactNo,
       emailId: emailId || existingProfile.emailId,
-      // insuranceCharges: insuranceCharges || existingProfile.insuranceCharges,
       edprowiseProfile,
     };
 

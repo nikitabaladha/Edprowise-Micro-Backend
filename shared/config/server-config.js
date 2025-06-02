@@ -1,4 +1,5 @@
-// shared/config/server-config.js
+// Edprowise-Micro-Backend\shared\config\server-config.js
+
 import dotenv from "dotenv";
 import path from "path";
 import bodyParser from "body-parser";
