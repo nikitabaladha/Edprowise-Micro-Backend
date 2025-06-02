@@ -1,4 +1,3 @@
-// controllers/emailController.js
 // import School from "../../models/School.js";
 // import SellerProfile from "../../models/SellerProfile.js";
 // import AdminUser from "../../models/AdminUser.js";

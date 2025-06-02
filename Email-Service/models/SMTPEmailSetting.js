@@ -35,7 +35,7 @@ const smtpEmailSettingSchema = new mongoose.Schema(
       required: true,
     },
   },
-  { timestamps: true } 
+  { timestamps: true }
 );
 
 export default mongoose.model("SmtpEmailSetting", smtpEmailSettingSchema);

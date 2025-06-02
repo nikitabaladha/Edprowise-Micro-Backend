@@ -20,17 +20,19 @@ const SERVICE_TARGETS = {
   email: process.env.EMAIL_SERVICE_URL,
 };
 
+// Route specific API prefixes
 app.use(
-  "/api",
+  "/api/user",
   proxy(SERVICE_TARGETS.user, {
-    proxyReqPathResolver: (req) => req.originalUrl,
+    proxyReqPathResolver: (req) => req.originalUrl.replace("/api/user", "/api"),
   })
 );
 
 app.use(
-  "/api",
+  "/api/email",
   proxy(SERVICE_TARGETS.email, {
-    proxyReqPathResolver: (req) => req.originalUrl,
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/api/email", "/api"),
   })
 );
 
@@ -44,7 +46,7 @@ app.use(
 
 app.use(
   "/email-service",
-  proxy(SERVICE_TARGETS.user, {
+  proxy(SERVICE_TARGETS.email, {
     proxyReqPathResolver: (req) =>
       req.originalUrl.replace("/user-and-profile-service", ""),
   })

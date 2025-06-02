@@ -1,5 +1,4 @@
-// Edprowise-Micro-Backend\User-And-Profile-Service\app.js
-
+// Edprowise-Micro-Backend\Email-Service\app.js
 import dotenv from "dotenv";
 import path from "path";
 import express from "express";
