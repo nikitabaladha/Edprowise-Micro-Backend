@@ -1,3 +1,4 @@
+// Edprowise-Micro-Backend\Email-Service\controllers\SMTPEmailSettings\get.js
 import SmtpEmailSetting from "../../models/SMTPEmailSetting.js";
 
 const get = async (req, res) => {

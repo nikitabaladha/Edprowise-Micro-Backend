@@ -33,6 +33,15 @@ app.use(
   proxy(SERVICE_TARGETS.email, {
     proxyReqPathResolver: (req) =>
       req.originalUrl.replace("/api/email", "/api"),
+    proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
+      // Preserve all headers including access_token
+      proxyReqOpts.headers = {
+        ...srcReq.headers,
+        // Ensure the access_token header is forwarded exactly as received
+        access_token: srcReq.headers.access_token,
+      };
+      return proxyReqOpts;
+    },
   })
 );
 
@@ -48,7 +57,7 @@ app.use(
   "/email-service",
   proxy(SERVICE_TARGETS.email, {
     proxyReqPathResolver: (req) =>
-      req.originalUrl.replace("/user-and-profile-service", ""),
+      req.originalUrl.replace("/email-service", ""),
   })
 );
 

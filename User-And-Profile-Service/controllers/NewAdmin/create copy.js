@@ -2,10 +2,10 @@
 import AdminUser from "../../models/AdminUser.js";
 import saltFunction from "../../validators/saltFunction.js";
 import AdminAddValidationSchema from "../../validators/signupValidationSchema.js";
-import smtpServiceClient from "../../utils/smtpServiceClient.js";
 
 import nodemailer from "nodemailer";
 
+// import SMTPEmailSetting from "../../../models/SMTPEmailSetting.js";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -18,18 +18,16 @@ const __dirname = dirname(__filename);
 async function sendAdminRegistrationEmail(
   adminFullName,
   email,
-  usersWithCredentials,
-  accessToken
+  usersWithCredentials
 ) {
   let hasError = false;
   let message = "";
   try {
     // 1. Get SMTP settings from database
-    const smtpSettings = await smtpServiceClient.getSettings(accessToken);
-
+    const smtpSettings = await SMTPEmailSetting.findOne();
     if (!smtpSettings) {
       console.error("SMTP settings not found");
-      return { hasError: true, message: "Email configuration error" };
+      return false;
     }
 
     // 2. Create Nodemailer transporter
@@ -48,7 +46,7 @@ async function sendAdminRegistrationEmail(
 
     const logoImagePath = path.join(
       __dirname,
-      "../../Images/edprowiseLogoImages/EdProwiseNewLogo.png"
+      "../../../Images/edprowiseLogoImages/EdProwiseNewLogo.png"
     );
     console.log("Logo path verification:");
     console.log("Full path:", logoImagePath);
@@ -75,7 +73,7 @@ async function sendAdminRegistrationEmail(
       },
     ];
 
-    const frontendUrl = process.env.FRONTEND_URL;
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     const loginUrl = `${frontendUrl.replace(/\/+$/, "")}/login/admin`;
     const contactUrl = `${frontendUrl.replace(/\/+$/, "")}/contact-us`;
 
@@ -306,7 +304,7 @@ async function sendAdminRegistrationEmail(
     console.error("Error sending registration email:", error);
     return {
       hasError: true,
-      message: "Failed to send email.",
+      message: "Email is not proper, we cannot send the email.",
     };
   }
 }
@@ -348,15 +346,7 @@ async function addAdmin(req, res) {
     console.log("Admin email", email, "Admin password", password);
 
     const adminFullName = `${firstName} ${lastName}`;
-
-    const accessToken = req.headers.access_token;
-
-    await sendAdminRegistrationEmail(
-      adminFullName,
-      email,
-      { email, password },
-      accessToken
-    );
+    await sendAdminRegistrationEmail(adminFullName, email, { email, password });
 
     delete user.password;
     delete user.salt;
