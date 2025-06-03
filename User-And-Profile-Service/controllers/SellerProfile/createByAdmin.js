@@ -3,9 +3,10 @@ import SellerProfile from "../../models/SellerProfile.js";
 import SellerProfileValidator from "../../validators/SellerProfile.js";
 import Seller from "../../models/Seller.js";
 import saltFunction from "../../validators/saltFunction.js";
+import smtpServiceClient from "../../utils/smtpServiceClient.js";
 
 import nodemailer from "nodemailer";
-// import SMTPEmailSetting from "../../models/SMTPEmailSetting.js";
+
 import path from "path";
 import fs from "fs";
 
@@ -35,11 +36,16 @@ function generateRandomPassword(length = 10) {
 async function sendSellerRegistrationEmail(
   companyName,
   companyEmail,
-  userCredentials
+  userCredentials,
+  accessToken
 ) {
   try {
-    const smtpSettings = await SMTPEmailSetting.findOne();
-    if (!smtpSettings) throw new Error("SMTP settings not found");
+    const smtpSettings = await smtpServiceClient.getSettings(accessToken);
+
+    if (!smtpSettings) {
+      console.error("SMTP settings not found");
+      return { hasError: true, message: "Email configuration error" };
+    }
 
     const transporter = nodemailer.createTransport({
       host: smtpSettings.mailHost,
@@ -445,10 +451,17 @@ async function createByAdmin(req, res) {
 
     await newSellerProfile.save();
 
-    await sendSellerRegistrationEmail(companyName, emailId, {
-      userId,
-      password,
-    });
+    const accessToken = req.headers.access_token;
+
+    await sendSellerRegistrationEmail(
+      companyName,
+      emailId,
+      {
+        userId,
+        password,
+      },
+      accessToken
+    );
 
     const newSeller = new Seller({
       _id: sellerId,

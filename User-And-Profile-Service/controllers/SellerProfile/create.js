@@ -3,7 +3,7 @@ import SellerProfileValidator from "../../validators/SellerProfile.js";
 import Seller from "../../models/Seller.js";
 
 import nodemailer from "nodemailer";
-// import SMTPEmailSetting from "../../models/SMTPEmailSetting.js";
+import smtpServiceClient from "../../utils/smtpServiceClient.js";
 
 import AdminUser from "../../models/AdminUser.js";
 // import { NotificationService } from "../../notificationService.js";
@@ -22,11 +22,16 @@ const __dirname = dirname(__filename);
 async function sendSellerRegistrationEmail(
   companyName,
   companyEmail,
-  userCredentials
+  userCredentials,
+  accessToken
 ) {
   try {
-    const smtpSettings = await SMTPEmailSetting.findOne();
-    if (!smtpSettings) throw new Error("SMTP settings not found");
+    const smtpSettings = await smtpServiceClient.getSettings(accessToken);
+
+    if (!smtpSettings) {
+      console.error("SMTP settings not found");
+      return { hasError: true, message: "Email configuration error" };
+    }
 
     const transporter = nodemailer.createTransport({
       host: smtpSettings.mailHost,
@@ -468,9 +473,16 @@ async function create(req, res) {
 
     await newSellerProfile.save({ session });
 
-    const emailSent = await sendSellerRegistrationEmail(companyName, emailId, {
-      userId: SellerDetails.userId,
-    });
+    const accessToken = req.headers.access_token;
+
+    const emailSent = await sendSellerRegistrationEmail(
+      companyName,
+      emailId,
+      {
+        userId: SellerDetails.userId,
+      },
+      accessToken
+    );
 
     if (!emailSent) {
       await session.abortTransaction();
@@ -501,25 +513,25 @@ async function create(req, res) {
 
     const relevantEdprowise = await AdminUser.find({}).session(session);
 
-    await NotificationService.sendNotification(
-      "NEW_SELLER_REGISTERED",
-      relevantEdprowise.map((admin) => ({
-        id: admin._id.toString(),
-        type: "edprowise",
-      })),
-      {
-        companyName: newSellerProfile.companyName,
-        randomId: randomId,
-        entityId: newSellerProfile._id,
-        entityType: "Seller Registred",
-        senderType: "seller",
-        senderId: senderId,
-        metadata: {
-          sellerId: senderId,
-          type: "seller_registered",
-        },
-      }
-    );
+    // await NotificationService.sendNotification(
+    //   "NEW_SELLER_REGISTERED",
+    //   relevantEdprowise.map((admin) => ({
+    //     id: admin._id.toString(),
+    //     type: "edprowise",
+    //   })),
+    //   {
+    //     companyName: newSellerProfile.companyName,
+    //     randomId: randomId,
+    //     entityId: newSellerProfile._id,
+    //     entityType: "Seller Registred",
+    //     senderType: "seller",
+    //     senderId: senderId,
+    //     metadata: {
+    //       sellerId: senderId,
+    //       type: "seller_registered",
+    //     },
+    //   }
+    // );
     await session.commitTransaction();
     session.endSession();
 

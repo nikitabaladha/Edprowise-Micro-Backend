@@ -2,9 +2,9 @@ import SchoolRegistration from "../../models/School.js";
 import User from "../../models/User.js";
 import SchoolRegistrationValidator from "../../validators/SchoolRegistrationValidator.js";
 import saltFunction from "../../validators/saltFunction.js";
+import smtpServiceClient from "../../utils/smtpServiceClient.js";
 
 import nodemailer from "nodemailer";
-// import SMTPEmailSetting from "../../../models/SMTPEmailSetting.js";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -33,13 +33,15 @@ function generateSchoolId() {
 async function sendSchoolRegistrationEmail(
   schoolName,
   schoolEmail,
-  usersWithCredentials
+  usersWithCredentials,
+  accessToken
 ) {
   let hasError = false;
   let message = "";
   try {
     // 1. Get SMTP settings from database
-    const smtpSettings = await SMTPEmailSetting.findOne();
+    const smtpSettings = await smtpServiceClient.getSettings(accessToken);
+
     if (!smtpSettings) {
       console.error("SMTP settings not found");
       return false;
@@ -61,7 +63,7 @@ async function sendSchoolRegistrationEmail(
 
     const logoImagePath = path.join(
       __dirname,
-      "../../../Images/edprowiseLogoImages/EdProwiseNewLogo.png"
+      "../../Images/edprowiseLogoImages/EdProwiseNewLogo.png"
     );
     console.log("Logo path verification:");
     console.log("Full path:", logoImagePath);
@@ -447,11 +449,13 @@ async function create(req, res) {
     });
 
     await User.insertMany(usersToSave);
+    const accessToken = req.headers.access_token;
 
     await sendSchoolRegistrationEmail(
       schoolName,
       schoolEmail,
-      usersWithCredentials
+      usersWithCredentials,
+      accessToken
     );
 
     return res.status(201).json({

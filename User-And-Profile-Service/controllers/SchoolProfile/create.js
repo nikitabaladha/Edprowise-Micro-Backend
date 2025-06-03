@@ -1,9 +1,9 @@
 import SchoolRegistration from "../../models/School.js";
 import SchoolRegistrationValidator from "../../validators/SchoolRegistrationValidator.js";
 import User from "../../models/User.js";
+import smtpServiceClient from "../../utils/smtpServiceClient.js";
 
 import nodemailer from "nodemailer";
-// import SMTPEmailSetting from "../../models/SMTPEmailSetting.js";
 import path from "path";
 import fs from "fs";
 
@@ -21,11 +21,13 @@ import mongoose from "mongoose";
 async function sendSchoolRegistrationEmail(
   schoolName,
   schoolEmail,
-  usersWithCredentials
+  usersWithCredentials,
+  accessToken
 ) {
   try {
     // 1. Get SMTP settings from database
-    const smtpSettings = await SMTPEmailSetting.findOne();
+
+    const smtpSettings = await smtpServiceClient.getSettings(accessToken);
     if (!smtpSettings) {
       console.error("SMTP settings not found");
       return { hasError: true, message: "SMTP settings not configured" };
@@ -61,14 +63,6 @@ async function sendSchoolRegistrationEmail(
     const logoBase64 = fs.readFileSync(logoImagePath, { encoding: "base64" });
     const base64Src = `data:image/png;base64,${logoBase64}`;
 
-    // Prepare attachments with CID
-    // const attachments = [{
-    //   filename: 'logo.png',
-    //   path: logoImagePath,
-    //   cid: 'edprowiselogo', // Must match the CID in HTML
-    //   contentDisposition: 'inline'
-    // }];
-
     const attachments = [
       {
         filename: "logo.png",
@@ -80,42 +74,6 @@ async function sendSchoolRegistrationEmail(
         },
       },
     ];
-
-    // const logoImagePath = path.join(
-    //   __dirname, '..', '..',
-    //   'Images',
-    //   'edprowiseLogoImages',
-    //   'EdProwiseNewLogo.png'
-    // );
-
-    // console.log('Logo path verification:');
-    // console.log('__dirname:', __dirname);
-    // console.log('Resolved path:', logoImagePath);
-    // console.log('File exists:', fs.existsSync(logoImagePath));
-
-    // if (!fs.existsSync(logoImagePath)) {
-    //   console.error('Could not find logo at:', logoImagePath);
-    //   return { hasError: true, message: "Logo file not found" };
-    // }
-
-    // try {
-    //   const imageBuffer = fs.readFileSync(logoImagePath);
-    //   fs.writeFileSync('./logo_test_output.png', imageBuffer); // Test output
-    //   console.log('Logo file verified and test copy created');
-    // } catch (err) {
-    //   console.error('Error reading logo file:', err);
-    //   return { hasError: true, message: "Logo file cannot be read" };
-    // }
-
-    //  <img src="cid:edprowiselogo"
-    //    onerror="this.src='${base64Src}'"
-    //    alt="EdProwise Logo" class="logo">
-
-    // const attachments = [{
-    //   filename: "EdProwiseNewLogo.png",
-    //   path: logoImagePath,
-    //   cid: "logo"
-    // }];
 
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     const loginUrl = `${frontendUrl.replace(/\/+$/, "")}/login`;
@@ -472,10 +430,13 @@ async function create(req, res) {
     const schoolDetails = await User.findOne({ schoolId }).session(session);
     const userId = schoolDetails.userId;
 
+    const accessToken = req.headers.access_token;
+
     const emailSent = await sendSchoolRegistrationEmail(
       schoolName,
       schoolEmail,
-      { userId }
+      { userId },
+      accessToken
     );
 
     if (!emailSent) {
@@ -497,26 +458,26 @@ async function create(req, res) {
 
     const relevantEdprowise = await AdminUser.find({}).session(session);
 
-    await NotificationService.sendNotification(
-      "NEW_SCHOOL_REGISTERED",
-      relevantEdprowise.map((admin) => ({
-        id: admin._id.toString(),
-        type: "edprowise",
-      })),
-      {
-        schoolName: newSchoolRegistration.schoolName,
-        schoolId: schoolId,
+    // await NotificationService.sendNotification(
+    //   "NEW_SCHOOL_REGISTERED",
+    //   relevantEdprowise.map((admin) => ({
+    //     id: admin._id.toString(),
+    //     type: "edprowise",
+    //   })),
+    //   {
+    //     schoolName: newSchoolRegistration.schoolName,
+    //     schoolId: schoolId,
 
-        entityId: newSchoolRegistration._id,
-        entityType: "School Registred",
-        senderType: "school",
-        senderId: senderId,
-        metadata: {
-          schoolId: schoolId,
-          type: "school_registered",
-        },
-      }
-    );
+    //     entityId: newSchoolRegistration._id,
+    //     entityType: "School Registred",
+    //     senderType: "school",
+    //     senderId: senderId,
+    //     metadata: {
+    //       schoolId: schoolId,
+    //       type: "school_registered",
+    //     },
+    //   }
+    // );
 
     await session.commitTransaction();
     session.endSession();

@@ -62,12 +62,12 @@ async function userLogin(req, res) {
     if (schemaType === "User") {
       tokenPayload.schoolId = user.schoolId;
 
-      const subscriptions = await Subscription.find(
-        { schoolId: user.schoolId },
-        { _id: 0, subscriptionFor: 1, subscriptionEndDate: 1 }
-      ).lean();
+      // const subscriptions = await Subscription.find(
+      //   { schoolId: user.schoolId },
+      //   { _id: 0, subscriptionFor: 1, subscriptionEndDate: 1 }
+      // ).lean();
 
-      tokenPayload.subscription = subscriptions || [];
+      // tokenPayload.subscription = subscriptions || [];
     }
 
     const token = jwt.sign(tokenPayload, jwtSecret, {

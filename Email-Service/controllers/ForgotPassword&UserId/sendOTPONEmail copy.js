@@ -3,7 +3,9 @@
 import nodemailer from "nodemailer";
 import SMTPEmailSetting from "../../models/SMTPEmailSetting.js";
 import VerificationCodeForEmail from "../../models/VerificationCodeForEmail.js";
-import axios from "axios";
+
+// import SellerProfile from "../../models/SellerProfile.js";
+// import School from "../../models/School.js";
 
 import path from "path";
 import fs from "fs";
@@ -20,16 +22,16 @@ function generateVerificationCode() {
 async function sendOTPOnEmail(req, res) {
   const { email } = req.body;
   try {
-    const emailCheck = await axios.post(
-      `${process.env.USER_SERVICE_URL}/api/check-email-exists`,
-      { email }
-    );
+    // Check if email already exists in SellerProfile
+    const sellerProfile = await SellerProfile.findOne({ emailId: email });
 
-    if (emailCheck.data.exists) {
-      return res.status(400).json({
-        hasError: true,
-        message: "Email already in use.",
-      });
+    // Check if email already exists in School
+    const schoolProfile = await School.findOne({ schoolEmail: email });
+
+    if (sellerProfile || schoolProfile) {
+      return res
+        .status(400)
+        .json({ hasError: true, message: "Email already in use." });
     }
 
     // Generate a new verification code

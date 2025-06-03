@@ -25,6 +25,13 @@ app.use(
   "/api/user",
   proxy(SERVICE_TARGETS.user, {
     proxyReqPathResolver: (req) => req.originalUrl.replace("/api/user", "/api"),
+    proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
+      proxyReqOpts.headers = {
+        ...srcReq.headers,
+        access_token: srcReq.headers.access_token,
+      };
+      return proxyReqOpts;
+    },
   })
 );
 
@@ -37,7 +44,6 @@ app.use(
       // Preserve all headers including access_token
       proxyReqOpts.headers = {
         ...srcReq.headers,
-        // Ensure the access_token header is forwarded exactly as received
         access_token: srcReq.headers.access_token,
       };
       return proxyReqOpts;
