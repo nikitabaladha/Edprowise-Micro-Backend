@@ -12,7 +12,11 @@ import {
 
 const router = express.Router();
 
-router.get("/get-smtp-email-settings", roleBasedMiddleware("Admin"), get);
+router.get(
+  "/get-smtp-email-settings",
+  roleBasedMiddleware("Admin", "School", "Seller"),
+  get
+);
 
 router.post(
   "/post-smtp-email-settings",

@@ -1,6 +1,6 @@
 import SellerProfile from "../../models/SellerProfile.js";
 import Seller from "../../models/Seller.js";
-// import QuoteProposal from "../../models/ProcurementService/QuoteProposal.js";
+import axios from "axios";
 
 async function getById(req, res) {
   try {
@@ -13,20 +13,19 @@ async function getById(req, res) {
       });
     }
 
-    const sellerProfile = await SellerProfile.findOne({ sellerId }).populate(
-      "dealingProducts.categoryId dealingProducts.subCategoryIds"
-    );
+    const [sellerProfile, seller] = await Promise.all([
+      SellerProfile.findOne({ sellerId }).populate(
+        "dealingProducts.categoryId dealingProducts.subCategoryIds"
+      ),
+      Seller.findOne({ _id: sellerId }).select("-password -salt"),
+    ]);
 
     if (!sellerProfile) {
       return res.status(404).json({
         hasError: true,
-        message: "Seller profile not found.",
+        message: "Seller Profile not found.",
       });
     }
-
-    const seller = await Seller.findOne({ _id: sellerId }).select(
-      "-password -salt"
-    );
 
     if (!seller) {
       return res.status(404).json({
@@ -35,36 +34,62 @@ async function getById(req, res) {
       });
     }
 
-    const ratingStats = await QuoteProposal.aggregate([
-      {
-        $match: {
-          sellerId: sellerId,
-          rating: { $ne: null },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          totalCount: { $sum: 1 },
-          totalRating: { $sum: "$rating" },
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          totalCount: 1,
-          averageRating: {
-            $cond: [
-              { $eq: ["$totalCount", 0] },
-              0,
-              { $divide: ["$totalRating", "$totalCount"] },
-            ],
-          },
-        },
-      },
-    ]);
+    if (sellerProfile.dealingProducts?.length > 0) {
+      await Promise.all(
+        sellerProfile.dealingProducts.map(async (product) => {
+          try {
+            // Fetch category name with auth header
 
-    const { totalCount = 0, averageRating = 0 } = ratingStats[0] || {};
+            const categoryRes = await axios.get(
+              `${process.env.PROCUREMENT_SERVICE_URL}/api/categories/${product.categoryId}`
+            );
+
+            if (!categoryRes.data.hasError && categoryRes.data.data) {
+              product.categoryName = categoryRes.data.data.categoryName;
+            }
+
+            // Fetch subcategory names with auth header
+            if (product.subCategoryIds?.length > 0) {
+              const subIds = product.subCategoryIds
+                .map((id) => id.toString())
+                .join(",");
+
+              const subRes = await axios.get(
+                `${process.env.PROCUREMENT_SERVICE_URL}/api/subcategories?ids=${subIds}`
+              );
+
+              if (!subRes.data.hasError && subRes.data.data) {
+                product.subCategoryName = subRes.data.data.map(
+                  (sub) => sub.subCategoryName
+                );
+              }
+            }
+          } catch (error) {
+            console.error("Error fetching category data:", error.message);
+          }
+        })
+      );
+    }
+
+    let totalCount = 0;
+    let averageRating = 0;
+
+    try {
+      const response = await axios.get(
+        `${process.env.PROCUREMENT_SERVICE_URL}/api/quote-proposal-by-seller-id/${sellerId}?include=ratings`
+      );
+
+      if (!response.data.hasError && response.data.data) {
+        totalCount = response.data.data.totalCount || 0;
+        averageRating = response.data.data.averageRating || 0;
+      }
+    } catch (error) {
+      console.error(
+        "Failed to fetch ratings from Procurement-Service:",
+        error.message
+      );
+      // Proceed with default values (0) if the service fails
+    }
 
     const responseData = {
       _id: seller._id,
@@ -100,7 +125,13 @@ async function getById(req, res) {
       noOfEmployees: sellerProfile.noOfEmployees,
       ceoName: sellerProfile.ceoName,
       turnover: sellerProfile.turnover,
-      dealingProducts: sellerProfile.dealingProducts,
+      dealingProducts: sellerProfile.dealingProducts.map((product) => ({
+        categoryId: product.categoryId,
+        categoryName: product.categoryName || null,
+        subCategoryIds: product.subCategoryIds,
+        subCategoryNames: product.subCategoryName || [], // Fixed property name
+        _id: product._id,
+      })),
       totalCount,
       averageRating: averageRating.toFixed(1),
     };

@@ -19,6 +19,8 @@ import {
   updateSubCategory,
   deleteSubCategory,
   updateWithoutIds,
+  getCategoryById,
+  getSubCategoriesByIds,
 } from "../controllers/MainCategoryCategorySubCategory/index.js";
 
 const router = express.Router();
@@ -89,4 +91,8 @@ router.delete(
   roleBasedMiddleware("Admin"),
   deleteSubCategory
 );
+
+router.get("/categories/:id", getCategoryById);
+
+router.get("/subcategories", getSubCategoriesByIds);
 export default router;

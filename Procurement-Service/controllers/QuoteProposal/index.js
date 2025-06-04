@@ -1,3 +1,4 @@
 import getBySellerIdAndEnquiryNumber from "./getBySellerIdAndEnquiryNumber.js";
+import getBySellerId from "./getBySellerId.js";
 
-export { getBySellerIdAndEnquiryNumber };
+export { getBySellerIdAndEnquiryNumber, getBySellerId };
