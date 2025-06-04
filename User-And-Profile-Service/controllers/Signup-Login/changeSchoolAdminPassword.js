@@ -3,7 +3,9 @@ import saltFunction from "../../validators/saltFunction.js";
 import School from "../../models/School.js";
 
 import nodemailer from "nodemailer";
-// import SMTPEmailSetting from "../../models/SMTPEmailSetting.js";
+
+import smtpServiceClient from "../../utils/smtpServiceClient.js";
+
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -15,16 +17,18 @@ const __dirname = dirname(__filename);
 async function sendPasswordUpdateEmail(
   schoolName,
   schoolEmail,
-  usersWithCredentials
+  usersWithCredentials,
+  accessToken
 ) {
   let hasError = false;
   let message = "";
   try {
     // 1. Get SMTP settings from database
-    const smtpSettings = await SMTPEmailSetting.findOne();
+    const smtpSettings = await smtpServiceClient.getSettings(accessToken);
+
     if (!smtpSettings) {
       console.error("SMTP settings not found");
-      return false;
+      return { hasError: true, message: "Email configuration error" };
     }
 
     // 3. Create Nodemailer transporter
@@ -344,10 +348,17 @@ async function changeSchoolAdminPassword(req, res) {
 
     console.log(`Password changed for school: ${schoolName} (${schoolEmail})`);
 
-    await sendPasswordUpdateEmail(schoolName, schoolEmail, {
-      userName: user.userId,
-      password: newPassword,
-    });
+    const accessToken = req.headers.access_token;
+
+    await sendPasswordUpdateEmail(
+      schoolName,
+      schoolEmail,
+      {
+        userName: user.userId,
+        password: newPassword,
+      },
+      accessToken
+    );
 
     return res.status(200).json({
       hasError: false,

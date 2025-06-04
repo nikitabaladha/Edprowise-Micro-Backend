@@ -1,10 +1,10 @@
+// Edprowise-Micro-Backend\Email-Service\controllers\ForgotPassword&UserId\findUserId.js
+
 import nodemailer from "nodemailer";
 import SMTPEmailSetting from "../../models/SMTPEmailSetting.js";
 import VerificationCode from "../../models/VerificationCode.js";
-// import SellerProfile from "../../models/SellerProfile.js";
-// import School from "../../models/School.js";
-// import User from "../../models/User.js";
-// import Seller from "../../models/Seller.js";
+
+import axios from "axios";
 
 import path from "path";
 import fs from "fs";
@@ -22,35 +22,25 @@ async function sendVerificationCode(req, res) {
   const { userId } = req.body;
 
   try {
-    let user = await Seller.findOne({ userId });
     let userEmail = null;
 
-    if (user) {
-      const sellerDetails = await SellerProfile.findOne({ sellerId: user._id });
-
-      if (sellerDetails) {
-        userEmail = sellerDetails.emailId;
-        console.log("Seller Email:", userEmail);
+    try {
+      const response = await axios.get(
+        `${process.env.USER_SERVICE_URL}/api/get-user-email-by-userId/${userId}`
+      );
+      if (response.data && !response.data.hasError) {
+        userEmail = response.data.email;
+      } else {
+        return res.status(404).json({
+          hasError: true,
+          message: response.data.message || "Email not found.",
+        });
       }
-    } else {
-      user = await User.findOne({ userId });
-
-      if (user) {
-        console.log("School User Found:", user);
-        const schoolDetails = await School.findOne({ schoolId: user.schoolId });
-
-        if (schoolDetails) {
-          userEmail = schoolDetails.schoolEmail;
-          console.log("School Email:", userEmail);
-        }
-      }
-    }
-    console.log("user Details:", user, "Email :", userEmail);
-
-    if (!user || !userEmail) {
-      return res
-        .status(404)
-        .json({ hasError: true, message: "User not found or email missing." });
+    } catch (err) {
+      return res.status(500).json({
+        hasError: true,
+        message: "Error communicating with User Service.",
+      });
     }
 
     // Generate a new verification code

@@ -1,7 +1,11 @@
 import nodemailer from "nodemailer";
 import SMTPEmailSetting from "../../models/SMTPEmailSetting.js";
 
-import axios from "axios";
+// import SellerProfile from "../../models/SellerProfile.js";
+// import School from "../../models/School.js";
+// import User from "../../models/User.js";
+// import Seller from "../../models/Seller.js";
+// import saltFunction from "../../validators/saltFunction.js";
 
 import path from "path";
 import fs from "fs";
@@ -270,41 +274,70 @@ const resetUserOrSellerPassword = async (req, res) => {
   try {
     const { userId, newPassword } = req.body;
 
-    const response = await axios.put(
-      `${process.env.USER_SERVICE_URL}/api/reset-user-or-seller-password`,
-      {
-        userId,
-        newPassword,
+    if (!userId || !newPassword) {
+      return res.status(400).json({
+        hasError: true,
+        message: "userId and newPassword are required.",
+      });
+    }
+
+    const { hashedPassword, salt } = saltFunction.hashPassword(newPassword);
+
+    // Try school user
+    let user = await User.findOne({ userId });
+    if (user) {
+      user.password = hashedPassword;
+      user.salt = salt;
+      await user.save();
+
+      const school = await School.findOne({ schoolId: user.schoolId });
+      if (school) {
+        await sendPasswordUpdateEmail(
+          school.schoolName,
+          school.schoolEmail,
+          { userName: user.userId, password: newPassword },
+          "School"
+        );
       }
-    );
 
-    if (response.data.hasError) {
-      return res.status(400).json(response.data);
+      return res.status(200).json({
+        hasError: false,
+        message: "Password updated for school user.",
+      });
     }
 
-    const { email, companyName, userName, role } = response.data.data;
+    // Try seller
+    let seller = await Seller.findOne({ userId });
+    if (seller) {
+      seller.password = hashedPassword;
+      seller.salt = salt;
+      await seller.save();
 
-    const emailResult = await sendPasswordUpdateEmail(
-      companyName,
-      email,
-      { userName, password: newPassword },
-      role
-    );
+      const sellerProfile = await SellerProfile.findOne({
+        sellerId: seller._id,
+      });
+      if (sellerProfile) {
+        await sendPasswordUpdateEmail(
+          sellerProfile.companyName,
+          sellerProfile.emailId,
+          { userName: seller.userId, password: newPassword },
+          "Seller"
+        );
+      }
 
-    if (emailResult.hasError) {
-      return res.status(500).json(emailResult);
+      return res.status(200).json({
+        hasError: false,
+        message: "Password updated for seller.",
+      });
     }
 
-    return res.status(200).json({
-      hasError: false,
-      message: "Password updated and email sent successfully.",
+    return res.status(404).json({
+      hasError: true,
+      message: "User ID not found in User or Seller collections.",
     });
   } catch (error) {
-    console.error("Error in resetUserOrSellerPassword:", error.message);
-    return res.status(500).json({
-      hasError: true,
-      message: "Failed to reset password or send email.",
-    });
+    console.error("Password reset error:", error.message);
+    return res.status(500).json({ hasError: true, message: "Server error." });
   }
 };
 

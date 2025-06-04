@@ -5,6 +5,8 @@ import userSignup from "./user-signup.js";
 import changeSellerPassword from "./changeSellerPassword.js";
 import changeSchoolAdminPassword from "./changeSchoolAdminPassword.js";
 import changeEdprowiseAdminPassword from "./changeEdprowiseAdminPassword.js";
+import getUserEmailByUserId from "./getUserEmailByUserId.js";
+import resetUserOrSellerPassword from "./resetUserOrSellerPassword.js";
 
 export {
   adminSignup,
@@ -14,4 +16,6 @@ export {
   changeSellerPassword,
   changeSchoolAdminPassword,
   changeEdprowiseAdminPassword,
+  getUserEmailByUserId,
+  resetUserOrSellerPassword,
 };

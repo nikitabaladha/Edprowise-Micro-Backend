@@ -2,7 +2,9 @@ import AdminUser from "../../models/AdminUser.js";
 import saltFunction from "../../validators/saltFunction.js";
 
 import nodemailer from "nodemailer";
-// import SMTPEmailSetting from "../../models/SMTPEmailSetting.js";
+
+import smtpServiceClient from "../../utils/smtpServiceClient.js";
+
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -14,16 +16,18 @@ const __dirname = dirname(__filename);
 async function sendPasswordUpdateEmail(
   userFullName,
   userEmail,
-  usersWithCredentials
+  usersWithCredentials,
+  accessToken
 ) {
   let hasError = false;
   let message = "";
   try {
     // 1. Get SMTP settings from database
-    const smtpSettings = await SMTPEmailSetting.findOne();
+    const smtpSettings = await smtpServiceClient.getSettings(accessToken);
+
     if (!smtpSettings) {
       console.error("SMTP settings not found");
-      return false;
+      return { hasError: true, message: "Email configuration error" };
     }
 
     // 2. Create Nodemailer transporter
@@ -223,7 +227,7 @@ async function sendPasswordUpdateEmail(
                             <p class="message">You recently update the password of ${
                               smtpSettings.mailFromName
                             } account.</p>
-                            <p class="message">Admin ${FullName}, password has been successfully updated.</p>
+                            <p class="message">Admin ${userFullName}, password has been successfully updated.</p>
 
                             <!-- User Details Box -->
                             <p class="message">The new login details for Admin ${userFullName} are: </p>
@@ -297,6 +301,14 @@ async function changeAdminPassword(req, res) {
       });
     }
 
+    const user = await AdminUser.findById(userId);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ hasError: true, message: "Admin User not found." });
+    }
+
     const userFullName = `${user.firstName} ${user.lastName}`;
 
     const userEmail = user.email;
@@ -308,14 +320,6 @@ async function changeAdminPassword(req, res) {
         hasError: true,
         message: "Both current and new passwords are required.",
       });
-    }
-
-    const user = await AdminUser.findById(userId);
-
-    if (!user) {
-      return res
-        .status(404)
-        .json({ hasError: true, message: "Admin User not found." });
     }
 
     const isPasswordValid = saltFunction.validatePassword(
@@ -336,10 +340,17 @@ async function changeAdminPassword(req, res) {
     user.salt = salt;
     await user.save();
 
-    await sendPasswordUpdateEmail(userFullName, userEmail, {
+    const accessToken = req.headers.access_token;
+
+    await sendPasswordUpdateEmail(
       userFullName,
-      password: newPassword,
-    });
+      userEmail,
+      {
+        userFullName,
+        password: newPassword,
+      },
+      accessToken
+    );
 
     return res.status(200).json({
       hasError: false,

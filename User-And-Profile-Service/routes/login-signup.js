@@ -9,6 +9,8 @@ import {
   changeSellerPassword,
   changeSchoolAdminPassword,
   changeEdprowiseAdminPassword,
+  getUserEmailByUserId,
+  resetUserOrSellerPassword,
 } from "../controllers/Signup-Login/index.js";
 
 const router = express.Router();
@@ -36,5 +38,9 @@ router.put(
   roleBasedMiddleware("Admin"),
   changeEdprowiseAdminPassword
 );
+
+router.get("/get-user-email-by-userId/:userId", getUserEmailByUserId);
+
+router.put("/reset-user-or-seller-password", resetUserOrSellerPassword);
 
 export default router;
