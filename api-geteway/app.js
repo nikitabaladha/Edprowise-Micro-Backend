@@ -19,6 +19,7 @@ const SERVICE_TARGETS = {
   user: process.env.USER_SERVICE_URL,
   email: process.env.EMAIL_SERVICE_URL,
   procurement: process.env.PROCUREMENT_SERVICE_URL,
+  enquiry: process.env.ENQUIRY_SERVICE_URL,
 };
 
 // Route specific API prefixes
@@ -46,6 +47,14 @@ app.use(
 );
 
 app.use(
+  "/api/enquiry",
+  proxy(SERVICE_TARGETS.enquiry, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/api/enquiry", "/api"),
+  })
+);
+
+app.use(
   "/user-and-profile-service",
   proxy(SERVICE_TARGETS.user, {
     proxyReqPathResolver: (req) =>
@@ -66,6 +75,14 @@ app.use(
   proxy(SERVICE_TARGETS.procurement, {
     proxyReqPathResolver: (req) =>
       req.originalUrl.replace("/procurement-service", ""),
+  })
+);
+
+app.use(
+  "/enquiry-service",
+  proxy(SERVICE_TARGETS.enquiry, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/enquiry-service", ""),
   })
 );
 
