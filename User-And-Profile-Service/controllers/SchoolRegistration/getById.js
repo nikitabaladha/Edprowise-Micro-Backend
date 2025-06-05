@@ -1,3 +1,5 @@
+// Edprowise-Micro-Backend\User-And-Profile-Service\controllers\SchoolRegistration\getById.js
+
 import SchoolRegistration from "../../models/School.js";
 
 async function getById(req, res) {

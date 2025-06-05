@@ -5,6 +5,7 @@ import proxy from "express-http-proxy";
 import configureServer from "../shared/config/server-config.js";
 import dotenv from "dotenv";
 import path from "path";
+import { subscribe } from "diagnostics_channel";
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ const SERVICE_TARGETS = {
   email: process.env.EMAIL_SERVICE_URL,
   procurement: process.env.PROCUREMENT_SERVICE_URL,
   enquiry: process.env.ENQUIRY_SERVICE_URL,
+  subscription: process.env.SUBSCRIPTION_SERVICE_URL,
 };
 
 // Route specific API prefixes
@@ -55,6 +57,14 @@ app.use(
 );
 
 app.use(
+  "/api/subscription",
+  proxy(SERVICE_TARGETS.subscription, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/api/subscription", "/api"),
+  })
+);
+
+app.use(
   "/user-and-profile-service",
   proxy(SERVICE_TARGETS.user, {
     proxyReqPathResolver: (req) =>
@@ -83,6 +93,14 @@ app.use(
   proxy(SERVICE_TARGETS.enquiry, {
     proxyReqPathResolver: (req) =>
       req.originalUrl.replace("/enquiry-service", ""),
+  })
+);
+
+app.use(
+  "/subscription-service",
+  proxy(SERVICE_TARGETS.subscription, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/subscription-service", ""),
   })
 );
 

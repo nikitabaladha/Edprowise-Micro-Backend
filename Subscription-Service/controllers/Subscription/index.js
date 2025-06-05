@@ -1,15 +1,15 @@
-import createSchool from "./create.js";
+import createSubscription from "./create.js";
 import getAll from "./getAll.js";
 import updateById from "./updateById.js";
 import deleteById from "./deleteById.js";
+import getBySchoolId from "./getBySchoolId.js";
 import getById from "./getById.js";
-import getSchoolsByIds from "./getSchoolsByIds.js";
 
 export {
-  createSchool,
+  createSubscription,
   getAll,
   updateById,
   deleteById,
+  getBySchoolId,
   getById,
-  getSchoolsByIds,
 };
