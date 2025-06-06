@@ -4,6 +4,8 @@ import QuoteProposal from "../../models/QuoteProposal.js";
 import SubmitQuote from "../../models/SubmitQuote.js";
 import QuoteRequest from "../../models/QuoteRequest.js";
 
+import axios from "axios";
+
 // import SellerProfile from "../../../models/SellerProfile.js";
 // import EdprowiseProfile from "../../../models/EdprowiseProfile.js";
 // import School from "../../../models/School.js";
@@ -57,12 +59,28 @@ async function updateSingleProduct(req, res) {
       });
     }
 
-    // Fetch location data for all parties
-    const [quoteRequest, sellerProfile, edprowiseProfile] = await Promise.all([
-      QuoteRequest.findOne({ enquiryNumber }),
-      SellerProfile.findOne({ sellerId }),
-      EdprowiseProfile.findOne(),
-    ]);
+    const [quoteRequest, sellerResponse, edprowiseResponse] = await Promise.all(
+      [
+        // Local query
+        QuoteRequest.findOne({ enquiryNumber }),
+
+        // User-Service calls
+        axios
+          .get(
+            `${process.env.USER_SERVICE_URL}/api/required-field-from-seller-profile/${sellerId}`
+          )
+          .catch(() => ({ data: { data: null } })),
+
+        axios
+          .get(
+            `${process.env.USER_SERVICE_URL}/api/required-field-from-edprowise-profile`
+          )
+          .catch(() => ({ data: { data: null } })),
+      ]
+    );
+
+    const sellerProfile = sellerResponse.data.data;
+    const edprowiseProfile = edprowiseResponse.data.data;
 
     if (!quoteRequest || !sellerProfile || !edprowiseProfile) {
       return res.status(404).json({
@@ -347,70 +365,70 @@ async function updateSingleProduct(req, res) {
     existingSubmitted.quotedAmount = totalAmount;
     await existingSubmitted.save();
 
-    await NotificationService.sendNotification(
-      "SCHOOL_RECEIVED_UPDATED_QUOTE_FROM_SELLER",
-      [{ id: quoteRequest.schoolId, type: "school" }],
-      {
-        companyName: sellerProfile.companyName,
-        quoteNumber: existingQuoteProposal.quoteNumber,
-        enquiryNumber: existingQuoteProposal.enquiryNumber,
-        entityId: existingQuoteProposal._id,
-        entityType: "QuoteProposal From Seller",
-        senderType: "seller",
-        senderId: sellerId,
-        metadata: {
-          enquiryNumber,
-          sellerId: sellerId,
-          type: "quote_updated_from_seller",
-        },
-      }
-    );
-    const schoolId = quoteRequest.schoolId;
+    // await NotificationService.sendNotification(
+    //   "SCHOOL_RECEIVED_UPDATED_QUOTE_FROM_SELLER",
+    //   [{ id: quoteRequest.schoolId, type: "school" }],
+    //   {
+    //     companyName: sellerProfile.companyName,
+    //     quoteNumber: existingQuoteProposal.quoteNumber,
+    //     enquiryNumber: existingQuoteProposal.enquiryNumber,
+    //     entityId: existingQuoteProposal._id,
+    //     entityType: "QuoteProposal From Seller",
+    //     senderType: "seller",
+    //     senderId: sellerId,
+    //     metadata: {
+    //       enquiryNumber,
+    //       sellerId: sellerId,
+    //       type: "quote_updated_from_seller",
+    //     },
+    //   }
+    // );
+    // const schoolId = quoteRequest.schoolId;
 
-    const schoolProfile = await School.findOne({ schoolId });
+    // const schoolProfile = await School.findOne({ schoolId });
 
-    await NotificationService.sendNotification(
-      "SELLER_RECEIVED_UPDATED_QUOTE_BY_OWN",
-      [{ id: sellerId, type: "seller" }],
-      {
-        schoolName: schoolProfile.schoolName,
-        quoteNumber: existingQuoteProposal.quoteNumber,
-        enquiryNumber: existingQuoteProposal.enquiryNumber,
-        entityId: existingQuoteProposal._id,
-        entityType: "QuoteProposal",
-        senderType: "seller",
-        senderId: sellerId,
-        metadata: {
-          enquiryNumber,
-          type: "quote_updated_from_seller",
-        },
-      }
-    );
+    // await NotificationService.sendNotification(
+    //   "SELLER_RECEIVED_UPDATED_QUOTE_BY_OWN",
+    //   [{ id: sellerId, type: "seller" }],
+    //   {
+    //     schoolName: schoolProfile.schoolName,
+    //     quoteNumber: existingQuoteProposal.quoteNumber,
+    //     enquiryNumber: existingQuoteProposal.enquiryNumber,
+    //     entityId: existingQuoteProposal._id,
+    //     entityType: "QuoteProposal",
+    //     senderType: "seller",
+    //     senderId: sellerId,
+    //     metadata: {
+    //       enquiryNumber,
+    //       type: "quote_updated_from_seller",
+    //     },
+    //   }
+    // );
 
-    const relevantEdprowise = await AdminUser.find({});
+    // const relevantEdprowise = await AdminUser.find({});
 
-    await NotificationService.sendNotification(
-      "EDPROWISE_RECEIVED_UPDATED_QUOTE",
-      relevantEdprowise.map((admin) => ({
-        id: admin._id.toString(),
-        type: "edprowise",
-      })),
-      {
-        companyName: sellerProfile.companyName,
-        schoolName: schoolProfile.schoolName,
-        quoteNumber: existingQuoteProposal.quoteNumber,
-        enquiryNumber: existingQuoteProposal.enquiryNumber,
-        entityId: existingQuoteProposal._id,
-        entityType: "QuoteProposal From Seller",
-        senderType: "seller",
-        senderId: sellerId,
-        metadata: {
-          enquiryNumber,
-          sellerId: sellerId,
-          type: "quote_updated_from_edprowise",
-        },
-      }
-    );
+    // await NotificationService.sendNotification(
+    //   "EDPROWISE_RECEIVED_UPDATED_QUOTE",
+    //   relevantEdprowise.map((admin) => ({
+    //     id: admin._id.toString(),
+    //     type: "edprowise",
+    //   })),
+    //   {
+    //     companyName: sellerProfile.companyName,
+    //     schoolName: schoolProfile.schoolName,
+    //     quoteNumber: existingQuoteProposal.quoteNumber,
+    //     enquiryNumber: existingQuoteProposal.enquiryNumber,
+    //     entityId: existingQuoteProposal._id,
+    //     entityType: "QuoteProposal From Seller",
+    //     senderType: "seller",
+    //     senderId: sellerId,
+    //     metadata: {
+    //       enquiryNumber,
+    //       sellerId: sellerId,
+    //       type: "quote_updated_from_edprowise",
+    //     },
+    //   }
+    // );
 
     return res.status(200).json({
       hasError: false,

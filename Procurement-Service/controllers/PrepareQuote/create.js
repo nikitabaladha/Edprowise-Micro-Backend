@@ -116,12 +116,6 @@ async function create(req, res) {
       });
     }
 
-    // const [quoteRequest, sellerProfile, edprowiseProfile] = await Promise.all([
-    //   QuoteRequest.findOne({ enquiryNumber }).session(session),
-    //   SellerProfile.findOne({ sellerId }).session(session),
-    //   EdprowiseProfile.findOne().session(session),
-    // ]);
-
     const [quoteRequest, sellerResponse, edprowiseResponse] = await Promise.all(
       [
         // Local query

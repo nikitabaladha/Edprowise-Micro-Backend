@@ -4,6 +4,7 @@ import updateById from "./updateById.js";
 import deleteById from "./deleteById.js";
 import getById from "./getById.js";
 import getSchoolsByIds from "./getSchoolsByIds.js";
+import requiredFieldFromSchoolProfile from "./requiredFieldFromSchoolProfile.js";
 
 export {
   createSchool,
@@ -12,4 +13,5 @@ export {
   deleteById,
   getById,
   getSchoolsByIds,
+  requiredFieldFromSchoolProfile,
 };

@@ -1,11 +1,14 @@
 import SubmitQuote from "../../models/SubmitQuote.js";
 import QuoteRequest from "../../models/QuoteRequest.js";
+import PrepareQuote from "../../models/PrepareQuote.js";
+
+import nodemailer from "nodemailer";
+import smtpServiceClient from "../../utils/smtpServiceClient.js";
+
+import axios from "axios";
 
 // import School from "../../../models/School.js";
 // import SellerProfile from "../../../models/SellerProfile.js";
-// import PrepareQuote from "../../../models/ProcurementService/PrepareQuote.js";
-// import nodemailer from "nodemailer";
-// import SMTPEmailSetting from "../../../models/SMTPEmailSetting.js";
 
 import path from "path";
 import fs from "fs";
@@ -18,17 +21,19 @@ const __dirname = dirname(__filename);
 async function sendSchoolRequestQuoteEmail(
   schoolName,
   schoolEmail,
-  usersWithCredentials
+  usersWithCredentials,
+  accessToken
 ) {
   let hasError = false;
   let message = "";
 
   try {
     // 1. SMTP settings
-    const smtpSettings = await SMTPEmailSetting.findOne();
+    const smtpSettings = await smtpServiceClient.getSettings(accessToken);
+
     if (!smtpSettings) {
       console.error("SMTP settings not found");
-      return false;
+      return { hasError: true, message: "Email configuration error" };
     }
 
     // 2. Email template
@@ -519,6 +524,17 @@ async function updateVenderStatus(req, res) {
       });
     }
 
+    const accessToken = req.headers["access_token"];
+
+    if (!accessToken) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(401).json({
+        hasError: true,
+        message: "Access token is missing",
+      });
+    }
+
     const allowedStatuses = ["Quote Accepted", "Quote Not Accepted"];
 
     if (!allowedStatuses.includes(venderStatus)) {
@@ -561,9 +577,32 @@ async function updateVenderStatus(req, res) {
 
       await existingQuoteRequest.save();
 
-      const school = await School.findOne({
-        schoolId: existingQuoteRequest.schoolId,
-      });
+      // const school = await School.findOne({
+      //   schoolId: existingQuoteRequest.schoolId,
+      // });
+
+      let school;
+      try {
+        const schoolResponse = await axios.get(
+          `${process.env.USER_SERVICE_URL}/api/required-field-from-school-profile/${existingQuoteRequest.schoolId}`,
+          {
+            params: { fields: "schoolName,schoolId,schoolEmail" },
+          }
+        );
+        school = schoolResponse?.data?.data;
+      } catch (err) {
+        console.error("Error fetching School profile:", {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status,
+          config: err.config,
+        });
+        return res.status(err.response?.status || 500).json({
+          hasError: true,
+          message: "Failed to fetch school profile",
+          error: err.message,
+        });
+      }
 
       if (!school) {
         return res.status(404).json({
@@ -605,17 +644,46 @@ async function updateVenderStatus(req, res) {
           .replace(",", ","),
       }));
 
-      const sellerDetails = await SellerProfile.find({ sellerId });
+      // const sellerDetails = await SellerProfile.find({ sellerId });
 
-      const sellerCompanyName = sellerDetails.companyName;
+      // const sellerCompanyName = sellerDetails.companyName;
 
-      await sendSchoolRequestQuoteEmail(schoolName, schoolEmail, schoolId, {
-        enquiryNumber,
-        products,
-        sellerCompanyName,
-        quoteDetails,
-        sellerId,
-      });
+      let sellerCompanyName = null;
+      try {
+        const sellerResponse = await axios.get(
+          `${process.env.USER_SERVICE_URL}/api/required-field-from-seller-profile/${sellerId}`,
+          {
+            params: { fields: "companyName" },
+          }
+        );
+        sellerCompanyName = sellerResponse?.data?.data?.companyName || null;
+      } catch (err) {
+        console.error("Error fetching seller profile:", {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status,
+          config: err.config,
+        });
+        return res.status(err.response?.status || 500).json({
+          hasError: true,
+          message: "Failed to fetch seller profile",
+          error: err.message,
+        });
+      }
+
+      await sendSchoolRequestQuoteEmail(
+        schoolName,
+        schoolEmail,
+        schoolId,
+        {
+          enquiryNumber,
+          products,
+          sellerCompanyName,
+          quoteDetails,
+          sellerId,
+        },
+        accessToken
+      );
     }
     return res.status(200).json({
       hasError: false,
