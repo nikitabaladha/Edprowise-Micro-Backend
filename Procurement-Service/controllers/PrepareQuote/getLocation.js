@@ -1,7 +1,6 @@
 import QuoteRequest from "../../models/QuoteRequest.js";
 
-// import SellerProfile from "../../../models/SellerProfile.js";
-// import EdprowiseProfile from "../../../models/EdprowiseProfile.js";
+import axios from "axios";
 
 async function getLocation(req, res) {
   try {
@@ -21,12 +20,44 @@ async function getLocation(req, res) {
       });
     }
 
-    // Fetch location data for all parties with only necessary fields
-    const [quoteRequest, sellerProfile, edprowiseProfile] = await Promise.all([
-      QuoteRequest.findOne({ enquiryNumber }).select("deliveryState"),
-      SellerProfile.findOne({ sellerId }).select("state"),
-      EdprowiseProfile.findOne().select("state"),
-    ]);
+    const accessToken = req.headers["access_token"];
+
+    if (!accessToken) {
+      return res.status(401).json({
+        hasError: true,
+        message: "Access token is missing",
+      });
+    }
+
+    const [quoteRequest, sellerResponse, edprowiseResponse] = await Promise.all(
+      [
+        // Local query
+        QuoteRequest.findOne({ enquiryNumber }).select("deliveryState"),
+
+        // User-Service calls
+        axios
+          .get(
+            `${process.env.USER_SERVICE_URL}/api/required-field-from-seller-profile/${sellerId}`,
+            {
+              params: { fields: "state" },
+            }
+          )
+          .catch(() => ({ data: { data: null } })),
+
+        axios
+          .get(
+            `${process.env.USER_SERVICE_URL}/api/required-field-from-edprowise-profile`,
+            {
+              params: { fields: "state" },
+            }
+          )
+          .catch(() => ({ data: { data: null } })),
+      ]
+    );
+
+    // Extract profiles from responses
+    const sellerProfile = sellerResponse.data.data;
+    const edprowiseProfile = edprowiseResponse.data.data;
 
     // Check if all required data exists
     const missingData = [];
@@ -44,6 +75,15 @@ async function getLocation(req, res) {
     const schoolState = quoteRequest.deliveryState;
     const sellerState = sellerProfile.state;
     const edprowiseState = edprowiseProfile.state;
+
+    if (!schoolState || !sellerState || !edprowiseState) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        hasError: true,
+        message: "Location data is incomplete.",
+      });
+    }
 
     // Check if state extraction was successful
     const missingStates = [];

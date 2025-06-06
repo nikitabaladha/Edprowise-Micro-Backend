@@ -15,7 +15,11 @@ const router = express.Router();
 
 router.post("/school", upload, roleBasedMiddleware("Admin"), createSchool);
 router.get("/school", roleBasedMiddleware("Admin"), getAll);
-router.get("/school/:schoolId", roleBasedMiddleware("Admin"), getById);
+router.get(
+  "/school/:schoolId",
+  roleBasedMiddleware("Admin", "School"),
+  getById
+);
 
 router.get("/get-school-by-ids", roleBasedMiddleware("Admin"), getSchoolsByIds);
 

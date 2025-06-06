@@ -3,6 +3,7 @@ import Product from "../../models/Product.js";
 import SubmitQuote from "../../models/SubmitQuote.js";
 import OrderFromBuyer from "../../models/OrderFromBuyer.js";
 
+import axios from "axios";
 // import SellerProfile from "../../models/SellerProfile.js";
 
 async function getProductsForSeller(req, res) {
@@ -17,15 +18,30 @@ async function getProductsForSeller(req, res) {
       });
     }
 
-    // Fetch the seller's profile to get the dealing products
-    const sellerProfile = await SellerProfile.findOne({ sellerId })
-      .populate("dealingProducts.categoryId")
-      .populate("dealingProducts.subCategoryIds");
+    let sellerProfile;
+    try {
+      const response = await axios.get(
+        `${process.env.USER_SERVICE_URL}/api/seller-by-dealing-products/${sellerId}`
+      );
+      sellerProfile = response.data.data;
 
-    if (!sellerProfile) {
-      return res.status(404).json({
+      if (!sellerProfile) {
+        return res.status(404).json({
+          hasError: true,
+          message: "Seller profile not found.",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching seller profile:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: error.config,
+      });
+      return res.status(error.response?.status || 500).json({
         hasError: true,
-        message: "Seller profile not found.",
+        message: "Failed to fetch seller profile",
+        error: error.message,
       });
     }
 
@@ -33,13 +49,14 @@ async function getProductsForSeller(req, res) {
     const productMatchConditions = sellerProfile.dealingProducts.flatMap(
       (product) => {
         return product.subCategoryIds.map((subCategoryId) => ({
-          categoryId: product.categoryId._id,
-          subCategoryId: subCategoryId._id,
+          categoryId: product.categoryId,
+          subCategoryId: subCategoryId,
         }));
       }
     );
 
     // Build the query
+
     const queryConditions = {
       $or: productMatchConditions.map((condition) => ({
         categoryId: condition.categoryId,

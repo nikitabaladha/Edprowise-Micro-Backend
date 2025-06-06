@@ -129,7 +129,7 @@ async function getById(req, res) {
         categoryId: product.categoryId,
         categoryName: product.categoryName || null,
         subCategoryIds: product.subCategoryIds,
-        subCategoryNames: product.subCategoryName || [], // Fixed property name
+        subCategoryNames: product.subCategoryName || [],
         _id: product._id,
       })),
       totalCount,

@@ -7,7 +7,10 @@ import Category from "../../models/Category.js";
 import SubCategory from "../../models/SubCategory.js";
 
 import nodemailer from "nodemailer";
-// import SMTPEmailSetting from "../../../models/SMTPEmailSetting.js";
+import smtpServiceClient from "../../utils/smtpServiceClient.js";
+
+import axios from "axios";
+
 // import SellerProfile from "../../../models/SellerProfile.js";
 // import AdminUser from "../../models/AdminUser.js";
 // import School from "../../../models/School.js";
@@ -69,17 +72,19 @@ async function generateEnquiryNumber() {
 async function sendSchoolRequestQuoteEmail(
   schoolName,
   schoolEmail,
-  usersWithCredentials
+  usersWithCredentials,
+  accessToken
 ) {
   let hasError = false;
   let message = "";
 
   try {
     // 1. SMTP settings
-    const smtpSettings = await SMTPEmailSetting.findOne();
+    const smtpSettings = await smtpServiceClient.getSettings(accessToken);
+
     if (!smtpSettings) {
       console.error("SMTP settings not found");
-      return false;
+      return { hasError: true, message: "Email configuration error" };
     }
 
     // 3. Nodemailer setup
@@ -411,11 +416,14 @@ async function sendEmailsToSellers({
   enrichedProducts,
   newQuoteRequest,
   enquiryNumber,
+  accessToken,
 }) {
   try {
-    const smtpSettings = await SMTPEmailSetting.findOne();
+    const smtpSettings = await smtpServiceClient.getSettings(accessToken);
+
     if (!smtpSettings) {
-      return { hasError: true, message: "SMTP settings not found" };
+      console.error("SMTP settings not found");
+      return { hasError: true, message: "Email configuration error" };
     }
 
     const transporter = nodemailer.createTransport({
@@ -824,6 +832,17 @@ async function create(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
+    const accessToken = req.headers["access_token"];
+
+    if (!accessToken) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(401).json({
+        hasError: true,
+        message: "Access token is missing",
+      });
+    }
+
     if (!schoolId) {
       return res.status(401).json({
         hasError: true,
@@ -959,7 +978,32 @@ async function create(req, res) {
 
     await newQuoteRequest.save({ session });
 
-    const schoolDetail = await School.findOne({ schoolId }).session(session);
+    let schoolDetail;
+    try {
+      const response = await axios.get(
+        `${process.env.USER_SERVICE_URL}/api/school/${schoolId}`,
+        {
+          headers: {
+            access_token: accessToken,
+          },
+        }
+      );
+      schoolDetail = response.data.data;
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      console.error("Error fetching school details:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: error.config,
+      });
+      return res.status(500).json({
+        hasError: true,
+        message: "Failed to fetch school information",
+      });
+    }
+
     const schoolEmail = schoolDetail.schoolEmail;
     const schoolName = schoolDetail.schoolName;
 
@@ -982,17 +1026,25 @@ async function create(req, res) {
       })
     );
 
-    await sendSchoolRequestQuoteEmail(schoolName, schoolEmail, {
-      enquiryNumber,
-      products: enrichedProducts,
-      quoteRequest: newQuoteRequest,
-    });
+    await sendSchoolRequestQuoteEmail(
+      schoolName,
+      schoolEmail,
+      {
+        enquiryNumber,
+        products: enrichedProducts,
+        quoteRequest: newQuoteRequest,
+      },
+      accessToken
+    );
 
-    await sendEmailsToSellers({
-      enrichedProducts,
-      newQuoteRequest,
-      enquiryNumber,
-    });
+    await sendEmailsToSellers(
+      {
+        enrichedProducts,
+        newQuoteRequest,
+        enquiryNumber,
+      },
+      accessToken
+    );
 
     // Find relevant sellers for each product category/subcategory
     const categoryIds = [...new Set(products.map((p) => p.categoryId))];
@@ -1000,80 +1052,97 @@ async function create(req, res) {
       ...new Set(products.flatMap((p) => p.subCategoryId)),
     ];
 
-    const relevantSellers = await SellerProfile.find({
-      "dealingProducts.categoryId": { $in: categoryIds },
-      "dealingProducts.subCategoryIds": { $in: subCategoryIds },
-    }).populate("dealingProducts.categoryId dealingProducts.subCategoryIds");
+    // const relevantSellers = await SellerProfile.find({
+    //   "dealingProducts.categoryId": { $in: categoryIds },
+    //   "dealingProducts.subCategoryIds": { $in: subCategoryIds },
+    // }).populate("dealingProducts.categoryId dealingProducts.subCategoryIds");
+
+    let relevantSellers = [];
+    try {
+      const response = await axios.post(
+        `${process.env.USER_SERVICE_URL}/api/sellers-by-products`,
+        { categoryIds, subCategoryIds },
+        {
+          headers: {
+            access_token: accessToken,
+          },
+        }
+      );
+      relevantSellers = response.data.data;
+    } catch (error) {
+      console.error("Error fetching relevant sellers:", error.message);
+      // Continue with empty array if seller fetch fails
+    }
 
     // Send notifications to relevant school
 
-    await NotificationService.sendNotification(
-      "SCHOOL_QUOTE_REQUESTED",
-      [
-        {
-          id: schoolId,
-          type: "school",
-        },
-      ],
-      {
-        schoolName,
-        enquiryNumber,
-        entityId: newQuoteRequest._id,
-        entityType: "QuoteRequest",
-        senderType: "school",
-        senderId: schoolId,
-        metadata: {
-          enquiryNumber: enquiryNumber,
-          type: "quote_requested",
-        },
-      }
-    );
+    // await NotificationService.sendNotification(
+    //   "SCHOOL_QUOTE_REQUESTED",
+    //   [
+    //     {
+    //       id: schoolId,
+    //       type: "school",
+    //     },
+    //   ],
+    //   {
+    //     schoolName,
+    //     enquiryNumber,
+    //     entityId: newQuoteRequest._id,
+    //     entityType: "QuoteRequest",
+    //     senderType: "school",
+    //     senderId: schoolId,
+    //     metadata: {
+    //       enquiryNumber: enquiryNumber,
+    //       type: "quote_requested",
+    //     },
+    //   }
+    // );
 
-    // Send notifications to relevant sellers
+    // // Send notifications to relevant sellers
 
-    await NotificationService.sendNotification(
-      "SELLER_QUOTE_RECEIVED",
-      relevantSellers.map((seller) => ({
-        id: seller.sellerId.toString(),
-        type: "seller",
-      })),
-      {
-        schoolName,
-        enquiryNumber,
-        entityId: newQuoteRequest._id,
-        entityType: "QuoteRequest",
-        senderType: "school",
-        senderId: schoolId,
-        metadata: {
-          enquiryNumber: enquiryNumber,
-          type: "quote_received",
-        },
-      }
-    );
+    // await NotificationService.sendNotification(
+    //   "SELLER_QUOTE_RECEIVED",
+    //   relevantSellers.map((seller) => ({
+    //     id: seller.sellerId.toString(),
+    //     type: "seller",
+    //   })),
+    //   {
+    //     schoolName,
+    //     enquiryNumber,
+    //     entityId: newQuoteRequest._id,
+    //     entityType: "QuoteRequest",
+    //     senderType: "school",
+    //     senderId: schoolId,
+    //     metadata: {
+    //       enquiryNumber: enquiryNumber,
+    //       type: "quote_received",
+    //     },
+    //   }
+    // );
 
-    // Send notifications to edprowise
+    // // Send notifications to edprowise
 
-    const relevantEdprowise = await AdminUser.find({});
+    // const relevantEdprowise = await AdminUser.find({});
 
-    await NotificationService.sendNotification(
-      "EDPROWISE_QUOTE_REQUESTED_FROM_SCHOOL",
-      relevantEdprowise.map((admin) => ({
-        id: admin._id.toString(),
-        type: "edprowise",
-      })),
-      {
-        schoolName,
-        enquiryNumber,
-        entityId: newQuoteRequest._id,
-        entityType: "QuoteRequest",
-        senderType: "school",
-        senderId: schoolId,
-        metadata: {
-          enquiryNumber: enquiryNumber,
-          type: "quote_received",
-        },
-      }
-    );
+    // await NotificationService.sendNotification(
+    //   "EDPROWISE_QUOTE_REQUESTED_FROM_SCHOOL",
+    //   relevantEdprowise.map((admin) => ({
+    //     id: admin._id.toString(),
+    //     type: "edprowise",
+    //   })),
+    //   {
+    //     schoolName,
+    //     enquiryNumber,
+    //     entityId: newQuoteRequest._id,
+    //     entityType: "QuoteRequest",
+    //     senderType: "school",
+    //     senderId: schoolId,
+    //     metadata: {
+    //       enquiryNumber: enquiryNumber,
+    //       type: "quote_received",
+    //     },
+    //   }
+    // );
 
     await session.commitTransaction();
     session.endSession();

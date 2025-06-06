@@ -4,6 +4,8 @@ import QuoteProposal from "../../models/QuoteProposal.js";
 import SubmitQuote from "../../models/SubmitQuote.js";
 import QuoteRequest from "../../models/QuoteRequest.js";
 
+import axios from "axios";
+
 // import SellerProfile from "../../../models/SellerProfile.js";
 // import EdprowiseProfile from "../../../models/EdprowiseProfile.js";
 // import AdminUser from "../../../models/AdminUser.js";
@@ -74,6 +76,15 @@ async function create(req, res) {
       });
     }
 
+    const accessToken = req.headers["access_token"];
+
+    if (!accessToken) {
+      return res.status(401).json({
+        hasError: true,
+        message: "Access token is missing",
+      });
+    }
+
     let { enquiryNumber, products } = req.body;
 
     if (!enquiryNumber) {
@@ -105,11 +116,34 @@ async function create(req, res) {
       });
     }
 
-    const [quoteRequest, sellerProfile, edprowiseProfile] = await Promise.all([
-      QuoteRequest.findOne({ enquiryNumber }).session(session),
-      SellerProfile.findOne({ sellerId }).session(session),
-      EdprowiseProfile.findOne().session(session),
-    ]);
+    // const [quoteRequest, sellerProfile, edprowiseProfile] = await Promise.all([
+    //   QuoteRequest.findOne({ enquiryNumber }).session(session),
+    //   SellerProfile.findOne({ sellerId }).session(session),
+    //   EdprowiseProfile.findOne().session(session),
+    // ]);
+
+    const [quoteRequest, sellerResponse, edprowiseResponse] = await Promise.all(
+      [
+        // Local query
+        QuoteRequest.findOne({ enquiryNumber }).session(session),
+
+        // User-Service calls
+        axios
+          .get(
+            `${process.env.USER_SERVICE_URL}/api/required-field-from-seller-profile/${sellerId}`
+          )
+          .catch(() => ({ data: { data: null } })),
+
+        axios
+          .get(
+            `${process.env.USER_SERVICE_URL}/api/required-field-from-edprowise-profile`
+          )
+          .catch(() => ({ data: { data: null } })),
+      ]
+    );
+
+    const sellerProfile = sellerResponse.data.data;
+    const edprowiseProfile = edprowiseResponse.data.data;
 
     if (!quoteRequest || !sellerProfile || !edprowiseProfile) {
       await session.abortTransaction();
@@ -433,50 +467,49 @@ async function create(req, res) {
     session.endSession();
 
     // Send notifications after transaction is committed
-    try {
-      await NotificationService.sendNotification(
-        "SELLER_QUOTE_PREPARED",
-        [{ id: sellerId, type: "seller" }],
-        {
-          enquiryNumber: enquiryNumber,
-          quoteNumber: newQuoteProposal.quoteNumber,
-          entityId: newQuoteProposal._id,
-          entityType: "QuoteProposal",
-          senderType: "seller",
-          senderId: sellerId,
-          metadata: {
-            enquiryNumber,
-            type: "quote_prepared",
-          },
-        }
-      );
+    // try {
+    //   await NotificationService.sendNotification(
+    //     "SELLER_QUOTE_PREPARED",
+    //     [{ id: sellerId, type: "seller" }],
+    //     {
+    //       enquiryNumber: enquiryNumber,
+    //       quoteNumber: newQuoteProposal.quoteNumber,
+    //       entityId: newQuoteProposal._id,
+    //       entityType: "QuoteProposal",
+    //       senderType: "seller",
+    //       senderId: sellerId,
+    //       metadata: {
+    //         enquiryNumber,
+    //         type: "quote_prepared",
+    //       },
+    //     }
+    //   );
 
-      const relevantEdprowise = await AdminUser.find({});
+    //   const relevantEdprowise = await AdminUser.find({});
 
-      await NotificationService.sendNotification(
-        "EDPROWISE_QUOTE_RECEIVED_FROM_SELLER",
-        relevantEdprowise.map((admin) => ({
-          id: admin._id.toString(),
-          type: "edprowise",
-        })),
-        {
-          companyName: sellerProfile.companyName,
-          enquiryNumber: enquiryNumber,
-          quoteNumber: newQuoteProposal.quoteNumber,
-          entityId: newQuoteProposal._id,
-          entityType: "QuoteProposal From Seller",
-          senderType: "seller",
-          senderId: sellerId,
-          metadata: {
-            enquiryNumber,
-            type: "quote_received_from_seller",
-          },
-        }
-      );
-    } catch (notificationError) {
-      console.error("Error sending notifications:", notificationError);
-      // Don't fail the request if notifications fail
-    }
+    //   await NotificationService.sendNotification(
+    //     "EDPROWISE_QUOTE_RECEIVED_FROM_SELLER",
+    //     relevantEdprowise.map((admin) => ({
+    //       id: admin._id.toString(),
+    //       type: "edprowise",
+    //     })),
+    //     {
+    //       companyName: sellerProfile.companyName,
+    //       enquiryNumber: enquiryNumber,
+    //       quoteNumber: newQuoteProposal.quoteNumber,
+    //       entityId: newQuoteProposal._id,
+    //       entityType: "QuoteProposal From Seller",
+    //       senderType: "seller",
+    //       senderId: sellerId,
+    //       metadata: {
+    //         enquiryNumber,
+    //         type: "quote_received_from_seller",
+    //       },
+    //     }
+    //   );
+    // } catch (notificationError) {
+    //   console.error("Error sending notifications:", notificationError);
+    // }
 
     return res.status(201).json({
       hasError: false,

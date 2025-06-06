@@ -2,7 +2,7 @@ import SubmitQuote from "../../models/SubmitQuote.js";
 import QuoteRequest from "../../models/QuoteRequest.js";
 import QuoteProposal from "../../models/QuoteProposal.js";
 
-// import SellerProfile from "../../models/SellerProfile.js";
+import axios from "axios";
 
 async function getOneByEnquiryNumberAndSellerId(req, res) {
   try {
@@ -24,7 +24,21 @@ async function getOneByEnquiryNumberAndSellerId(req, res) {
       });
     }
 
-    const sellerProfile = await SellerProfile.findOne({ sellerId });
+    let companyName = null;
+    try {
+      const userServiceResponse = await axios.get(
+        `${process.env.USER_SERVICE_URL}/api/required-field-from-seller-profile/${sellerId}`,
+        {
+          params: { fields: "companyName" },
+        }
+      );
+      companyName = userServiceResponse?.data?.data?.companyName || null;
+    } catch (error) {
+      console.error(
+        "Error fetching seller company name from User Service:",
+        error.message
+      );
+    }
 
     const quoteRequest = await QuoteRequest.findOne({ enquiryNumber });
 
@@ -35,7 +49,7 @@ async function getOneByEnquiryNumberAndSellerId(req, res) {
 
     const responseData = {
       ...quote.toObject(),
-      companyName: sellerProfile ? sellerProfile.companyName : null,
+      companyName,
       buyerStatus: quoteRequest?.buyerStatus || null,
       supplierStatus: quoteRequest?.supplierStatus || null,
       edprowiseStatus: quoteRequest?.edprowiseStatus || null,

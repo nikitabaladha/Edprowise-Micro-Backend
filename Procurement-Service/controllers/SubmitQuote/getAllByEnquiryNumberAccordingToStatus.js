@@ -4,6 +4,8 @@ import QuoteProposal from "../../models/QuoteProposal.js";
 
 // import SellerProfile from "../../../models/SellerProfile.js";
 
+import axios from "axios";
+
 async function getAllByEnquiryNumberAccordingToStatus(req, res) {
   try {
     const schoolId = req.user?.schoolId;
@@ -43,9 +45,25 @@ async function getAllByEnquiryNumberAccordingToStatus(req, res) {
     const edprowiseStatus = quoteRequest?.edprowiseStatus || null;
 
     const sellerIds = quotes.map((quote) => quote.sellerId);
-    const sellerProfiles = await SellerProfile.find({
-      sellerId: { $in: sellerIds },
-    });
+
+    let sellerProfiles = [];
+    try {
+      const response = await axios.get(
+        `${process.env.USER_SERVICE_URL}/api/bulk-required-fields-from-seller-profile`,
+        {
+          params: {
+            ids: sellerIds.join(","),
+            fields: "companyName",
+          },
+        }
+      );
+      sellerProfiles = response.data?.data || [];
+    } catch (err) {
+      console.error(
+        "Error fetching seller profiles from User Service:",
+        err.message
+      );
+    }
 
     const sellerProfileMap = sellerProfiles.reduce((acc, profile) => {
       acc[profile.sellerId] = profile.companyName;

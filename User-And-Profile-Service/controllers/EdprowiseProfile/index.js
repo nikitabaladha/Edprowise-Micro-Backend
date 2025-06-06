@@ -1,5 +1,6 @@
 import create from "./create.js";
 import getById from "./getById.js";
 import updateById from "./updateById.js";
+import requiredFieldFromEdprowise from "./requiredFieldFromEdprowise.js";
 
-export { create, getById, updateById };
+export { create, getById, updateById, requiredFieldFromEdprowise };
