@@ -9,7 +9,6 @@ import {
   deleteById,
   getById,
   getSchoolsByIds,
-  requiredFieldFromSchoolProfile,
 } from "../controllers/SchoolRegistration/index.js";
 
 const router = express.Router();
@@ -23,11 +22,6 @@ router.get(
 );
 
 router.get("/get-school-by-ids", roleBasedMiddleware("Admin"), getSchoolsByIds);
-
-router.get(
-  "/required-field-from-school-profile/:schoolId",
-  requiredFieldFromSchoolProfile
-);
 
 router.put("/school/:id", upload, roleBasedMiddleware("Admin"), updateById);
 

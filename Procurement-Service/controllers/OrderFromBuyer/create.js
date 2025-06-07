@@ -7,12 +7,12 @@ import QuoteProposal from "../../models/QuoteProposal.js";
 import SubmitQuote from "../../models/SubmitQuote.js";
 
 import nodemailer from "nodemailer";
+import smtpServiceClient from "../../utils/smtpServiceClient.js";
 
 // import School from "../../../models/School.js";
 // import SellerProfile from "../../../models/SellerProfile.js";
 // import AdminUser from "../../../models/AdminUser.js";
 // import { NotificationService } from "../../../notificationService.js";
-// import SMTPEmailSetting from "../../../models/SMTPEmailSetting.js";
 
 import path from "path";
 import fs from "fs";
@@ -25,17 +25,19 @@ const __dirname = dirname(__filename);
 async function sendSchoolRequestQuoteEmail(
   schoolName,
   schoolEmail,
-  orderDetails
+  orderDetails,
+  accessToken
 ) {
   let hasError = false;
   let message = "";
 
   try {
     // 1. SMTP settings
-    const smtpSettings = await SMTPEmailSetting.findOne();
+    const smtpSettings = await smtpServiceClient.getSettings(accessToken);
+
     if (!smtpSettings) {
       console.error("SMTP settings not found");
-      return false;
+      return { hasError: true, message: "Email configuration error" };
     }
 
     // 3. Nodemailer setup
@@ -346,14 +348,17 @@ async function sendEmailsToSellers(
   sellerName,
   sellerEmail,
   schoolName,
-  orderDetails
+  orderDetails,
+  accessToken
 ) {
   try {
-    const smtpSettings = await SMTPEmailSetting.findOne();
-    if (!smtpSettings) {
-      return { hasError: true, message: "SMTP settings not found" };
-    }
+    // 1. SMTP settings
+    const smtpSettings = await smtpServiceClient.getSettings(accessToken);
 
+    if (!smtpSettings) {
+      console.error("SMTP settings not found");
+      return { hasError: true, message: "Email configuration error" };
+    }
     console.log("Setting up email transporter...");
     const transporter = nodemailer.createTransport({
       host: smtpSettings.mailHost,
@@ -822,6 +827,17 @@ async function create(req, res) {
       });
     }
 
+    const accessToken = req.headers["access_token"];
+
+    if (!accessToken) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(401).json({
+        hasError: true,
+        message: "Access token is missing",
+      });
+    }
+
     let {
       enquiryNumber,
       products,
@@ -1076,19 +1092,24 @@ async function create(req, res) {
     const schoolEmail = schoolDetail.schoolEmail;
     const schoolName = schoolDetail.schoolName;
 
-    await sendSchoolRequestQuoteEmail(schoolName, schoolEmail, {
-      orders: await Promise.all(
-        Array.from(sellerOrderNumbers.entries()).map(
-          async ([sellerId, orderNumber]) => ({
-            orderNumber,
-            seller: await SellerProfile.findById(sellerId),
-            products: orderFromBuyerEntries.filter(
-              (o) => o.sellerId.toString() === sellerId
-            ),
-          })
-        )
-      ),
-    });
+    await sendSchoolRequestQuoteEmail(
+      schoolName,
+      schoolEmail,
+      {
+        orders: await Promise.all(
+          Array.from(sellerOrderNumbers.entries()).map(
+            async ([sellerId, orderNumber]) => ({
+              orderNumber,
+              seller: await SellerProfile.findById(sellerId),
+              products: orderFromBuyerEntries.filter(
+                (o) => o.sellerId.toString() === sellerId
+              ),
+            })
+          )
+        ),
+      },
+      accessToken
+    );
 
     for (const [sellerId, orderNumber] of sellerOrderNumbers.entries()) {
       const sellerDetails = await SellerProfile.findById(sellerId);
@@ -1115,7 +1136,8 @@ async function create(req, res) {
           deliveryLandMark,
           deliveryPincode,
           expectedDeliveryDate,
-        }
+        },
+        accessToken
       );
     }
 

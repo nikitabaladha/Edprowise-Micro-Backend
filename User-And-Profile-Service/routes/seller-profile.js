@@ -12,9 +12,6 @@ import {
   getByIdForAdmin,
   deleteBySellerId,
   sellersByProducts,
-  sellerByDealingProducts,
-  requiredFieldFromSellerProfile,
-  bulkRequiredFieldsFromSellerProfile,
 } from "../controllers/SellerProfile/index.js";
 
 router.post("/seller-profile", upload, roleBasedMiddleware("Seller"), create);
@@ -37,8 +34,6 @@ router.put(
 
 router.get("/seller-profile", roleBasedMiddleware("Seller"), getById);
 
-router.get("/seller-by-dealing-products/:sellerId", sellerByDealingProducts);
-
 router.get(
   "/seller-profile-get-by-id/:sellerId",
   roleBasedMiddleware("Admin"),
@@ -46,16 +41,6 @@ router.get(
 );
 
 router.get("/seller-profile-get-all", roleBasedMiddleware("Admin"), getAll);
-
-router.get(
-  "/required-field-from-seller-profile/:sellerId",
-  requiredFieldFromSellerProfile
-);
-
-router.get(
-  "/bulk-required-fields-from-seller-profile",
-  bulkRequiredFieldsFromSellerProfile
-);
 
 router.put(
   "/seller-profile-delete/:id",

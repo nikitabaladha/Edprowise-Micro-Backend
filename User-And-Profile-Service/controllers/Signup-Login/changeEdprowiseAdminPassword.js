@@ -3,7 +3,7 @@ import saltFunction from "../../validators/saltFunction.js";
 
 import nodemailer from "nodemailer";
 
-import smtpServiceClient from "../../utils/smtpServiceClient.js";
+import smtpServiceClient from "../Inter-Service-Communication/smtpServiceClient.js";
 
 import path from "path";
 import fs from "fs";

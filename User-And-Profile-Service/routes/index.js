@@ -10,7 +10,7 @@ import EdprowiseProfileRoutes from "./edprowiseProfile.js";
 import AdminUserRoutes from "./admin.js";
 import NewAdminRoutes from "./NewAdmin.js";
 
-import CrossServiceAPI from "./cross-service-api.js";
+import InterServiceCommunication from "./inter-service-communication.js";
 
 export default (app) => {
   app.use("/api", loginSignupRoutes);
@@ -23,5 +23,5 @@ export default (app) => {
   app.use("/api", EdprowiseProfileRoutes);
   app.use("/api", AdminUserRoutes);
   app.use("/api", NewAdminRoutes);
-  app.use("/api", CrossServiceAPI);
+  app.use("/api", InterServiceCommunication);
 };

@@ -7,9 +7,6 @@ import smtpServiceClient from "../../utils/smtpServiceClient.js";
 
 import axios from "axios";
 
-// import School from "../../../models/School.js";
-// import SellerProfile from "../../../models/SellerProfile.js";
-
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -577,10 +574,6 @@ async function updateVenderStatus(req, res) {
 
       await existingQuoteRequest.save();
 
-      // const school = await School.findOne({
-      //   schoolId: existingQuoteRequest.schoolId,
-      // });
-
       let school;
       try {
         const schoolResponse = await axios.get(
@@ -643,10 +636,6 @@ async function updateVenderStatus(req, res) {
           .replace(/ /g, " ")
           .replace(",", ","),
       }));
-
-      // const sellerDetails = await SellerProfile.find({ sellerId });
-
-      // const sellerCompanyName = sellerDetails.companyName;
 
       let sellerCompanyName = null;
       try {

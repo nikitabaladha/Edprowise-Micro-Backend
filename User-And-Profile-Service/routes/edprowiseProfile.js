@@ -7,7 +7,6 @@ import {
   create,
   getById,
   updateById,
-  requiredFieldFromEdprowise,
 } from "../controllers/EdprowiseProfile/index.js";
 
 router.post("/edprowise-profile", upload, roleBasedMiddleware("Admin"), create);
@@ -21,10 +20,6 @@ router.get(
   "/edprowise-profile",
   roleBasedMiddleware("Admin", "Seller", "School"),
   getById
-);
-router.get(
-  "/required-field-from-edprowise-profile",
-  requiredFieldFromEdprowise
 );
 
 export default router;

@@ -3,7 +3,7 @@ import SellerProfileValidator from "../../validators/SellerProfile.js";
 import Seller from "../../models/Seller.js";
 
 import nodemailer from "nodemailer";
-import smtpServiceClient from "../../utils/smtpServiceClient.js";
+import smtpServiceClient from "../Inter-Service-Communication/smtpServiceClient.js";
 
 import AdminUser from "../../models/AdminUser.js";
 // import { NotificationService } from "../../notificationService.js";

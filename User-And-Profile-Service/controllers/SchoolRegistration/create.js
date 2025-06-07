@@ -2,7 +2,7 @@ import SchoolRegistration from "../../models/School.js";
 import User from "../../models/User.js";
 import SchoolRegistrationValidator from "../../validators/SchoolRegistrationValidator.js";
 import saltFunction from "../../validators/saltFunction.js";
-import smtpServiceClient from "../../utils/smtpServiceClient.js";
+import smtpServiceClient from "../Inter-Service-Communication/smtpServiceClient.js";
 
 import nodemailer from "nodemailer";
 import path from "path";

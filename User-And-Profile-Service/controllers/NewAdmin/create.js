@@ -2,7 +2,7 @@
 import AdminUser from "../../models/AdminUser.js";
 import saltFunction from "../../validators/saltFunction.js";
 import AdminAddValidationSchema from "../../validators/signupValidationSchema.js";
-import smtpServiceClient from "../../utils/smtpServiceClient.js";
+import smtpServiceClient from "../Inter-Service-Communication/smtpServiceClient.js";
 
 import nodemailer from "nodemailer";
 

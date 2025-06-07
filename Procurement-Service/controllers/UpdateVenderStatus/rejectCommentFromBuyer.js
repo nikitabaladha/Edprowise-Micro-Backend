@@ -78,91 +78,82 @@ async function rejectCommentFromBuyer(req, res) {
       });
     }
 
-    const [sellerProfile, relevantEdprowise, schoolProfile] = await Promise.all(
-      [
-        SellerProfile.findOne({ sellerId }).session(session),
-        AdminUser.find({}).session(session),
-        School.findOne({ schoolId: senderId }).session(session),
-      ]
-    );
+    // const [sellerProfile, relevantEdprowise, schoolProfile] = await Promise.all(
+    //   [
+    //     SellerProfile.findOne({ sellerId }).session(session),
+    //     AdminUser.find({}).session(session),
+    //     School.findOne({ schoolId: senderId }).session(session),
+    //   ]
+    // );
 
-    if (!sellerProfile || !schoolProfile) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(404).json({
-        hasError: true,
-        message: "Required seller or school profile not found.",
-      });
-    }
+    // try {
+    //   // Send notifications (if fails, throw to rollback)
+    //   await NotificationService.sendNotification(
+    //     "SCHOOL_REJECTED_QUOTE",
+    //     [{ id: senderId.toString(), type: "school" }],
+    //     {
+    //       companyName: sellerProfile.companyName,
+    //       quoteNumber: updatedQuoteProposal.quoteNumber,
+    //       enquiryNumber: updatedQuoteProposal.enquiryNumber,
+    //       entityId: updatedQuoteProposal._id,
+    //       entityType: "QuoteProposal Reject",
+    //       senderType: "school",
+    //       senderId: senderId,
+    //       metadata: {
+    //         enquiryNumber,
+    //         type: "quote_rejected_by_school",
+    //       },
+    //     }
+    //   );
 
-    try {
-      // Send notifications (if fails, throw to rollback)
-      await NotificationService.sendNotification(
-        "SCHOOL_REJECTED_QUOTE",
-        [{ id: senderId.toString(), type: "school" }],
-        {
-          companyName: sellerProfile.companyName,
-          quoteNumber: updatedQuoteProposal.quoteNumber,
-          enquiryNumber: updatedQuoteProposal.enquiryNumber,
-          entityId: updatedQuoteProposal._id,
-          entityType: "QuoteProposal Reject",
-          senderType: "school",
-          senderId: senderId,
-          metadata: {
-            enquiryNumber,
-            type: "quote_rejected_by_school",
-          },
-        }
-      );
+    //   await NotificationService.sendNotification(
+    //     "SELLER_RECEIVE_REJECTED_QUOTE_FROM_SCHOOL",
+    //     [{ id: sellerId.toString(), type: "seller" }],
+    //     {
+    //       companyName: sellerProfile.companyName,
+    //       schoolName: schoolProfile.schoolName,
+    //       quoteNumber: updatedQuoteProposal.quoteNumber,
+    //       enquiryNumber: updatedQuoteProposal.enquiryNumber,
+    //       entityId: updatedQuoteProposal._id,
+    //       entityType: "QuoteProposal Reject",
+    //       senderType: "school",
+    //       senderId: senderId,
+    //       metadata: {
+    //         enquiryNumber,
+    //         type: "quote_rejected_by_school",
+    //       },
+    //     }
+    //   );
 
-      await NotificationService.sendNotification(
-        "SELLER_RECEIVE_REJECTED_QUOTE_FROM_SCHOOL",
-        [{ id: sellerId.toString(), type: "seller" }],
-        {
-          companyName: sellerProfile.companyName,
-          schoolName: schoolProfile.schoolName,
-          quoteNumber: updatedQuoteProposal.quoteNumber,
-          enquiryNumber: updatedQuoteProposal.enquiryNumber,
-          entityId: updatedQuoteProposal._id,
-          entityType: "QuoteProposal Reject",
-          senderType: "school",
-          senderId: senderId,
-          metadata: {
-            enquiryNumber,
-            type: "quote_rejected_by_school",
-          },
-        }
-      );
-
-      await NotificationService.sendNotification(
-        "EDPROWISE_RECEIVE_REJECTED_QUOTE_FROM_SCHOOL",
-        relevantEdprowise.map((admin) => ({
-          id: admin._id.toString(),
-          type: "edprowise",
-        })),
-        {
-          companyName: sellerProfile.companyName,
-          schoolName: schoolProfile.schoolName,
-          quoteNumber: updatedQuoteProposal.quoteNumber,
-          enquiryNumber: updatedQuoteProposal.enquiryNumber,
-          entityId: updatedQuoteProposal._id,
-          entityType: "QuoteProposal Reject",
-          senderType: "school",
-          senderId: senderId,
-          metadata: {
-            enquiryNumber,
-            type: "quote_rejected_by_school",
-          },
-        }
-      );
-    } catch (notificationError) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(500).json({
-        hasError: true,
-        message: "Notification sending failed: " + notificationError.message,
-      });
-    }
+    //   await NotificationService.sendNotification(
+    //     "EDPROWISE_RECEIVE_REJECTED_QUOTE_FROM_SCHOOL",
+    //     relevantEdprowise.map((admin) => ({
+    //       id: admin._id.toString(),
+    //       type: "edprowise",
+    //     })),
+    //     {
+    //       companyName: sellerProfile.companyName,
+    //       schoolName: schoolProfile.schoolName,
+    //       quoteNumber: updatedQuoteProposal.quoteNumber,
+    //       enquiryNumber: updatedQuoteProposal.enquiryNumber,
+    //       entityId: updatedQuoteProposal._id,
+    //       entityType: "QuoteProposal Reject",
+    //       senderType: "school",
+    //       senderId: senderId,
+    //       metadata: {
+    //         enquiryNumber,
+    //         type: "quote_rejected_by_school",
+    //       },
+    //     }
+    //   );
+    // } catch (notificationError) {
+    //   await session.abortTransaction();
+    //   session.endSession();
+    //   return res.status(500).json({
+    //     hasError: true,
+    //     message: "Notification sending failed: " + notificationError.message,
+    //   });
+    // }
 
     await session.commitTransaction();
     session.endSession();
