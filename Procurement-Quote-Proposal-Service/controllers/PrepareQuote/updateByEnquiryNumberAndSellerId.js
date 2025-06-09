@@ -46,17 +46,18 @@ async function updateSingleProduct(req, res) {
       });
     }
 
-    // Fetch location data for all parties
-    // const [quoteRequest, sellerProfile, edprowiseProfile] = await Promise.all([
-    //   QuoteRequest.findOne({ enquiryNumber }),
-    //   SellerProfile.findOne({ sellerId }),
-    //   EdprowiseProfile.findOne(),
-    // ]);
+    const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
 
-    const [quoteRequest, sellerResponse, edprowiseResponse] = await Promise.all(
-      [
-        // Local query
-        QuoteRequest.findOne({ enquiryNumber }),
+    const [quoteRequestResponse, sellerResponse, edprowiseResponse] =
+      await Promise.all([
+        axios
+          .get(
+            `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}`,
+            {
+              params: { fields: "deliveryState, schoolId" },
+            }
+          )
+          .catch(() => ({ data: { data: null } })),
 
         // User-Service calls
         axios
@@ -70,11 +71,11 @@ async function updateSingleProduct(req, res) {
             `${process.env.USER_SERVICE_URL}/api/required-field-from-edprowise-profile`
           )
           .catch(() => ({ data: { data: null } })),
-      ]
-    );
+      ]);
 
     const sellerProfile = sellerResponse.data.data;
     const edprowiseProfile = edprowiseResponse.data.data;
+    const quoteRequest = quoteRequestResponse?.data?.data;
 
     if (!quoteRequest || !sellerProfile || !edprowiseProfile) {
       return res.status(404).json({

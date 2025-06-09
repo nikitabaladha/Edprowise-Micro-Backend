@@ -1,10 +1,11 @@
+import axios from "axios";
+
 import Product from "../../models/Product.js";
 import QuoteRequest from "../../models/QuoteRequest.js";
 
 async function getByEnquiryNumber(req, res) {
   try {
     const { enquiryNumber } = req.params;
-
     const quoteRequest = await QuoteRequest.findOne({ enquiryNumber });
 
     if (!quoteRequest) {
@@ -14,37 +15,72 @@ async function getByEnquiryNumber(req, res) {
       });
     }
 
-    const products = await Product.find({ enquiryNumber })
-      .populate("categoryId", "categoryName")
-      .populate("subCategoryId", "subCategoryName");
+    const products = await Product.find({ enquiryNumber });
 
-    const formattedProducts = products.map((product) => ({
-      id: product._id,
-      schoolId: product.schoolId,
-      categoryId: product.categoryId?._id || null,
-      categoryName: product.categoryId?.categoryName || null,
-      subCategoryId: product.subCategoryId?._id || null,
-      subCategoryName: product.subCategoryId?.subCategoryName || null,
-      description: product.description,
-      productImages: product.productImages || [],
-      unit: product.unit,
-      quantity: product.quantity,
-      enquiryNumber: product.enquiryNumber,
+    const formattedProducts = [];
 
-      // quote request table data
+    for (const product of products) {
+      let categoryName = null;
+      let subCategoryName = null;
 
-      quoteRequestId: quoteRequest._id,
-      deliveryAddress: quoteRequest.deliveryAddress,
-      deliveryLocation: quoteRequest.deliveryLocation,
-      deliveryLandMark: quoteRequest.deliveryLandMark,
-      deliveryPincode: quoteRequest.deliveryPincode,
-      expectedDeliveryDate: quoteRequest.expectedDeliveryDate,
-      buyerStatus: quoteRequest.buyerStatus,
-      supplierStatus: quoteRequest.supplierStatus,
-      edprowiseStatus: quoteRequest.edprowiseStatus,
-      createdAt: quoteRequest.createdAt,
-      updatedAt: quoteRequest.updatedAt,
-    }));
+      // Fetch category name
+      if (product.categoryId) {
+        try {
+          const categoryResponse = await axios.get(
+            `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/categories/${product.categoryId}`
+          );
+          categoryName = categoryResponse.data.data?.categoryName || null;
+        } catch (error) {
+          console.error(
+            `Error fetching category for ${product.categoryId}:`,
+            error.message
+          );
+        }
+      }
+
+      // Fetch subcategory name
+      if (product.subCategoryId) {
+        try {
+          const subCategoryResponse = await axios.get(
+            `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/subcategories?ids=${product.subCategoryId}`
+          );
+          subCategoryName =
+            subCategoryResponse.data.data?.[0]?.subCategoryName || null;
+        } catch (error) {
+          console.error(
+            `Error fetching subcategory for ${product.subCategoryId}:`,
+            error.message
+          );
+        }
+      }
+
+      formattedProducts.push({
+        id: product._id,
+        schoolId: product.schoolId,
+        categoryId: product.categoryId || null,
+        categoryName,
+        subCategoryId: product.subCategoryId || null,
+        subCategoryName,
+        description: product.description,
+        productImages: product.productImages || [],
+        unit: product.unit,
+        quantity: product.quantity,
+        enquiryNumber: product.enquiryNumber,
+
+        // quote request table data
+        quoteRequestId: quoteRequest._id,
+        deliveryAddress: quoteRequest.deliveryAddress,
+        deliveryLocation: quoteRequest.deliveryLocation,
+        deliveryLandMark: quoteRequest.deliveryLandMark,
+        deliveryPincode: quoteRequest.deliveryPincode,
+        expectedDeliveryDate: quoteRequest.expectedDeliveryDate,
+        buyerStatus: quoteRequest.buyerStatus,
+        supplierStatus: quoteRequest.supplierStatus,
+        edprowiseStatus: quoteRequest.edprowiseStatus,
+        createdAt: quoteRequest.createdAt,
+        updatedAt: quoteRequest.updatedAt,
+      });
+    }
 
     return res.status(200).json({
       hasError: false,

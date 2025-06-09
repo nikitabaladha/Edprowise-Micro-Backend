@@ -53,27 +53,24 @@ async function updateDeliveryCharges(req, res) {
       });
     }
 
-    // Fetch all required data in parallel
-    // const [
-    //   quoteRequest,
-    //   sellerProfile,
-    //   edprowiseProfile,
-    //   existingQuoteProposal,
-    // ] = await Promise.all([
-    //   QuoteRequest.findOne({ enquiryNumber }).session(session),
-    //   SellerProfile.findOne({ sellerId }).session(session),
-    //   EdprowiseProfile.findOne().session(session),
-    //   QuoteProposal.findOne({ enquiryNumber, sellerId }).session(session),
-    // ]);
+    const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
 
     const [
-      quoteRequest,
+      quoteRequestResponse,
       sellerResponse,
       edprowiseResponse,
       existingQuoteProposal,
     ] = await Promise.all([
       // Local query
-      QuoteRequest.findOne({ enquiryNumber }).session(session),
+
+      axios
+        .get(
+          `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}`,
+          {
+            params: { fields: "deliveryState,schoolId" },
+          }
+        )
+        .catch(() => ({ data: { data: null } })),
 
       // User-Service calls
       axios
@@ -91,6 +88,7 @@ async function updateDeliveryCharges(req, res) {
       QuoteProposal.findOne({ enquiryNumber, sellerId }).session(session),
     ]);
 
+    const quoteRequest = quoteRequestResponse?.data?.data;
     const sellerProfile = sellerResponse.data.data;
     const edprowiseProfile = edprowiseResponse.data.data;
 

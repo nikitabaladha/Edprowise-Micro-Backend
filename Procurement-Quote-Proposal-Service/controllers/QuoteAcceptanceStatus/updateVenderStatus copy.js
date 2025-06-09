@@ -525,6 +525,8 @@ async function updateVenderStatus(req, res) {
     const accessToken = req.headers["access_token"];
 
     if (!accessToken) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(401).json({
         hasError: true,
         message: "Access token is missing",
@@ -542,7 +544,6 @@ async function updateVenderStatus(req, res) {
       });
     }
 
-    // 1. Check existing quote (local service)
     const existingQuote = await SubmitQuote.findOne({
       enquiryNumber,
       sellerId,
@@ -555,22 +556,9 @@ async function updateVenderStatus(req, res) {
       });
     }
 
-    // 2. Fetch quote request from external service
-    let existingQuoteRequest;
-    try {
-      const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
-      const response = await axios.get(
-        `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}`
-      );
-      existingQuoteRequest = response.data.data;
-    } catch (error) {
-      console.error("Error fetching quote request:", error.message);
-      return res.status(error.response?.status || 500).json({
-        hasError: true,
-        message: "Failed to fetch quote request",
-        error: error.message,
-      });
-    }
+    const existingQuoteRequest = await QuoteRequest.findOne({
+      enquiryNumber,
+    });
 
     if (!existingQuoteRequest) {
       return res.status(404).json({
@@ -579,47 +567,30 @@ async function updateVenderStatus(req, res) {
       });
     }
 
-    // 3. Update local quote status
     existingQuote.venderStatus = venderStatus;
     await existingQuote.save();
 
     if (venderStatus === "Quote Accepted") {
-      // 4. Update quote request status in external service
-      try {
-        const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
-        await axios.put(
-          `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}/status`,
-          { buyerStatus: "Quote Received", edprowiseStatus: "Quote Accepted" }
-        );
-      } catch (error) {
-        console.error("Error updating quote request status:", {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status,
-          config: error.config,
-        });
-        return res.status(error.response?.status || 500).json({
-          hasError: true,
-          message: "Failed to update quote request status",
-          error: error.message,
-        });
-      }
+      existingQuoteRequest.buyerStatus = "Quote Received";
 
-      // Rest of your existing code for sending emails remains the same...
+      await existingQuoteRequest.save();
+
       let school;
       try {
         const schoolResponse = await axios.get(
           `${process.env.USER_SERVICE_URL}/api/required-field-from-school-profile/${existingQuoteRequest.schoolId}`,
           {
             params: { fields: "schoolName,schoolId,schoolEmail" },
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
           }
         );
         school = schoolResponse?.data?.data;
       } catch (err) {
-        console.error("Error fetching School profile:", err.message);
+        console.error("Error fetching School profile:", {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status,
+          config: err.config,
+        });
         return res.status(err.response?.status || 500).json({
           hasError: true,
           message: "Failed to fetch school profile",
@@ -673,14 +644,16 @@ async function updateVenderStatus(req, res) {
           `${process.env.USER_SERVICE_URL}/api/required-field-from-seller-profile/${sellerId}`,
           {
             params: { fields: "companyName" },
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
           }
         );
         sellerCompanyName = sellerResponse?.data?.data?.companyName || null;
       } catch (err) {
-        console.error("Error fetching seller profile:", err.message);
+        console.error("Error fetching seller profile:", {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status,
+          config: err.config,
+        });
         return res.status(err.response?.status || 500).json({
           hasError: true,
           message: "Failed to fetch seller profile",
@@ -702,7 +675,6 @@ async function updateVenderStatus(req, res) {
         accessToken
       );
     }
-
     return res.status(200).json({
       hasError: false,
       message: "Quote status updated successfully.",

@@ -1,7 +1,7 @@
 import axios from "axios";
 
-import PrepareQuote from "../../models/PrepareQuote.js";
 import PrepareQuoteValidator from "../../validators/PrepareQuote.js";
+import PrepareQuote from "../../models/PrepareQuote.js";
 import QuoteProposal from "../../models/QuoteProposal.js";
 import SubmitQuote from "../../models/SubmitQuote.js";
 
@@ -10,6 +10,7 @@ import SubmitQuote from "../../models/SubmitQuote.js";
 // import SellerProfile from "../../../models/SellerProfile.js";
 // import EdprowiseProfile from "../../../models/EdprowiseProfile.js";
 // import AdminUser from "../../../models/AdminUser.js";
+
 // import { NotificationService } from "../../../notificationService.js";
 
 import mongoose from "mongoose";
@@ -117,25 +118,43 @@ async function create(req, res) {
       });
     }
 
-    const [quoteRequest, sellerResponse, edprowiseResponse] = await Promise.all(
-      [
-        // Local query
-        QuoteRequest.findOne({ enquiryNumber }).session(session),
+    let quoteRequest;
+    try {
+      const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
+      const response = await axios.get(
+        `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}`
+      );
+      quoteRequest = response.data.data;
+    } catch (error) {
+      console.error("Error fetching quote request:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: error.config,
+      });
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(error.response?.status || 500).json({
+        hasError: true,
+        message: "Failed to fetch quote request",
+        error: error.message,
+      });
+    }
 
-        // User-Service calls
-        axios
-          .get(
-            `${process.env.USER_SERVICE_URL}/api/required-field-from-seller-profile/${sellerId}`
-          )
-          .catch(() => ({ data: { data: null } })),
+    const [sellerResponse, edprowiseResponse] = await Promise.all([
+      // User-Service calls
+      axios
+        .get(
+          `${process.env.USER_SERVICE_URL}/api/required-field-from-seller-profile/${sellerId}`
+        )
+        .catch(() => ({ data: { data: null } })),
 
-        axios
-          .get(
-            `${process.env.USER_SERVICE_URL}/api/required-field-from-edprowise-profile`
-          )
-          .catch(() => ({ data: { data: null } })),
-      ]
-    );
+      axios
+        .get(
+          `${process.env.USER_SERVICE_URL}/api/required-field-from-edprowise-profile`
+        )
+        .catch(() => ({ data: { data: null } })),
+    ]);
 
     const sellerProfile = sellerResponse.data.data;
     const edprowiseProfile = edprowiseResponse.data.data;
@@ -432,18 +451,25 @@ async function create(req, res) {
 
     await newQuoteProposal.save({ session });
 
-    const updatedQuoteRequest = await QuoteRequest.findOneAndUpdate(
-      { enquiryNumber },
-      { edprowiseStatus: "Quote Received" },
-      { new: true, session }
-    );
-
-    if (!updatedQuoteRequest) {
+    try {
+      const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
+      await axios.put(
+        `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}/status`,
+        { edprowiseStatus: "Quote Received" }
+      );
+    } catch (error) {
+      console.error("Error updating quote request status:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: error.config,
+      });
       await session.abortTransaction();
       session.endSession();
-      return res.status(404).json({
+      return res.status(error.response?.status || 500).json({
         hasError: true,
-        message: "Quote request not found with the given enquiry number.",
+        message: "Failed to update quote request status",
+        error: error.message,
       });
     }
 

@@ -1,3 +1,3 @@
-import smtpServiceClient from "./smtpServiceClient.js";
+import getOrderFromBuyerByEnquiryNumbers from "./getOrderFromBuyerByEnquiryNumbers.js";
 
-export { smtpServiceClient };
+export { getOrderFromBuyerByEnquiryNumbers };

@@ -17,12 +17,12 @@ const ProductSchema = new mongoose.Schema(
     enquiryNumber: { type: String },
     categoryId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Category",
+      // ref: "Category",
       required: true,
     },
     subCategoryId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "SubCategory",
+      // ref: "SubCategory",
       required: true,
     },
     description: { type: String },

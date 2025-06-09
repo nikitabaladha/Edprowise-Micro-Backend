@@ -1,3 +1,4 @@
-import smtpServiceClient from "./smtpServiceClient.js";
+import getQuoteRequestByEnquiryNumber from "./getQuoteRequestByEnquiryNumber.js";
+import updateQuoteRequestStatus from "./updateQuoteRequestStatus.js";
 
-export { smtpServiceClient };
+export { getQuoteRequestByEnquiryNumber, updateQuoteRequestStatus };

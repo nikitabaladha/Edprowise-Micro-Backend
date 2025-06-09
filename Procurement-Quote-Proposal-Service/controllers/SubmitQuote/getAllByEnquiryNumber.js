@@ -3,10 +3,6 @@ import axios from "axios";
 import SubmitQuote from "../../models/SubmitQuote.js";
 import QuoteProposal from "../../models/QuoteProposal.js";
 
-// import SellerProfile from "../../../models/SellerProfile.js";
-
-// import QuoteRequest from "../../models/QuoteRequest.js";
-
 async function getAllByEnquiryNumber(req, res) {
   try {
     const { enquiryNumber } = req.params;
@@ -27,11 +23,26 @@ async function getAllByEnquiryNumber(req, res) {
       });
     }
 
-    const quoteRequest = await QuoteRequest.findOne({ enquiryNumber });
+    let quoteRequestData = null;
+    try {
+      const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
+      const response = await axios.get(
+        `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}`,
+        {
+          params: { fields: "buyerStatus,supplierStatus,edprowiseStatus" },
+        }
+      );
+      quoteRequestData = response.data?.data || null;
+    } catch (error) {
+      console.error(
+        "Error fetching quote request from quote-request service:",
+        error.message
+      );
+    }
 
-    const buyerStatus = quoteRequest?.buyerStatus || null;
+    const buyerStatus = quoteRequestData?.buyerStatus || null;
 
-    const edprowiseStatus = quoteRequest?.edprowiseStatus || null;
+    const edprowiseStatus = quoteRequestData?.edprowiseStatus || null;
 
     const sellerIds = quotes.map((quote) => quote.sellerId);
 

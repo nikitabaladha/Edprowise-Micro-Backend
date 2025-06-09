@@ -1,4 +1,4 @@
-import Category from "../../../models/Category.js";
+import Category from "../../models/Category.js";
 
 async function getCategoryById(req, res) {
   try {
@@ -9,7 +9,7 @@ async function getCategoryById(req, res) {
         .status(404)
         .json({ hasError: true, message: "Category not found" });
     }
-    return res.json({ hasError: false, data: category });
+    return res.status(201).json({ hasError: false, data: category });
   } catch (error) {
     return res.status(500).json({ hasError: true, message: "Server error" });
   }

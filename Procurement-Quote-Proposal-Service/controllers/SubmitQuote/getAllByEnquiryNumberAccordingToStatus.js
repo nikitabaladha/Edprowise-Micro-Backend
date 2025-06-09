@@ -40,11 +40,25 @@ async function getAllByEnquiryNumberAccordingToStatus(req, res) {
       });
     }
 
-    const quoteRequest = await QuoteRequest.findOne({ enquiryNumber });
+    let quoteRequestData = null;
+    try {
+      const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
+      const response = await axios.get(
+        `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}`,
+        {
+          params: { fields: "buyerStatus,supplierStatus,edprowiseStatus" },
+        }
+      );
+      quoteRequestData = response.data?.data || null;
+    } catch (error) {
+      console.error(
+        "Error fetching quote request from quote-request service:",
+        error.message
+      );
+    }
 
-    const buyerStatus = quoteRequest?.buyerStatus || null;
-    const edprowiseStatus = quoteRequest?.edprowiseStatus || null;
-
+    const buyerStatus = quoteRequestData?.buyerStatus || null;
+    const edprowiseStatus = quoteRequestData?.edprowiseStatus || null;
     const sellerIds = quotes.map((quote) => quote.sellerId);
 
     let sellerProfiles = [];

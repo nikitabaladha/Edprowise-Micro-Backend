@@ -41,7 +41,22 @@ async function getOneByEnquiryNumberAndSellerId(req, res) {
       );
     }
 
-    const quoteRequest = await QuoteRequest.findOne({ enquiryNumber });
+    let quoteRequestData = null;
+    try {
+      const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
+      const response = await axios.get(
+        `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}`,
+        {
+          params: { fields: "buyerStatus,supplierStatus,edprowiseStatus" },
+        }
+      );
+      quoteRequestData = response.data?.data || null;
+    } catch (error) {
+      console.error(
+        "Error fetching quote request from quote-request service:",
+        error.message
+      );
+    }
 
     const quoteProposal = await QuoteProposal.findOne({
       enquiryNumber,
@@ -51,9 +66,9 @@ async function getOneByEnquiryNumberAndSellerId(req, res) {
     const responseData = {
       ...quote.toObject(),
       companyName,
-      buyerStatus: quoteRequest?.buyerStatus || null,
-      supplierStatus: quoteRequest?.supplierStatus || null,
-      edprowiseStatus: quoteRequest?.edprowiseStatus || null,
+      buyerStatus: quoteRequestData?.buyerStatus || null,
+      supplierStatus: quoteRequestData?.supplierStatus || null,
+      edprowiseStatus: quoteRequestData?.edprowiseStatus || null,
       quoteNumber: quoteProposal?.quoteNumber || null,
     };
 

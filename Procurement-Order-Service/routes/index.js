@@ -6,6 +6,8 @@ import UpdateTDSRoutes from "./update-tds.js";
 import CancelOrder from "./order-cancel.js";
 import FeedBackAndRating from "./feedback-and-rating.js";
 
+import InterServiceCommunication from "./inter-service-communication.js";
+
 export default (app) => {
   app.use("/api", UpdateVenderStatusRoutes);
   app.use("/api", OrderFromBuyerRoutes);
@@ -14,4 +16,6 @@ export default (app) => {
   app.use("/api", UpdateTDSRoutes);
   app.use("/api", CancelOrder);
   app.use("/api", FeedBackAndRating);
+
+  app.use("/api", InterServiceCommunication);
 };

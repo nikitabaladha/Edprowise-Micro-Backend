@@ -44,7 +44,7 @@ async function getByIdForAdmin(req, res) {
             // Fetch category name with auth header
 
             const categoryRes = await axios.get(
-              `${process.env.PROCUREMENT_SERVICE_URL}/api/categories/${product.categoryId}`
+              `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/categories/${product.categoryId}`
             );
 
             if (!categoryRes.data.hasError && categoryRes.data.data) {
@@ -58,7 +58,7 @@ async function getByIdForAdmin(req, res) {
                 .join(",");
 
               const subRes = await axios.get(
-                `${process.env.PROCUREMENT_SERVICE_URL}/api/subcategories?ids=${subIds}`
+                `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/subcategories?ids=${subIds}`
               );
 
               if (!subRes.data.hasError && subRes.data.data) {
@@ -79,7 +79,7 @@ async function getByIdForAdmin(req, res) {
 
     try {
       const response = await axios.get(
-        `${process.env.PROCUREMENT_SERVICE_URL}/api/quote-proposal-by-seller-id/${sellerId}?include=ratings`
+        `${process.env.PROCUREMENT_QUOTE_PROPOSAL_SERVICE_URL}/api/quote-proposal-by-seller-id/${sellerId}?include=ratings`
       );
 
       if (!response.data.hasError && response.data.data) {

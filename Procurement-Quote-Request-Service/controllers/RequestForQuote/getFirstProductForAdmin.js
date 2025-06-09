@@ -1,6 +1,8 @@
 import QuoteRequest from "../../models/QuoteRequest.js";
 import Product from "../../models/Product.js";
 
+import axios from "axios";
+
 async function getFirstProductForAdmin(req, res) {
   try {
     const quoteRequests = await QuoteRequest.find().sort({ createdAt: -1 });
@@ -9,10 +11,32 @@ async function getFirstProductForAdmin(req, res) {
       quoteRequests.map(async (quote) => {
         const product = await Product.findOne({
           enquiryNumber: quote.enquiryNumber,
-        })
-          .populate("categoryId", "categoryName")
-          .populate("subCategoryId", "subCategoryName")
-          .exec();
+        }).exec();
+
+        let categoryData = null;
+        let subCategoryData = null;
+
+        if (product?.categoryId) {
+          try {
+            const categoryRes = await axios.get(
+              `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/categories/${product.categoryId}`
+            );
+            categoryData = categoryRes.data?.data || null;
+          } catch (err) {
+            console.error("Failed to fetch category:", err.message);
+          }
+        }
+
+        if (product?.subCategoryId) {
+          try {
+            const subCategoryRes = await axios.get(
+              `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/subcategories/?ids=${product.subCategoryId}`
+            );
+            subCategoryData = subCategoryRes.data?.data?.[0] || null;
+          } catch (err) {
+            console.error("Failed to fetch subcategory:", err.message);
+          }
+        }
 
         return {
           id: quote._id,
@@ -28,12 +52,12 @@ async function getFirstProductForAdmin(req, res) {
           edprowiseStatus: quote.edprowiseStatus,
           createdAt: quote.createdAt,
           updatedAt: quote.updatedAt,
-          categoryId: product?.categoryId?._id || null,
-          categoryName: product?.categoryId?.categoryName || null,
-          subCategoryId: product?.subCategoryId?._id || null,
-          subCategoryName: product?.subCategoryId?.subCategoryName || null,
+          categoryId: product?.categoryId || null,
+          categoryName: categoryData?.categoryName || null,
+          subCategoryId: product?.subCategoryId || null,
+          subCategoryName: subCategoryData?.subCategoryName || null,
           description: product?.description || null,
-          productImages: product.productImages || [],
+          productImages: product?.productImages || [],
           unit: product?.unit || null,
           quantity: product?.quantity || null,
           productEnquiryNumber: product?.enquiryNumber || null,

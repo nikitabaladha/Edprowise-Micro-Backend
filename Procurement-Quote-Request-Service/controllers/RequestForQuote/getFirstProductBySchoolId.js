@@ -1,6 +1,8 @@
 import QuoteRequest from "../../models/QuoteRequest.js";
 import Product from "../../models/Product.js";
 
+import axios from "axios";
+
 async function getBySchoolId(req, res) {
   const schoolId = req.user?.schoolId;
 
@@ -21,13 +23,41 @@ async function getBySchoolId(req, res) {
       quoteRequests.map(async (quote) => {
         const products = await Product.find({
           enquiryNumber: quote.enquiryNumber,
-        })
-          .populate("categoryId", "categoryName")
-          .populate("subCategoryId", "subCategoryName")
-          .exec();
+        }).exec();
 
         // Get only the first product if available
         const firstProduct = products.length > 0 ? products[0] : null;
+
+        let categoryName = null;
+        let subCategoryName = null;
+
+        if (firstProduct) {
+          try {
+            // Fetch category data
+            if (firstProduct.categoryId) {
+              const categoryResponse = await axios.get(
+                `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/categories/${firstProduct.categoryId}`
+              );
+              categoryName = categoryResponse.data.data?.categoryName || null;
+            }
+
+            // Fetch subcategory data
+            if (firstProduct.subCategoryId) {
+              const subCategoryResponse = await axios.get(
+                `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/subcategories?ids=${firstProduct.subCategoryId}`
+              );
+              subCategoryName =
+                subCategoryResponse.data.data?.[0]?.subCategoryName || null;
+            }
+          } catch (error) {
+            console.error("Error fetching category/subcategory data:", {
+              message: error.message,
+              response: error.response?.data,
+              status: error.response?.status,
+              config: error.config,
+            });
+          }
+        }
 
         return {
           id: quote._id,
@@ -44,14 +74,10 @@ async function getBySchoolId(req, res) {
           createdAt: quote.createdAt,
           updatedAt: quote.updatedAt,
           // product fields
-          categoryId: firstProduct ? firstProduct.categoryId._id : null,
-          categoryName: firstProduct
-            ? firstProduct.categoryId.categoryName
-            : null,
-          subCategoryId: firstProduct ? firstProduct.subCategoryId._id : null,
-          subCategoryName: firstProduct
-            ? firstProduct.subCategoryId.subCategoryName
-            : null,
+          categoryId: firstProduct ? firstProduct.categoryId : null,
+          categoryName: categoryName,
+          subCategoryId: firstProduct ? firstProduct.subCategoryId : null,
+          subCategoryName: subCategoryName,
           description: firstProduct ? firstProduct.description : null,
           productImages: firstProduct ? firstProduct.productImages : [],
           unit: firstProduct ? firstProduct.unit : null,

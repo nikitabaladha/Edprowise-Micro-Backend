@@ -8,7 +8,6 @@ import getAllCategory from "./Category/getAll.js";
 import getAllCategoryByMainCategoryId from "./Category/getByMainCategoryId.js";
 import updateCategory from "./Category/updateByMainCategoryId.js";
 import deleteCategory from "./Category/deleteCategory.js";
-import getCategoryById from "./Category/getCategoryById.js";
 
 import createSubCategory from "./SubCategory/create.js";
 import createWithoutIds from "./SubCategory/createWithoutIds.js";
@@ -18,7 +17,6 @@ import getAllSubcategory from "./SubCategory/getAll.js";
 import updateSubCategory from "./SubCategory/updateSubCategory.js";
 import deleteSubCategory from "./SubCategory/deleteSubCategory.js";
 import updateWithoutIds from "./SubCategory/updateWithoutIds.js";
-import getSubCategoriesByIds from "./SubCategory/getSubCategoriesByIds.js";
 
 export {
   createMainCategory,
@@ -38,6 +36,4 @@ export {
   updateSubCategory,
   deleteSubCategory,
   updateWithoutIds,
-  getCategoryById,
-  getSubCategoriesByIds,
 };

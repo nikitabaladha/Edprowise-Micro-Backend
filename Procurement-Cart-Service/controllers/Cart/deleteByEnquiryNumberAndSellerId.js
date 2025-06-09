@@ -1,6 +1,5 @@
+import axios from "axios";
 import Cart from "../../models/Cart.js";
-
-// import SubmitQuote from "../../models/SubmitQuote.js";
 
 async function deleteByEnquiryNumberAndSellerId(req, res) {
   try {
@@ -39,10 +38,22 @@ async function deleteByEnquiryNumberAndSellerId(req, res) {
       });
     }
 
-    await SubmitQuote.updateOne(
-      { enquiryNumber, sellerId },
-      { venderStatusFromBuyer: "Pending" }
-    );
+    try {
+      await axios.put(
+        `${process.env.PROCUREMENT_QUOTE_PROPOSAL_SERVICE_URL}/api/update-submitquote-by-status`,
+        { venderStatusFromBuyer: "Pending" },
+        {
+          params: { enquiryNumber, sellerId },
+        }
+      );
+    } catch (err) {
+      console.error("Failed to update SubmitQuote:", err.message);
+      return res.status(500).json({
+        hasError: true,
+        message:
+          "Failed to update submit quote status in quote-proposal-service",
+      });
+    }
 
     return res.status(200).json({
       hasError: false,

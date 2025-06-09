@@ -1009,25 +1009,58 @@ async function create(req, res) {
     const schoolEmail = schoolDetail.schoolEmail;
     const schoolName = schoolDetail.schoolName;
 
+    // const enrichedProducts = await Promise.all(
+    //   createdEntries.map(async (product) => {
+    //     const category = await Category.findById(product.categoryId)
+    //       .lean()
+    //       .session(session);
+
+    //     const subCategory = await SubCategory.findById(product.subCategoryId)
+    //       .lean()
+    //       .session(session);
+
+    //     return {
+    //       ...product.toObject(),
+    //       categoryName: category?.categoryName || "Unknown Category",
+    //       subCategoryName:
+    //         subCategory?.subCategoryName || "Unknown SubCategory",
+    //     };
+    //   })
+    // );
+
     const enrichedProducts = await Promise.all(
       createdEntries.map(async (product) => {
-        const category = await Category.findById(product.categoryId)
-          .lean()
-          .session(session);
+        try {
+          // Fetch category from procurement-category service
+          const categoryResponse = await axios.get(
+            `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/categories/${product.categoryId}`
+          );
 
-        const subCategory = await SubCategory.findById(product.subCategoryId)
-          .lean()
-          .session(session);
+          // Fetch subcategory using the batch endpoint (more efficient)
+          const subCategoryResponse = await axios.get(
+            `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/subcategories?ids=${product.subCategoryId}`
+          );
 
-        return {
-          ...product.toObject(),
-          categoryName: category?.categoryName || "Unknown Category",
-          subCategoryName:
-            subCategory?.subCategoryName || "Unknown SubCategory",
-        };
+          // Since your batch endpoint returns an array, we take the first (and only) item
+          const subCategory = subCategoryResponse.data.data?.[0] || {};
+
+          return {
+            ...product.toObject(),
+            categoryName:
+              categoryResponse.data.data?.categoryName || "Unknown Category",
+            subCategoryName:
+              subCategory.subCategoryName || "Unknown SubCategory",
+          };
+        } catch (error) {
+          console.error("Error fetching category/subcategory:", error.message);
+          return {
+            ...product.toObject(),
+            categoryName: "Unknown Category",
+            subCategoryName: "Unknown SubCategory",
+          };
+        }
       })
     );
-
     await sendSchoolRequestQuoteEmail(
       schoolName,
       schoolEmail,
@@ -1053,11 +1086,6 @@ async function create(req, res) {
     const subCategoryIds = [
       ...new Set(products.flatMap((p) => p.subCategoryId)),
     ];
-
-    // const relevantSellers = await SellerProfile.find({
-    //   "dealingProducts.categoryId": { $in: categoryIds },
-    //   "dealingProducts.subCategoryIds": { $in: subCategoryIds },
-    // }).populate("dealingProducts.categoryId dealingProducts.subCategoryIds");
 
     let relevantSellers = [];
     try {
