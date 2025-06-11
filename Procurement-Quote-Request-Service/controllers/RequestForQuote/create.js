@@ -1009,25 +1009,6 @@ async function create(req, res) {
     const schoolEmail = schoolDetail.schoolEmail;
     const schoolName = schoolDetail.schoolName;
 
-    // const enrichedProducts = await Promise.all(
-    //   createdEntries.map(async (product) => {
-    //     const category = await Category.findById(product.categoryId)
-    //       .lean()
-    //       .session(session);
-
-    //     const subCategory = await SubCategory.findById(product.subCategoryId)
-    //       .lean()
-    //       .session(session);
-
-    //     return {
-    //       ...product.toObject(),
-    //       categoryName: category?.categoryName || "Unknown Category",
-    //       subCategoryName:
-    //         subCategory?.subCategoryName || "Unknown SubCategory",
-    //     };
-    //   })
-    // );
-
     const enrichedProducts = await Promise.all(
       createdEntries.map(async (product) => {
         try {

@@ -1,8 +1,13 @@
-// import QuoteProposal from "../../models/QuoteProposal.js";
-// import SubmitQuote from "../../models/SubmitQuote.js";
 import OrderDetailsFromSeller from "../../models/OrderDetailsFromSeller.js";
 
-// import AdminUser from "../../../models/AdminUser.js";
+import {
+  getQuoteProposalBySellerIdEnqNoQuoteNo,
+  fetchSubmitQuoteBySellerIdAndEnqNo,
+  updateQuoteProposal,
+} from "../AxiosRequestService/quoteProposalServiceRequest.js";
+
+import { getAllEdprowiseAdmins } from "../AxiosRequestService/userServiceRequest.js";
+
 // import { NotificationService } from "../../../notificationService.js";
 
 async function updateTDS(req, res) {
@@ -17,32 +22,38 @@ async function updateTDS(req, res) {
       });
     }
 
-    const existingQuoteProposal = await QuoteProposal.findOne({
+    const quoteProposalRes = await getQuoteProposalBySellerIdEnqNoQuoteNo(
       enquiryNumber,
       quoteNumber,
-      sellerId,
-    });
+      sellerId
+    );
 
-    if (!existingQuoteProposal) {
+    if (quoteProposalRes.hasError || !quoteProposalRes.data) {
       return res.status(404).json({
         hasError: true,
         message:
           "No Quote Proposal found for the given enquiryNumber, quoteNumber, and sellerId.",
+        error: quoteProposalRes.error,
       });
     }
 
-    const existingSubmitQuote = await SubmitQuote.findOne({
-      enquiryNumber,
-      sellerId,
-    });
+    const existingQuoteProposal = quoteProposalRes.data;
 
-    if (!existingSubmitQuote) {
+    const submitQuoteRes = await fetchSubmitQuoteBySellerIdAndEnqNo(
+      sellerId,
+      enquiryNumber
+    );
+
+    if (submitQuoteRes.hasError || !submitQuoteRes.data) {
       return res.status(404).json({
         hasError: true,
         message:
           "No Submit Quote found for the given enquiryNumber and sellerId.",
+        error: submitQuoteRes.error,
       });
     }
+
+    const existingSubmitQuote = submitQuoteRes.data;
 
     const existingOrderDetailsFromSeller = await OrderDetailsFromSeller.findOne(
       {
@@ -74,88 +85,97 @@ async function updateTDS(req, res) {
       existingSubmitQuote.advanceRequiredAmount -
       tdsValueForEdprowise;
 
-    existingQuoteProposal.tDSAmount = tDSAmount;
-    existingQuoteProposal.tdsValue = tdsValue;
-    existingQuoteProposal.tdsValueForEdprowise = tdsValueForEdprowise;
-    existingQuoteProposal.finalPayableAmountWithTDS = finalPayableAmountWithTDS;
-    existingQuoteProposal.finalPayableAmountWithTDSForEdprowise =
-      finalPayableAmountWithTDSForEdprowise;
+    const updateResponse = await updateQuoteProposal(enquiryNumber, sellerId, {
+      tDSAmount,
+      tdsValue,
+      tdsValueForEdprowise,
+      finalPayableAmountWithTDS,
+      finalPayableAmountWithTDSForEdprowise,
+    });
 
-    // Save the updated QuoteProposal
-    await existingQuoteProposal.save();
+    if (updateResponse.hasError || !updateResponse.data) {
+      return res.status(500).json({
+        hasError: true,
+        message: "Failed to update quote proposal via service.",
+        error: updateResponse.error,
+      });
+    }
+
+    const updatedQuoteProposal = updateResponse.data;
 
     const senderId = req.user.id;
 
-    const relevantEdprowise = await AdminUser.find({});
+    const adminsRes = await getAllEdprowiseAdmins();
+    const relevantEdprowise = adminsRes?.data || [];
 
-    await NotificationService.sendNotification(
-      "EDPROWISE_TDS_UPDATED",
-      relevantEdprowise.map((admin) => ({
-        id: admin._id.toString(),
-        type: "edprowise",
-      })),
-      {
-        orderNumber: existingOrderDetailsFromSeller.orderNumber,
-        enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
-        entityId: existingQuoteProposal._id,
-        entityType: "TDS Update",
-        senderType: "edprowise",
-        senderId: senderId,
-        metadata: {
-          orderNumber: existingOrderDetailsFromSeller.orderNumber,
-          type: "tds_updated_by_edprowise",
-        },
-      }
-    );
+    // await NotificationService.sendNotification(
+    //   "EDPROWISE_TDS_UPDATED",
+    //   relevantEdprowise.map((admin) => ({
+    //     id: admin._id.toString(),
+    //     type: "edprowise",
+    //   })),
+    //   {
+    //     orderNumber: existingOrderDetailsFromSeller.orderNumber,
+    //     enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
+    //     entityId: updatedQuoteProposal._id,
+    //     entityType: "TDS Update",
+    //     senderType: "edprowise",
+    //     senderId: senderId,
+    //     metadata: {
+    //       orderNumber: existingOrderDetailsFromSeller.orderNumber,
+    //       type: "tds_updated_by_edprowise",
+    //     },
+    //   }
+    // );
 
-    await NotificationService.sendNotification(
-      "SCHOOL_TDS_UPDATED",
-      [
-        {
-          id: existingOrderDetailsFromSeller.schoolId.toString(),
-          type: "school",
-        },
-      ],
-      {
-        orderNumber: existingOrderDetailsFromSeller.orderNumber,
-        enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
-        entityId: existingQuoteProposal._id,
-        entityType: "TDS Update",
-        senderType: "edprowise",
-        senderId: senderId,
-        metadata: {
-          orderNumber: existingOrderDetailsFromSeller.orderNumber,
-          type: "tds_updated_by_edprowise",
-        },
-      }
-    );
+    // await NotificationService.sendNotification(
+    //   "SCHOOL_TDS_UPDATED",
+    //   [
+    //     {
+    //       id: existingOrderDetailsFromSeller.schoolId.toString(),
+    //       type: "school",
+    //     },
+    //   ],
+    //   {
+    //     orderNumber: existingOrderDetailsFromSeller.orderNumber,
+    //     enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
+    //     entityId: updatedQuoteProposal._id,
+    //     entityType: "TDS Update",
+    //     senderType: "edprowise",
+    //     senderId: senderId,
+    //     metadata: {
+    //       orderNumber: existingOrderDetailsFromSeller.orderNumber,
+    //       type: "tds_updated_by_edprowise",
+    //     },
+    //   }
+    // );
 
-    await NotificationService.sendNotification(
-      "SELLER_TDS_UPDATED",
-      [
-        {
-          id: existingOrderDetailsFromSeller.sellerId.toString(),
-          type: "seller",
-        },
-      ],
-      {
-        orderNumber: existingOrderDetailsFromSeller.orderNumber,
-        enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
-        entityId: existingQuoteProposal._id,
-        entityType: "TDS Update",
-        senderType: "edprowise",
-        senderId: senderId,
-        metadata: {
-          orderNumber: existingOrderDetailsFromSeller.orderNumber,
-          type: "tds_updated_by_edprowise",
-        },
-      }
-    );
+    // await NotificationService.sendNotification(
+    //   "SELLER_TDS_UPDATED",
+    //   [
+    //     {
+    //       id: existingOrderDetailsFromSeller.sellerId.toString(),
+    //       type: "seller",
+    //     },
+    //   ],
+    //   {
+    //     orderNumber: existingOrderDetailsFromSeller.orderNumber,
+    //     enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
+    //     entityId: updatedQuoteProposal._id,
+    //     entityType: "TDS Update",
+    //     senderType: "edprowise",
+    //     senderId: senderId,
+    //     metadata: {
+    //       orderNumber: existingOrderDetailsFromSeller.orderNumber,
+    //       type: "tds_updated_by_edprowise",
+    //     },
+    //   }
+    // );
 
     return res.status(200).json({
       hasError: false,
       message: "TDS amount updated successfully.",
-      data: existingQuoteProposal,
+      data: updatedQuoteProposal,
     });
   } catch (error) {
     console.error("Error updating TDS amount:", error);

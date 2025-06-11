@@ -1,10 +1,12 @@
 import OrderDetailsFromSeller from "../../models/OrderDetailsFromSeller.js";
-// import QuoteRequest from "../../models/QuoteRequest.js";
-// import QuoteProposal from "../../models/QuoteProposal.js";
-// import SubmitQuote from "../../models/SubmitQuote.js";
-// import PrepareQuote from "../../models/PrepareQuote.js";
 
-// import SellerProfile from "../../../models/SellerProfile.js";
+import { getQuoteRequestByEnquiryNumber } from "../AxiosRequestService/quoteRequestServiceRequest.js";
+import {
+  getQuoteProposal,
+  fetchPrepareQuoteBySellerIdAndEnqNo,
+  fetchSubmitQuoteBySellerIdAndEnqNo,
+} from "../AxiosRequestService/quoteProposalServiceRequest.js";
+import { getSellerById } from "../AxiosRequestService/userServiceRequest.js";
 
 async function getOneByOrderNumber(req, res) {
   const { orderNumber } = req.params;
@@ -17,7 +19,7 @@ async function getOneByOrderNumber(req, res) {
   }
 
   try {
-    // First find the order details by orderNumber
+    // Step 1: Get order details
     const orderDetails = await OrderDetailsFromSeller.findOne({ orderNumber })
       .select(
         "orderNumber createdAt actualDeliveryDate enquiryNumber sellerId schoolId invoiceForSchool invoiceForEdprowise"
@@ -31,42 +33,65 @@ async function getOneByOrderNumber(req, res) {
       });
     }
 
-    // Get seller profile using the sellerId from the order details
-    const sellerProfile = await SellerProfile.findOne({
-      sellerId: orderDetails.sellerId,
-    })
-      .select("companyName")
-      .lean();
-
-    const companyName = sellerProfile ? sellerProfile.companyName : null;
     const { enquiryNumber, sellerId } = orderDetails;
 
-    // Fetch all related data in parallel for better performance
-    const [quoteRequest, quoteProposal, prepareQuote, submitQuote] =
+    // Step 2: Use service call to get seller profile
+    const sellerProfileRes = await getSellerById(sellerId, "companyName");
+    const companyName = sellerProfileRes?.data?.companyName || null;
+
+    // Step 3: Call other microservices in parallel using Axios service functions
+    const [quoteRequestRes, quoteProposalRes, prepareQuoteRes, submitQuoteRes] =
       await Promise.all([
-        QuoteRequest.findOne({ enquiryNumber })
-          .select("expectedDeliveryDate")
-          .lean(),
-        QuoteProposal.findOne({ sellerId, enquiryNumber })
-          .select(
-            "totalAmountBeforeGstAndDiscount totalAmount orderStatus totalTaxableValue " +
-              "totalTaxAmount finalPayableAmountWithTDS tDSAmount tdsValue supplierStatus " +
-              "edprowiseStatus buyerStatus totalTaxableValueForEdprowise " +
-              "totalAmountForEdprowise totalTaxAmountForEdprowise tdsValueForEdprowise " +
-              "finalPayableAmountWithTDSForEdprowise rating feedbackComment "
-          )
-          .lean(),
-        PrepareQuote.findOne({ sellerId, enquiryNumber })
-          .select(
-            "cgstRate sgstRate igstRate cgstRateForEdprowise sgstRateForEdprowise igstRateForEdprowise"
-          )
-          .lean(),
-        SubmitQuote.findOne({ enquiryNumber, sellerId })
-          .select("advanceRequiredAmount deliveryCharges")
-          .lean(),
+        getQuoteRequestByEnquiryNumber(enquiryNumber, "expectedDeliveryDate"),
+        getQuoteProposal(
+          enquiryNumber,
+          sellerId,
+          [
+            "totalAmountBeforeGstAndDiscount",
+            "totalAmount",
+            "orderStatus",
+            "totalTaxableValue",
+            "totalTaxAmount",
+            "finalPayableAmountWithTDS",
+            "tDSAmount",
+            "tdsValue",
+            "supplierStatus",
+            "edprowiseStatus",
+            "buyerStatus",
+            "totalTaxableValueForEdprowise",
+            "totalAmountForEdprowise",
+            "totalTaxAmountForEdprowise",
+            "tdsValueForEdprowise",
+            "finalPayableAmountWithTDSForEdprowise",
+            "rating",
+            "feedbackComment",
+          ].join(",")
+        ),
+        fetchPrepareQuoteBySellerIdAndEnqNo(
+          sellerId,
+          enquiryNumber,
+          [
+            "cgstRate",
+            "sgstRate",
+            "igstRate",
+            "cgstRateForEdprowise",
+            "sgstRateForEdprowise",
+            "igstRateForEdprowise",
+          ].join(",")
+        ),
+        fetchSubmitQuoteBySellerIdAndEnqNo(
+          sellerId,
+          enquiryNumber,
+          ["advanceRequiredAmount", "deliveryCharges"].join(",")
+        ),
       ]);
 
-    // Construct the enriched order object
+    const quoteRequest = quoteRequestRes?.data || {};
+    const quoteProposal = quoteProposalRes?.data || {};
+    const prepareQuote = prepareQuoteRes?.data || {};
+    const submitQuote = submitQuoteRes?.data || {};
+
+    // Step 4: Construct final response object
     const enrichedOrder = {
       ...orderDetails,
       companyName,

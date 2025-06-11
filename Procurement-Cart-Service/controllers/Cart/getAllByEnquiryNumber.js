@@ -122,8 +122,6 @@ import axios from "axios";
 
 import Cart from "../../models/Cart.js";
 
-// import SubmitQuote from "../../models/SubmitQuote.js";
-
 async function getAllByEnquiryNumber(req, res) {
   try {
     const schoolId = req.user?.schoolId;

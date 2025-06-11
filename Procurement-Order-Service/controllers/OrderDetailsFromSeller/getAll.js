@@ -1,20 +1,21 @@
 import OrderDetailsFromSeller from "../../models/OrderDetailsFromSeller.js";
+import {
+  fetchQuoteProposalBySellerIdsAndEnqNos,
+  fetchSubmitQuoteBySellerIdsAndEnqNos,
+  fetchPrepareQuoteBySellerIdsAndEnqNos,
+} from "../AxiosRequestService/quoteProposalServiceRequest.js";
 
-// import QuoteRequest from "../../models/QuoteRequest.js";
-// import QuoteProposal from "../../models/QuoteProposal.js";
-// import SubmitQuote from "../../models/SubmitQuote.js";
-// import PrepareQuote from "../../models/PrepareQuote.js";
+import { getRequiredFieldsBySellerIds } from "../AxiosRequestService/userServiceRequest.js";
 
-// import SellerProfile from "../../models/SellerProfile.js";
+import { fetchQuoteRequestByEnqNos } from "../AxiosRequestService/quoteRequestServiceRequest.js";
 
 async function getAll(req, res) {
   try {
-    // Fetch all orders with necessary fields
+    // 1. Fetch orders
     const orders = await OrderDetailsFromSeller.find()
       .sort({ createdAt: -1 })
       .select(
-        "orderNumber quoteNumber createdAt actualDeliveryDate otherCharges " +
-          "enquiryNumber sellerId schoolId"
+        "orderNumber quoteNumber createdAt actualDeliveryDate otherCharges enquiryNumber sellerId schoolId"
       )
       .lean();
 
@@ -25,70 +26,85 @@ async function getAll(req, res) {
       });
     }
 
-    // Get unique sellerIds and enquiryNumbers
+    // 2. Unique sellerIds & enquiryNumbers
     const sellerIds = [...new Set(orders.map((order) => order.sellerId))];
     const enquiryNumbers = [
       ...new Set(orders.map((order) => order.enquiryNumber)),
     ];
 
-    // Fetch related data in parallel
+    // 3. Field selections (comma-separated format)
+    const quoteProposalFields = `
+      enquiryNumber,sellerId,totalAmountBeforeGstAndDiscount,totalAmount,cancelReasonFromBuyer,
+      cancelReasonFromSeller,totalTaxableValue,totalTaxAmount,tdsValue,finalPayableAmountWithTDS,
+      tDSAmount,supplierStatus,edprowiseStatus,buyerStatus,totalTaxableValueForEdprowise,
+      totalAmountForEdprowise,totalTaxAmountForEdprowise,tdsValueForEdprowise,
+      finalPayableAmountWithTDSForEdprowise,orderStatus
+    `.replace(/\s+/g, "");
+
+    const submitQuoteFields = `
+      enquiryNumber,sellerId,advanceRequiredAmount,deliveryCharges
+    `.replace(/\s+/g, "");
+
+    const prepareQuoteFields = `
+      enquiryNumber,sellerId,cgstRate,sgstRate,igstRate,cgstRateForEdprowise,
+      sgstRateForEdprowise,igstRateForEdprowise
+    `.replace(/\s+/g, "");
+
+    const QuoteRequestFields = `enquiryNumber,expectedDeliveryDate`;
+
+    const sellerProfileFields = `sellerId,companyName`;
+
+    // 4. Fetch related data
     const [
-      sellerProfiles,
-      quoteRequests,
-      quoteProposals,
-      submitQuotes,
-      prepareQuotes,
+      sellerProfilesresponse,
+      quoteRequestsResponse,
+      quoteProposalsResponse,
+      submitQuotesResponse,
+      prepareQuotesResponse,
     ] = await Promise.all([
-      SellerProfile.find({ sellerId: { $in: sellerIds } })
-        .select("sellerId companyName")
-        .lean(),
-      QuoteRequest.find({ enquiryNumber: { $in: enquiryNumbers } })
-        .select("enquiryNumber expectedDeliveryDate")
-        .lean(),
-      QuoteProposal.find({
-        enquiryNumber: { $in: enquiryNumbers },
-        sellerId: { $in: sellerIds },
-      })
-        .select(
-          `enquiryNumber 
-          sellerId 
-          totalAmountBeforeGstAndDiscount 
-          totalAmount 
-          cancelReasonFromBuyer 
-          cancelReasonFromSeller
-          totalTaxableValue 
-          totalTaxAmount
-          tdsValue 
-          finalPayableAmountWithTDS
-          tDSAmount 
-          supplierStatus 
-          edprowiseStatus 
-          buyerStatus 
-          totalTaxableValueForEdprowise 
-          totalAmountForEdprowise 
-          totalTaxAmountForEdprowise 
-          tdsValueForEdprowise 
-          finalPayableAmountWithTDSForEdprowise
-          orderStatus `
-        )
-        .lean(),
-      SubmitQuote.find({
-        enquiryNumber: { $in: enquiryNumbers },
-        sellerId: { $in: sellerIds },
-      })
-        .select("enquiryNumber sellerId advanceRequiredAmount deliveryCharges")
-        .lean(),
-      PrepareQuote.find({
-        enquiryNumber: { $in: enquiryNumbers },
-        sellerId: { $in: sellerIds },
-      })
-        .select(
-          "enquiryNumber sellerId cgstRate sgstRate igstRate cgstRateForEdprowise sgstRateForEdprowise igstRateForEdprowise "
-        )
-        .lean(),
+      getRequiredFieldsBySellerIds(sellerIds, sellerProfileFields),
+      fetchQuoteRequestByEnqNos(enquiryNumbers, QuoteRequestFields),
+      fetchQuoteProposalBySellerIdsAndEnqNos(
+        sellerIds,
+        enquiryNumbers,
+        quoteProposalFields
+      ),
+      fetchSubmitQuoteBySellerIdsAndEnqNos(
+        sellerIds,
+        enquiryNumbers,
+        submitQuoteFields
+      ),
+      fetchPrepareQuoteBySellerIdsAndEnqNos(
+        sellerIds,
+        enquiryNumbers,
+        prepareQuoteFields
+      ),
     ]);
 
-    // Create lookup maps
+    // 5. Handle errors
+    if (
+      sellerProfilesresponse.hasError ||
+      quoteProposalsResponse.hasError ||
+      submitQuotesResponse.hasError ||
+      prepareQuotesResponse.hasError ||
+      quoteRequestsResponse.hasError
+    ) {
+      return res.status(500).json({
+        hasError: true,
+        message: "Failed to fetch quote-related data",
+        error: {
+          sellerProfiles: sellerProfilesresponse.error,
+          quoteProposals: quoteProposalsResponse.error,
+          submitQuotes: submitQuotesResponse.error,
+          prepareQuotes: prepareQuotesResponse.error,
+          quoteRequests: quoteRequestsResponse.error,
+        },
+      });
+    }
+
+    const sellerProfiles = sellerProfilesresponse.data;
+
+    // 6. Build maps
     const sellerMap = Object.fromEntries(
       sellerProfiles.map((seller) => [
         seller.sellerId.toString(),
@@ -97,23 +113,31 @@ async function getAll(req, res) {
     );
 
     const quoteRequestMap = Object.fromEntries(
-      quoteRequests.map((q) => [q.enquiryNumber, q])
+      quoteRequestsResponse.data.map((q) => [q.enquiryNumber, q])
     );
 
-    // Create composite key maps for quoteProposals and submitQuotes
     const quoteProposalMap = Object.fromEntries(
-      quoteProposals.map((qp) => [`${qp.enquiryNumber}_${qp.sellerId}`, qp])
+      quoteProposalsResponse.data.map((qp) => [
+        `${qp.enquiryNumber}_${qp.sellerId}`,
+        qp,
+      ])
     );
 
     const submitQuoteMap = Object.fromEntries(
-      submitQuotes.map((sq) => [`${sq.enquiryNumber}_${sq.sellerId}`, sq])
+      submitQuotesResponse.data.map((sq) => [
+        `${sq.enquiryNumber}_${sq.sellerId}`,
+        sq,
+      ])
     );
 
     const prepareQuoteMap = Object.fromEntries(
-      prepareQuotes.map((pq) => [`${pq.enquiryNumber}_${pq.sellerId}`, pq])
+      prepareQuotesResponse.data.map((pq) => [
+        `${pq.enquiryNumber}_${pq.sellerId}`,
+        pq,
+      ])
     );
 
-    // Enrich orders with related data
+    // 7. Enrich orders
     const enrichedOrders = orders.map((order) => {
       const compositeKey = `${order.enquiryNumber}_${order.sellerId}`;
       const quoteProposal = quoteProposalMap[compositeKey] || {};
@@ -140,8 +164,7 @@ async function getAll(req, res) {
         totalGstAmountForEdprowise:
           quoteProposal.totalTaxAmountForEdprowise || null,
         advanceAdjustment: submitQuote.advanceRequiredAmount || 0,
-        deliveryCharges: submitQuote?.deliveryCharges || 0,
-
+        deliveryCharges: submitQuote.deliveryCharges || 0,
         finalPayableAmountWithTDS: quoteProposal.finalPayableAmountWithTDS || 0,
         finalPayableAmountWithTDSForEdprowise:
           quoteProposal.finalPayableAmountWithTDSForEdprowise || 0,
@@ -159,6 +182,7 @@ async function getAll(req, res) {
       };
     });
 
+    // 8. Send response
     return res.status(200).json({
       message: "All order details retrieved successfully!",
       data: enrichedOrders,

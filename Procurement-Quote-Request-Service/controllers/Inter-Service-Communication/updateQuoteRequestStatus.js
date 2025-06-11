@@ -1,6 +1,6 @@
 import QuoteRequest from "../../models/QuoteRequest.js";
 
-async function getQuoteRequestByEnquiryNumber(req, res) {
+async function updateQuoteRequestStatus(req, res) {
   try {
     const { enquiryNumber } = req.params;
     const { edprowiseStatus, buyerStatus } = req.body;
@@ -45,4 +45,4 @@ async function getQuoteRequestByEnquiryNumber(req, res) {
   }
 }
 
-export default getQuoteRequestByEnquiryNumber;
+export default updateQuoteRequestStatus;

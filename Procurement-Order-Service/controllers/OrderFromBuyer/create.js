@@ -5,16 +5,27 @@ import OrderDetailsFromSeller from "../../models/OrderDetailsFromSeller.js";
 import nodemailer from "nodemailer";
 import smtpServiceClient from "../Inter-Service-Communication/smtpServiceClient.js";
 
-// import QuoteRequest from "../../models/QuoteRequest.js";
-// import QuoteProposal from "../../models/QuoteProposal.js";
-// import SubmitQuote from "../../models/SubmitQuote.js";
-
-// import Cart from "../../models/Cart.js";
-
-// import School from "../../../models/School.js";
-// import SellerProfile from "../../../models/SellerProfile.js";
-// import AdminUser from "../../../models/AdminUser.js";
 // import { NotificationService } from "../../../notificationService.js";
+
+import {
+  getSchoolById,
+  getSellerById,
+  getallSellersByIds,
+  getAllEdprowiseAdmins,
+} from "../AxiosRequestService/userServiceRequest.js";
+
+import {
+  updateQuoteProposal,
+  updateSubmitQuote,
+  getQuoteProposal,
+} from "../AxiosRequestService/quoteProposalServiceRequest.js";
+
+import {
+  getCart,
+  deleteCarts,
+} from "../AxiosRequestService/cartServiceRequest.js";
+
+import { updateQuoteRequest } from "../AxiosRequestService/quoteRequestServiceRequest.js";
 
 import path from "path";
 import fs from "fs";
@@ -873,16 +884,9 @@ async function create(req, res) {
       });
     }
 
-    const carts = await Cart.find({
-      _id: { $in: selectedCartIds },
-      enquiryNumber,
-    });
-    if (carts.length === 0) {
-      return res.status(404).json({
-        hasError: true,
-        message: "No carts found for the given enquiry number.",
-      });
-    }
+    const cartResponse = await getCart(enquiryNumber, selectedCartIds);
+
+    const carts = cartResponse.data;
 
     const cartMap = new Map(carts.map((cart) => [cart._id.toString(), cart]));
 
@@ -996,12 +1000,13 @@ async function create(req, res) {
         totalAmount: cartEntry.totalAmount || 0,
       });
 
-      const quoteProposal = await QuoteProposal.findOne({
-        sellerId: cartEntry.sellerId,
-        enquiryNumber: enquiryNumber,
-      }).session(session);
+      const quoteProposalResponse = await getQuoteProposal(
+        enquiryNumber,
+        cartEntry.sellerId,
+        "quoteNumber"
+      );
 
-      const quoteNumber = quoteProposal ? quoteProposal.quoteNumber : null;
+      const quoteNumber = quoteProposalResponse?.data?.[0]?.quoteNumber || null;
 
       if (!orderDetailsFromSellerEntries.has(cartEntry.sellerId.toString())) {
         orderDetailsFromSellerEntries.set(cartEntry.sellerId.toString(), {
@@ -1034,65 +1039,42 @@ async function create(req, res) {
       { session }
     );
 
-    await QuoteRequest.findOneAndUpdate(
-      { schoolId, enquiryNumber },
-      [
-        {
-          $set: {
-            deliveryAddress: { $ifNull: [deliveryAddress, "$deliveryAddress"] },
-            deliveryCountry: {
-              $ifNull: [deliveryCountry, "$deliveryCountry"],
-            },
-            deliveryState: {
-              $ifNull: [deliveryState, "$deliveryState"],
-            },
-            deliveryCity: {
-              $ifNull: [deliveryCity, "$deliveryCity"],
-            },
-            deliveryLandMark: {
-              $ifNull: [deliveryLandMark, "$deliveryLandMark"],
-            },
-            deliveryPincode: { $ifNull: [deliveryPincode, "$deliveryPincode"] },
-            expectedDeliveryDate: {
-              $ifNull: [expectedDeliveryDate, "$expectedDeliveryDate"],
-            },
-          },
-        },
-      ],
-      { session, upsert: true, new: true }
-    );
+    const updatePayload = {};
+    if (deliveryAddress) updatePayload.deliveryAddress = deliveryAddress;
+    if (deliveryCountry) updatePayload.deliveryCountry = deliveryCountry;
+    if (deliveryState) updatePayload.deliveryState = deliveryState;
+    if (deliveryCity) updatePayload.deliveryCity = deliveryCity;
+    if (deliveryLandMark) updatePayload.deliveryLandMark = deliveryLandMark;
+    if (deliveryPincode) updatePayload.deliveryPincode = deliveryPincode;
+    if (expectedDeliveryDate)
+      updatePayload.expectedDeliveryDate = expectedDeliveryDate;
+
+    await updateQuoteRequest(enquiryNumber, schoolId, updatePayload);
 
     for (const entry of orderFromBuyerEntries) {
-      await QuoteProposal.findOneAndUpdate(
-        { sellerId: entry.sellerId, enquiryNumber: enquiryNumber },
-        {
-          supplierStatus: "Order Received",
-          edprowiseStatus: "Order Placed",
-          buyerStatus: "Order Placed",
-        },
-        { new: true }
-      );
+      await updateQuoteProposal(enquiryNumber, entry.sellerId.toString(), {
+        supplierStatus: "Order Received",
+        edprowiseStatus: "Order Placed",
+        buyerStatus: "Order Placed",
+      });
 
-      await SubmitQuote.findOneAndUpdate(
-        { sellerId: entry.sellerId, enquiryNumber: enquiryNumber },
-        {
-          venderStatusFromBuyer: "Order Placed",
-        },
-        { new: true }
-      );
+      await updateSubmitQuote(enquiryNumber, entry.sellerId.toString(), {
+        venderStatusFromBuyer: "Order Placed",
+      });
     }
 
     for (const sellerId of sellerIds) {
-      await Cart.deleteMany({
-        _id: { $in: selectedCartIds },
-        enquiryNumber: enquiryNumber,
-        schoolId: schoolId,
-      }).session(session);
+      const cartDeleteResponse = await deleteCarts(
+        enquiryNumber,
+        schoolId,
+        selectedCartIds
+      );
     }
 
-    const schoolDetail = await School.findOne({ schoolId });
-    const schoolEmail = schoolDetail.schoolEmail;
-    const schoolName = schoolDetail.schoolName;
+    const schoolDetail = await getSchoolById(schoolId);
+
+    const schoolEmail = schoolDetail.data.schoolEmail;
+    const schoolName = schoolDetail.data.schoolName;
 
     await sendSchoolRequestQuoteEmail(
       schoolName,
@@ -1102,7 +1084,7 @@ async function create(req, res) {
           Array.from(sellerOrderNumbers.entries()).map(
             async ([sellerId, orderNumber]) => ({
               orderNumber,
-              seller: await SellerProfile.findById(sellerId),
+              seller: await getSellerById(sellerId),
               products: orderFromBuyerEntries.filter(
                 (o) => o.sellerId.toString() === sellerId
               ),
@@ -1114,19 +1096,32 @@ async function create(req, res) {
     );
 
     for (const [sellerId, orderNumber] of sellerOrderNumbers.entries()) {
-      const sellerDetails = await SellerProfile.findById(sellerId);
+      const sellerDetails = await getSellerById(sellerId);
 
       if (!sellerDetails) {
         console.error(`Seller profile not found for ID: ${sellerId}`);
         continue;
       }
+
+      const allSellerIds = Array.from(sellerOrderNumbers.keys());
+
+      // Then fetch all sellers in one go
+      const allSellersResponse = await getallSellersByIds(allSellerIds);
+      if (!allSellersResponse || allSellersResponse.hasError) {
+        console.error("Failed to fetch seller profiles");
+        continue;
+      }
+
+      const allSellers = allSellersResponse.data;
+
+      // Then use them in your mapping
       const sellerProducts = orderFromBuyerEntries.filter(
         (o) => o.sellerId.toString() === sellerId
       );
 
       await sendEmailsToSellers(
-        sellerDetails.companyName,
-        sellerDetails.emailId,
+        allSellers.companyName,
+        allSellers.emailId,
         schoolName,
         {
           orderNumber,
@@ -1143,86 +1138,91 @@ async function create(req, res) {
       );
     }
 
-    const schoolProfile = await School.findOne({ schoolId });
-
     for (const savedEntry of savedOrderDetails) {
       const sellerId = savedEntry.sellerId.toString();
       const orderNumber = savedEntry.orderNumber;
 
-      await NotificationService.sendNotification(
-        "SELLER_RECEIVED_ORDER",
-        [{ id: sellerId, type: "seller" }],
-        {
-          schoolName: schoolProfile?.schoolName || "Unknown School",
-          enquiryNumber: enquiryNumber,
-          orderNumber: orderNumber,
-          entityId: savedEntry._id,
-          entityType: "Order From Buyer",
-          senderType: "school",
-          senderId: schoolId,
-          metadata: {
-            enquiryNumber,
-            orderNumber,
-            type: "seller_received_order",
-          },
-        }
-      );
+      // await NotificationService.sendNotification(
+      //   "SELLER_RECEIVED_ORDER",
+      //   [{ id: sellerId, type: "seller" }],
+      //   {
+      //     schoolName: schoolProfile?.schoolName || "Unknown School",
+      //     enquiryNumber: enquiryNumber,
+      //     orderNumber: orderNumber,
+      //     entityId: savedEntry._id,
+      //     entityType: "Order From Buyer",
+      //     senderType: "school",
+      //     senderId: schoolId,
+      //     metadata: {
+      //       enquiryNumber,
+      //       orderNumber,
+      //       type: "seller_received_order",
+      //     },
+      //   }
+      // );
     }
 
     for (const savedEntry of savedOrderDetails) {
       const orderNumber = savedEntry.orderNumber;
-      const sellerProfile = await SellerProfile.findOne({
-        sellerId: savedEntry.sellerId,
-      }).session(session);
 
-      await NotificationService.sendNotification(
-        "SCHOOL_PLACED_ORDER",
-        [{ id: schoolId, type: "school" }],
-        {
-          schoolName: schoolProfile?.schoolName || "Unknown School",
-          companyName: sellerProfile?.companyName || "Unknown Company",
-          enquiryNumber: enquiryNumber,
-          orderNumber: orderNumber,
-          entityId: savedEntry._id,
-          entityType: "Order From Buyer",
-          senderType: "school",
-          senderId: schoolId,
-          metadata: {
-            enquiryNumber,
-            orderNumber,
-            type: "school_placed_order",
-          },
-        }
+      const sellerProfileResponse = await getSellerById(
+        savedEntry.sellerId.toString()
       );
+
+      const sellerProfile = sellerProfileResponse.data;
+
+      // await NotificationService.sendNotification(
+      //   "SCHOOL_PLACED_ORDER",
+      //   [{ id: schoolId, type: "school" }],
+      //   {
+      //     schoolName: schoolProfile?.schoolName || "Unknown School",
+      //     companyName: sellerProfile?.companyName || "Unknown Company",
+      //     enquiryNumber: enquiryNumber,
+      //     orderNumber: orderNumber,
+      //     entityId: savedEntry._id,
+      //     entityType: "Order From Buyer",
+      //     senderType: "school",
+      //     senderId: schoolId,
+      //     metadata: {
+      //       enquiryNumber,
+      //       orderNumber,
+      //       type: "school_placed_order",
+      //     },
+      //   }
+      // );
     }
 
-    const relevantAdmins = await AdminUser.find({}).session(session);
-    for (const savedEntry of savedOrderDetails) {
-      const sellerProfile = await SellerProfile.findOne({
-        sellerId: savedEntry.sellerId,
-      }).session(session);
+    const relevantAdminsResponse = await getAllEdprowiseAdmins();
+    const relevantAdmins = relevantAdminsResponse.data;
 
-      for (const admin of relevantAdmins) {
-        await NotificationService.sendNotification(
-          "EDPROWISE_RECEIVED_ORDER",
-          [{ id: admin._id.toString(), type: "edprowise" }],
-          {
-            schoolName: schoolProfile?.schoolName || "Unknown School",
-            companyName: sellerProfile?.companyName || "Unknown Company",
-            enquiryNumber: enquiryNumber,
-            orderNumber: savedEntry.orderNumber,
-            entityId: savedEntry._id,
-            entityType: "Order From Buyer",
-            senderType: "school",
-            senderId: schoolId,
-            metadata: {
-              enquiryNumber,
-              orderNumber: savedEntry.orderNumber,
-              type: "edprowise_received_order",
-            },
-          }
-        );
-      }
+    for (const savedEntry of savedOrderDetails) {
+      const sellerProfileResponse = await getSellerById(
+        savedEntry.sellerId.toString()
+      );
+
+      const sellerProfile = sellerProfileResponse.data;
+
+      //   for (const admin of relevantAdmins) {
+      //     await NotificationService.sendNotification(
+      //       "EDPROWISE_RECEIVED_ORDER",
+      //       [{ id: admin._id.toString(), type: "edprowise" }],
+      //       {
+      //         schoolName: schoolName || "Unknown School",
+      //         companyName: sellerProfile?.companyName || "Unknown Company",
+      //         enquiryNumber: enquiryNumber,
+      //         orderNumber: savedEntry.orderNumber,
+      //         entityId: savedEntry._id,
+      //         entityType: "Order From Buyer",
+      //         senderType: "school",
+      //         senderId: schoolId,
+      //         metadata: {
+      //           enquiryNumber,
+      //           orderNumber: savedEntry.orderNumber,
+      //           type: "edprowise_received_order",
+      //         },
+      //       }
+      //     );
+      //   }
     }
 
     await session.commitTransaction();

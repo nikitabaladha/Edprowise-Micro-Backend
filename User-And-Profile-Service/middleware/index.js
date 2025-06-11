@@ -24,7 +24,14 @@ const roleBasedMiddleware = (...allowedRoles) => {
 
       next();
     } catch (error) {
-      console.error(error.message);
+      console.error("JWT error:", error.message);
+
+      if (error.name === "TokenExpiredError") {
+        return res.status(401).json({
+          hasError: true,
+          message: "Token expired. Please login again.",
+        });
+      }
       return res.status(401).json({ hasError: true, message: "Invalid token" });
     }
   };

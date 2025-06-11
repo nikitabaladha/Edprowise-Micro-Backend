@@ -1,4 +1,7 @@
-// import QuoteProposal from "../../models/QuoteProposal.js";
+import {
+  updateQuoteProposal,
+  getQuoteProposal,
+} from "../AxiosRequestService/quoteProposalServiceRequest.js";
 
 async function updateOrderStatus(req, res) {
   try {
@@ -23,23 +26,29 @@ async function updateOrderStatus(req, res) {
       });
     }
 
-    const existingQuote = await QuoteProposal.findOne({
-      enquiryNumber,
-      sellerId,
-    });
+    const existingQuoteRes = await getQuoteProposal(enquiryNumber, sellerId);
 
-    if (!existingQuote) {
+    if (existingQuoteRes.hasError || !existingQuoteRes.data) {
       return res.status(404).json({
         hasError: true,
         message: "Quote not found for the given enquiryNumber and sellerId.",
+        error: existingQuoteRes.error,
       });
     }
 
-    // Update the orderStatus
-    existingQuote.orderStatus = orderStatus;
+    const updateRes = await updateQuoteProposal(enquiryNumber, sellerId, {
+      orderStatus,
+    });
 
-    // Save the updated QuoteProposal
-    const updatedQuote = await existingQuote.save();
+    if (updateRes.hasError || !updateRes.data) {
+      return res.status(500).json({
+        hasError: true,
+        message: "Failed to update quote status via service.",
+        error: updateRes.error,
+      });
+    }
+
+    const updatedQuote = updateRes.data;
 
     return res.status(200).json({
       hasError: false,

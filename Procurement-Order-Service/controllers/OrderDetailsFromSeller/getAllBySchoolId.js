@@ -1,10 +1,12 @@
 import OrderDetailsFromSeller from "../../models/OrderDetailsFromSeller.js";
-// import QuoteRequest from "../../models/QuoteRequest.js";
-// import QuoteProposal from "../../models/QuoteProposal.js";
-// import PrepareQuote from "../../models/PrepareQuote.js";
-// import SubmitQuote from "../../models/SubmitQuote.js";
 
-// import SellerProfile from "../../../models/SellerProfile.js";
+import { getQuoteRequestByEnquiryNumber } from "../AxiosRequestService/quoteRequestServiceRequest.js";
+import {
+  getQuoteProposalBySellerIdEnqNoQuoteNo,
+  fetchPrepareQuoteBySellerIdAndEnqNo,
+  fetchSubmitQuoteBySellerIdAndEnqNo,
+} from "../AxiosRequestService/quoteProposalServiceRequest.js";
+import { getSellerById } from "../AxiosRequestService/userServiceRequest.js";
 
 async function getAllBySchoolId(req, res) {
   const { id } = req.params;
@@ -35,29 +37,67 @@ async function getAllBySchoolId(req, res) {
       orderDetails.map(async (order) => {
         const { enquiryNumber, sellerId, quoteNumber } = order;
 
+        // Field strings
+        const quoteRequestFields = "expectedDeliveryDate";
+        const quoteProposalFields = `
+          totalAmountBeforeGstAndDiscount,
+          totalAmount,
+          totalTaxableValue,
+          totalTaxAmount,
+          finalPayableAmountWithTDS,
+          tDSAmount,
+          tdsValue,
+          supplierStatus,
+          edprowiseStatus,
+          buyerStatus,
+          updatedAt,
+          rating,
+          feedbackComment
+        `;
+        const submitQuoteFields = `
+          advanceRequiredAmount,
+          deliveryCharges
+        `;
+        const prepareQuoteFields = `
+          cgstRate,
+          sgstRate,
+          igstRate
+        `;
+        const sellerFields = "companyName";
+
+        // Parallel API calls
         const [
-          quoteRequest,
-          quoteProposals,
-          submitQuote,
-          sellerProfile,
-          prepareQuote,
+          quoteRequestRes,
+          quoteProposalRes,
+          submitQuoteRes,
+          sellerProfileRes,
+          prepareQuoteRes,
         ] = await Promise.all([
-          QuoteRequest.findOne({ enquiryNumber })
-            .select("expectedDeliveryDate")
-            .lean(),
-          QuoteProposal.findOne({ enquiryNumber, quoteNumber, sellerId })
-            .select(
-              "totalAmountBeforeGstAndDiscount totalAmount totalTaxableValue totalTaxAmount finalPayableAmountWithTDS tDSAmount tdsValue supplierStatus edprowiseStatus buyerStatus updatedAt rating feedbackComment"
-            )
-            .lean(),
-          SubmitQuote.findOne({ enquiryNumber, sellerId })
-            .select("advanceRequiredAmount deliveryCharges")
-            .lean(),
-          SellerProfile.findOne({ sellerId }).select("companyName").lean(),
-          PrepareQuote.findOne({ enquiryNumber, sellerId })
-            .select("cgstRate sgstRate igstRate")
-            .lean(),
+          getQuoteRequestByEnquiryNumber(enquiryNumber, quoteRequestFields),
+          getQuoteProposalBySellerIdEnqNoQuoteNo(
+            enquiryNumber,
+            quoteNumber,
+            sellerId,
+            quoteProposalFields
+          ),
+          fetchSubmitQuoteBySellerIdAndEnqNo(
+            sellerId,
+            enquiryNumber,
+            submitQuoteFields
+          ),
+          getSellerById(sellerId, sellerFields),
+          fetchPrepareQuoteBySellerIdAndEnqNo(
+            sellerId,
+            enquiryNumber,
+            prepareQuoteFields
+          ),
         ]);
+
+        const quoteRequest = quoteRequestRes.data || {};
+        const quoteProposals = quoteProposalRes.data || {};
+        const submitQuote = submitQuoteRes.data || {};
+        const sellerProfile = sellerProfileRes.data || {};
+        const prepareQuote = prepareQuoteRes.data || {};
 
         return {
           _id: order._id,

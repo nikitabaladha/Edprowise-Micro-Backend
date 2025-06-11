@@ -1,11 +1,19 @@
 import OrderDetailsFromSeller from "../../models/OrderDetailsFromSeller.js";
 
-// import AdminUser from "../../../models/AdminUser.js";
-// import School from "../../../models/School.js";
-// import Seller from "../../../models/SellerProfile.js";
 // import { NotificationService } from "../../../notificationService.js";
 
-// import QuoteProposal from "../../models/QuoteProposal.js";
+import {
+  updateQuoteProposal,
+  updateSubmitQuote,
+  getQuoteProposal,
+} from "../AxiosRequestService/quoteProposalServiceRequest.js";
+
+import {
+  getSchoolById,
+  getSellerById,
+  getallSellersByIds,
+  getAllEdprowiseAdmins,
+} from "../AxiosRequestService/userServiceRequest.js";
 
 async function CancelOrderByBuyer(req, res) {
   try {
@@ -30,30 +38,29 @@ async function CancelOrderByBuyer(req, res) {
       });
     }
 
-    const existingQuote = await QuoteProposal.findOne({
+    const updateData = {
+      buyerStatus,
+      supplierStatus: buyerStatus,
+      edprowiseStatus: buyerStatus,
+    };
+
+    const updatedQuoteProposal = await updateQuoteProposal(
       enquiryNumber,
       sellerId,
-    });
+      updateData
+    );
 
-    if (!existingQuote) {
-      return res.status(404).json({
+    if (updatedQuoteProposal?.hasError) {
+      return res.status(500).json({
         hasError: true,
-        message:
-          "Quote not found for the given enquiryNumber,sellerId and schoolId.",
+        message: updatedQuote.message,
       });
     }
-
-    // Update the orderStatus
-    existingQuote.buyerStatus = buyerStatus;
-    existingQuote.supplierStatus = buyerStatus;
-    existingQuote.edprowiseStatus = buyerStatus;
 
     // Save the updated QuoteProposal
     const updatedQuote = await existingQuote.save();
 
-    const schoolProfile = await School.findOne({
-      schoolId,
-    });
+    const schoolProfile = await getSchoolById(schoolId);
 
     if (!schoolProfile) {
       return res.status(404).json({
@@ -62,11 +69,9 @@ async function CancelOrderByBuyer(req, res) {
       });
     }
 
-    const sellerProfile = await Seller.findOne({
-      sellerId,
-    });
+    const sellerProfile = await getSellerById(sellerId);
 
-    if (!sellerProfile) {
+    if (sellerProfile?.hasError || !sellerProfile?.data) {
       return res.status(404).json({
         hasError: true,
         message: `Seller not found for given seller ID ${sellerId}.`,
@@ -89,77 +94,86 @@ async function CancelOrderByBuyer(req, res) {
 
     const senderId = req.user.schoolId;
 
-    const relevantEdprowise = await AdminUser.find({});
+    const relevantEdprowise = await getAllEdprowiseAdmins();
+    if (
+      relevantEdprowise?.hasError ||
+      !Array.isArray(relevantEdprowise?.data)
+    ) {
+      return res.status(500).json({
+        hasError: true,
+        message: `Failed to fetch admin user list.`,
+      });
+    }
 
-    await NotificationService.sendNotification(
-      "SCHOOL_CANCELLED_ORDER_FOR_EDPROWISE",
-      relevantEdprowise.map((admin) => ({
-        id: admin._id.toString(),
-        type: "edprowise",
-      })),
-      {
-        companyName: sellerProfile.companyName,
-        schoolName: schoolProfile.schoolName,
-        orderNumber: existingOrderDetailsFromSeller.orderNumber,
-        enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
-        entityId: existingOrderDetailsFromSeller._id,
-        entityType: "Order Cancel",
-        senderType: "school",
-        senderId: senderId,
-        metadata: {
-          orderNumber: existingOrderDetailsFromSeller.orderNumber,
-          type: "order_cancelled_by_school",
-        },
-      }
-    );
+    // await NotificationService.sendNotification(
+    //   "SCHOOL_CANCELLED_ORDER_FOR_EDPROWISE",
+    //   relevantEdprowise.map((admin) => ({
+    //     id: admin._id.toString(),
+    //     type: "edprowise",
+    //   })),
+    //   {
+    //     companyName: sellerProfile.companyName,
+    //     schoolName: schoolProfile.schoolName,
+    //     orderNumber: existingOrderDetailsFromSeller.orderNumber,
+    //     enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
+    //     entityId: existingOrderDetailsFromSeller._id,
+    //     entityType: "Order Cancel",
+    //     senderType: "school",
+    //     senderId: senderId,
+    //     metadata: {
+    //       orderNumber: existingOrderDetailsFromSeller.orderNumber,
+    //       type: "order_cancelled_by_school",
+    //     },
+    //   }
+    // );
 
-    await NotificationService.sendNotification(
-      "SCHOOL_CANCELLED_ORDER_FOR_SCHOOL",
-      [
-        {
-          id: schoolId.toString(),
-          type: "school",
-        },
-      ],
-      {
-        companyName: sellerProfile.companyName,
-        schoolName: schoolProfile.schoolName,
-        orderNumber: existingOrderDetailsFromSeller.orderNumber,
-        enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
-        entityId: existingOrderDetailsFromSeller._id,
-        entityType: "Order Cancel",
-        senderType: "school",
-        senderId: senderId,
-        metadata: {
-          orderNumber: existingOrderDetailsFromSeller.orderNumber,
-          type: "order_cancelled_by_school",
-        },
-      }
-    );
+    // await NotificationService.sendNotification(
+    //   "SCHOOL_CANCELLED_ORDER_FOR_SCHOOL",
+    //   [
+    //     {
+    //       id: schoolId.toString(),
+    //       type: "school",
+    //     },
+    //   ],
+    //   {
+    //     companyName: sellerProfile.companyName,
+    //     schoolName: schoolProfile.schoolName,
+    //     orderNumber: existingOrderDetailsFromSeller.orderNumber,
+    //     enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
+    //     entityId: existingOrderDetailsFromSeller._id,
+    //     entityType: "Order Cancel",
+    //     senderType: "school",
+    //     senderId: senderId,
+    //     metadata: {
+    //       orderNumber: existingOrderDetailsFromSeller.orderNumber,
+    //       type: "order_cancelled_by_school",
+    //     },
+    //   }
+    // );
 
-    await NotificationService.sendNotification(
-      "SCHOOL_CANCELLED_ORDER_FOR_SELLER",
-      [
-        {
-          id: sellerId.toString(),
-          type: "seller",
-        },
-      ],
-      {
-        companyName: sellerProfile.companyName,
-        schoolName: schoolProfile.schoolName,
-        orderNumber: existingOrderDetailsFromSeller.orderNumber,
-        enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
-        entityId: existingOrderDetailsFromSeller._id,
-        entityType: "Order Cancel",
-        senderType: "school",
-        senderId: senderId,
-        metadata: {
-          orderNumber: existingOrderDetailsFromSeller.orderNumber,
-          type: "order_cancelled_by_school",
-        },
-      }
-    );
+    // await NotificationService.sendNotification(
+    //   "SCHOOL_CANCELLED_ORDER_FOR_SELLER",
+    //   [
+    //     {
+    //       id: sellerId.toString(),
+    //       type: "seller",
+    //     },
+    //   ],
+    //   {
+    //     companyName: sellerProfile.companyName,
+    //     schoolName: schoolProfile.schoolName,
+    //     orderNumber: existingOrderDetailsFromSeller.orderNumber,
+    //     enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
+    //     entityId: existingOrderDetailsFromSeller._id,
+    //     entityType: "Order Cancel",
+    //     senderType: "school",
+    //     senderId: senderId,
+    //     metadata: {
+    //       orderNumber: existingOrderDetailsFromSeller.orderNumber,
+    //       type: "order_cancelled_by_school",
+    //     },
+    //   }
+    // );
 
     return res.status(200).json({
       hasError: false,

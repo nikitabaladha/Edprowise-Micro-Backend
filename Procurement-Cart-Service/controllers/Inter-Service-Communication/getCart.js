@@ -1,0 +1,45 @@
+import Cart from "../../models/Cart.js";
+
+async function getCart(req, res) {
+  try {
+    const { ids = "", enquiryNumber, fields } = req.query;
+
+    if (!ids || !enquiryNumber) {
+      return res.status(400).json({
+        hasError: true,
+        message: "Both 'ids' and 'enquiryNumber' are required.",
+      });
+    }
+
+    const idArray = ids.split(",").map((id) => id.trim());
+
+    const projection = {};
+    if (fields) {
+      fields.split(",").forEach((field) => {
+        projection[field.trim()] = 1;
+      });
+    }
+
+    const carts = await Cart.find(
+      {
+        _id: { $in: idArray },
+        enquiryNumber,
+      },
+      projection
+    );
+
+    return res.status(200).json({
+      hasError: false,
+      data: carts,
+    });
+  } catch (error) {
+    console.error("Error in get cart:", error);
+    return res.status(500).json({
+      hasError: true,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+}
+
+export default getCart;

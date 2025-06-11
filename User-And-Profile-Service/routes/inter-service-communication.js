@@ -7,6 +7,8 @@ import {
   requiredFieldFromSellerProfile,
   bulkRequiredFieldsFromSellerProfile,
   requiredFieldFromEdprowise,
+  getAllAdminWithRequiredFields,
+  getRequiredFieldsBySellerIds,
 } from "../controllers/Inter-Service-Communication/index.js";
 
 const router = express.Router();
@@ -34,5 +36,9 @@ router.get(
   "/required-field-from-edprowise-profile",
   requiredFieldFromEdprowise
 );
+
+router.get("/required-field-by-sellerids", getRequiredFieldsBySellerIds);
+
+router.get("/required-field-from-all-admins", getAllAdminWithRequiredFields);
 
 export default router;

@@ -13,7 +13,7 @@ async function getSubmitQuoteBySellerIdsAndEnqNo(req, res) {
     const sellerIdArray = sellerIds.split(",").map((id) => id.trim());
 
     let projection = {};
-    if (fields) {
+    if (fields?.trim()) {
       fields.split(",").forEach((field) => {
         projection[field.trim()] = 1;
       });

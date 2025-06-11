@@ -1,9 +1,12 @@
 import OrderDetailsFromSeller from "../../models/OrderDetailsFromSeller.js";
 import OrderDetailsFromSellerValidator from "../../validators/OrderDetailsFromSeller.js";
 
-// import AdminUser from "../../../models/AdminUser.js";
-// import School from "../../../models/School.js";
-// import Seller from "../../../models/SellerProfile.js";
+import {
+  getSchoolById,
+  getSellerById,
+  getAllEdprowiseAdmins,
+} from "../AxiosRequestService/userServiceRequest.js";
+
 // import { NotificationService } from "../../../notificationService.js";
 
 async function updateByOrderNumber(req, res) {
@@ -65,103 +68,111 @@ async function updateByOrderNumber(req, res) {
         message: "Failed to update order details.",
       });
     }
+
     const schoolId = updatedOrderDetails.schoolId;
 
-    const schoolProfile = await School.findOne({
-      schoolId,
-    });
-
-    if (!schoolProfile) {
+    // Replace DB query with service call
+    const schoolResponse = await getSchoolById(schoolId, "schoolName");
+    if (schoolResponse.hasError || !schoolResponse.data) {
       return res.status(404).json({
         hasError: true,
         message: `School not found for given school ID ${schoolId}.`,
       });
     }
+    const schoolName = schoolResponse.data.schoolName;
 
-    const sellerProfile = await Seller.findOne({
-      sellerId,
-    });
-
-    if (!sellerProfile) {
+    // Replace DB query with service call
+    const sellerResponse = await getSellerById(sellerId, "companyName");
+    if (sellerResponse.hasError || !sellerResponse.data) {
       return res.status(404).json({
         hasError: true,
         message: `Seller not found for given seller ID ${sellerId}.`,
       });
     }
+    const companyName = sellerResponse.data.companyName;
 
     const senderId = req.user.id;
 
-    const relevantEdprowise = await AdminUser.find({});
+    // Replace AdminUser.find with service call
+    const adminsResponse = await getAllEdprowiseAdmins("id");
+    if (adminsResponse.hasError || !adminsResponse.data?.length) {
+      return res.status(500).json({
+        hasError: true,
+        message: "Failed to fetch Edprowise admins.",
+      });
+    }
 
-    await NotificationService.sendNotification(
-      "SELLER_DELIVERY_DATE_CHANGED_FOR_EDPROWISE",
-      relevantEdprowise.map((admin) => ({
-        id: admin._id.toString(),
-        type: "edprowise",
-      })),
-      {
-        companyName: sellerProfile.companyName,
-        schoolName: schoolProfile.schoolName,
-        orderNumber: updatedOrderDetails.orderNumber,
-        enquiryNumber: updatedOrderDetails.enquiryNumber,
-        entityId: updatedOrderDetails._id,
-        entityType: "Delivery Date Changed",
-        senderType: "seller",
-        senderId: senderId,
-        metadata: {
-          orderNumber: updatedOrderDetails.orderNumber,
-          type: "delivery_date_changed_by_seller",
-        },
-      }
-    );
+    const relevantEdprowise = adminsResponse.data;
 
-    await NotificationService.sendNotification(
-      "SELLER_DELIVERY_DATE_CHANGED_FOR_SCHOOL",
-      [
-        {
-          id: schoolId.toString(),
-          type: "school",
-        },
-      ],
-      {
-        companyName: sellerProfile.companyName,
-        schoolName: schoolProfile.schoolName,
-        orderNumber: updatedOrderDetails.orderNumber,
-        enquiryNumber: updatedOrderDetails.enquiryNumber,
-        entityId: updatedOrderDetails._id,
-        entityType: "Delivery Date Changed",
-        senderType: "seller",
-        senderId: senderId,
-        metadata: {
-          orderNumber: updatedOrderDetails.orderNumber,
-          type: "delivery_date_changed_by_seller",
-        },
-      }
-    );
+    // await NotificationService.sendNotification(
+    //   "SELLER_DELIVERY_DATE_CHANGED_FOR_EDPROWISE",
+    //   relevantEdprowise.map((admin) => ({
+    //     id: admin.id.toString(),
+    //     type: "edprowise",
+    //   })),
+    //   {
+    //     companyName,
+    //     schoolName,
+    //     orderNumber: updatedOrderDetails.orderNumber,
+    //     enquiryNumber: updatedOrderDetails.enquiryNumber,
+    //     entityId: updatedOrderDetails._id,
+    //     entityType: "Delivery Date Changed",
+    //     senderType: "seller",
+    //     senderId: senderId,
+    //     metadata: {
+    //       orderNumber: updatedOrderDetails.orderNumber,
+    //       type: "delivery_date_changed_by_seller",
+    //     },
+    //   }
+    // );
 
-    await NotificationService.sendNotification(
-      "SELLER_DELIVERY_DATE_CHANGED_FOR_SELLER",
-      [
-        {
-          id: sellerId.toString(),
-          type: "seller",
-        },
-      ],
-      {
-        companyName: sellerProfile.companyName,
-        schoolName: schoolProfile.schoolName,
-        orderNumber: updatedOrderDetails.orderNumber,
-        enquiryNumber: updatedOrderDetails.enquiryNumber,
-        entityId: updatedOrderDetails._id,
-        entityType: "Delivery Date Changed",
-        senderType: "seller",
-        senderId: senderId,
-        metadata: {
-          orderNumber: updatedOrderDetails.orderNumber,
-          type: "delivery_date_changed_by_seller",
-        },
-      }
-    );
+    // await NotificationService.sendNotification(
+    //   "SELLER_DELIVERY_DATE_CHANGED_FOR_SCHOOL",
+    //   [
+    //     {
+    //       id: schoolId.toString(),
+    //       type: "school",
+    //     },
+    //   ],
+    //   {
+    //     companyName,
+    //     schoolName,
+    //     orderNumber: updatedOrderDetails.orderNumber,
+    //     enquiryNumber: updatedOrderDetails.enquiryNumber,
+    //     entityId: updatedOrderDetails._id,
+    //     entityType: "Delivery Date Changed",
+    //     senderType: "seller",
+    //     senderId: senderId,
+    //     metadata: {
+    //       orderNumber: updatedOrderDetails.orderNumber,
+    //       type: "delivery_date_changed_by_seller",
+    //     },
+    //   }
+    // );
+
+    // await NotificationService.sendNotification(
+    //   "SELLER_DELIVERY_DATE_CHANGED_FOR_SELLER",
+    //   [
+    //     {
+    //       id: sellerId.toString(),
+    //       type: "seller",
+    //     },
+    //   ],
+    //   {
+    //     companyName,
+    //     schoolName,
+    //     orderNumber: updatedOrderDetails.orderNumber,
+    //     enquiryNumber: updatedOrderDetails.enquiryNumber,
+    //     entityId: updatedOrderDetails._id,
+    //     entityType: "Delivery Date Changed",
+    //     senderType: "seller",
+    //     senderId: senderId,
+    //     metadata: {
+    //       orderNumber: updatedOrderDetails.orderNumber,
+    //       type: "delivery_date_changed_by_seller",
+    //     },
+    //   }
+    // );
 
     return res.status(200).json({
       message: "Order details updated successfully!",

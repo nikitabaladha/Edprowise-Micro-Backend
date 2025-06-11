@@ -1,5 +1,14 @@
 // import QuoteProposal from "../../models/QuoteProposal.js";
 
+import {
+  updateQuoteProposal,
+  updateSubmitQuote,
+  getQuoteProposal,
+  fetchPrepareQuotes,
+  fetchSubmitQuoteBySellerIdAndEnqNos,
+  fetchSubmitQuoteBySellerIdsAndEnqNo,
+} from "../AxiosRequestService/quoteProposalServiceRequest.js";
+
 async function giveFeedBackAndRatingByBuyer(req, res) {
   try {
     const { enquiryNumber, sellerId, schoolId } = req.query;
@@ -33,18 +42,22 @@ async function giveFeedBackAndRatingByBuyer(req, res) {
       rating: numericRating,
     };
 
-    const updatedQuote = await QuoteProposal.findOneAndUpdate(
-      { enquiryNumber, sellerId },
-      updateData,
-      { new: true }
+    const updatedQuoteResponse = await updateQuoteProposal(
+      enquiryNumber,
+      sellerId,
+      updateData
     );
 
-    if (!updatedQuote) {
+    if (updatedQuoteResponse.hasError || !updatedQuoteResponse.data) {
       return res.status(404).json({
         hasError: true,
-        message: "Quote not found for the given enquiryNumber and sellerId.",
+        message:
+          updatedQuoteResponse.message || "Failed to update quote proposal.",
+        error: updatedQuoteResponse.error || null,
       });
     }
+
+    const updatedQuote = updatedQuoteResponse.data;
 
     return res.status(200).json({
       hasError: false,

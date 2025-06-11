@@ -1,4 +1,4 @@
-// import QuoteProposal from "../../models/QuoteProposal.js";
+import { getQuoteProposalBySellerIdEnqNoQuoteNo } from "../AxiosRequestService/quoteProposalServiceRequest.js";
 
 async function getTDSAmount(req, res) {
   try {
@@ -11,21 +11,22 @@ async function getTDSAmount(req, res) {
       });
     }
 
-    const existingQuoteProposal = await QuoteProposal.findOne({
+    const quoteProposalresponse = await getQuoteProposalBySellerIdEnqNoQuoteNo(
       enquiryNumber,
       quoteNumber,
-      sellerId,
-    });
+      sellerId
+    );
 
-    if (!existingQuoteProposal) {
+    if (quoteProposalresponse.hasError || !quoteProposalresponse.data) {
       return res.status(404).json({
         hasError: true,
         message:
           "No Quote Proposal found for the given enquiryNumber, quoteNumber, and sellerId.",
+        error: result.error,
       });
     }
 
-    const tDSAmount = existingQuoteProposal.tDSAmount || 0;
+    const tDSAmount = quoteProposalresponse.data.tDSAmount || 0;
 
     return res.status(200).json({
       hasError: false,

@@ -1,6 +1,6 @@
 import SubmitQuote from "../../models/SubmitQuote.js";
 
-async function getSubmitQuoteBySellerIdAndEnqNo(req, res) {
+async function getSubmitQuoteBySellerIdAndEnqNos(req, res) {
   try {
     const { sellerId, enquiryNumbers, fields } = req.query;
     if (!sellerId || !enquiryNumbers) {
@@ -13,7 +13,7 @@ async function getSubmitQuoteBySellerIdAndEnqNo(req, res) {
     const enquiryNumbersArray = enquiryNumbers.split(",");
 
     let projection = {};
-    if (fields) {
+    if (fields?.trim()) {
       fields.split(",").forEach((field) => {
         projection[field.trim()] = 1;
       });
@@ -33,4 +33,4 @@ async function getSubmitQuoteBySellerIdAndEnqNo(req, res) {
   }
 }
 
-export default getSubmitQuoteBySellerIdAndEnqNo;
+export default getSubmitQuoteBySellerIdAndEnqNos;
