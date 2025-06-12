@@ -20,25 +20,11 @@ async function getAllSubscription(req, res) {
 
     let schools = [];
 
-    const accessToken = req.headers["access_token"];
-
-    if (!accessToken) {
-      return res.status(401).json({
-        hasError: true,
-        message: "Access token is missing",
-      });
-    }
-
     try {
       const response = await axios.get(
         `${
           process.env.USER_SERVICE_URL
-        }/api/get-school-by-ids?ids=${schoolIds.join(",")}`,
-        {
-          headers: {
-            access_token: accessToken,
-          },
-        }
+        }/api/get-school-by-ids?ids=${schoolIds.join(",")}`
       );
       schools = response.data.data;
     } catch (error) {

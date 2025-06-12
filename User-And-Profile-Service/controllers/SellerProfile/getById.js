@@ -88,7 +88,6 @@ async function getById(req, res) {
         "Failed to fetch ratings from Procurement-Service:",
         error.message
       );
-      // Proceed with default values (0) if the service fails
     }
 
     const responseData = {

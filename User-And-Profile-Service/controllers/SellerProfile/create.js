@@ -1,12 +1,14 @@
+// Edprowise-Micro-Backend\User-And-Profile-Service\controllers\SellerProfile\create.js
+
 import SellerProfile from "../../models/SellerProfile.js";
 import SellerProfileValidator from "../../validators/SellerProfile.js";
 import Seller from "../../models/Seller.js";
+import AdminUser from "../../models/AdminUser.js";
 
 import nodemailer from "nodemailer";
 import smtpServiceClient from "../Inter-Service-Communication/smtpServiceClient.js";
 
-import AdminUser from "../../models/AdminUser.js";
-// import { NotificationService } from "../../notificationService.js";
+import { sendNotification } from "../AxiosRequestService/notificationServiceRequest.js";
 
 import mongoose from "mongoose";
 
@@ -513,25 +515,25 @@ async function create(req, res) {
 
     const relevantEdprowise = await AdminUser.find({}).session(session);
 
-    // await NotificationService.sendNotification(
-    //   "NEW_SELLER_REGISTERED",
-    //   relevantEdprowise.map((admin) => ({
-    //     id: admin._id.toString(),
-    //     type: "edprowise",
-    //   })),
-    //   {
-    //     companyName: newSellerProfile.companyName,
-    //     randomId: randomId,
-    //     entityId: newSellerProfile._id,
-    //     entityType: "Seller Registred",
-    //     senderType: "seller",
-    //     senderId: senderId,
-    //     metadata: {
-    //       sellerId: senderId,
-    //       type: "seller_registered",
-    //     },
-    //   }
-    // );
+    await sendNotification(
+      "NEW_SELLER_REGISTERED",
+      relevantEdprowise.map((admin) => ({
+        id: admin._id.toString(),
+        type: "edprowise",
+      })),
+      {
+        companyName: newSellerProfile.companyName,
+        randomId: randomId,
+        entityId: newSellerProfile._id,
+        entityType: "Seller Registred",
+        senderType: "seller",
+        senderId: senderId,
+        metadata: {
+          sellerId: senderId,
+          type: "seller_registered",
+        },
+      }
+    );
     await session.commitTransaction();
     session.endSession();
 

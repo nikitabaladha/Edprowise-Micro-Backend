@@ -1,9 +1,7 @@
 import School from "../../models/School.js";
 
-// Controller
 async function getSchoolsByIds(req, res) {
   try {
-    // Get schoolIds from query parameter (comma-separated string)
     const schoolIds = req.query.ids ? req.query.ids.split(",") : [];
 
     if (!schoolIds.length) {

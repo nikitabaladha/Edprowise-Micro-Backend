@@ -14,7 +14,6 @@ import { dirname } from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// i want to keep the current logic as it is without any chnage
 async function sendAdminRegistrationEmail(
   adminFullName,
   email,

@@ -25,6 +25,8 @@ const SERVICE_TARGETS = {
   procurementQuoteProposal: process.env.PROCUREMENT_QUOTE_PROPOSAL_SERVICE_URL,
   procurementCart: process.env.PROCUREMENT_CART_SERVICE_URL,
   procurementOrder: process.env.PROCUREMENT_ORDER_SERVICE_URL,
+
+  notification: process.env.NOTIFICATION_SERVICE_URL,
 };
 
 // Route specific API prefixes
@@ -99,7 +101,47 @@ app.use(
   })
 );
 
+app.use(
+  "/api/notification",
+  proxy(SERVICE_TARGETS.notification, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/api/notification", "/api"),
+  })
+);
+
 // ======================================
+
+app.use(
+  "/user-and-profile-service",
+  proxy(SERVICE_TARGETS.user, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/user-and-profile-service", ""),
+  })
+);
+
+app.use(
+  "/email-service",
+  proxy(SERVICE_TARGETS.email, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/email-service", ""),
+  })
+);
+
+app.use(
+  "/enquiry-service",
+  proxy(SERVICE_TARGETS.enquiry, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/enquiry-service", ""),
+  })
+);
+
+app.use(
+  "/subscription-service",
+  proxy(SERVICE_TARGETS.subscription, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/subscription-service", ""),
+  })
+);
 
 app.use(
   "/procurementCategory-service",
@@ -142,34 +184,10 @@ app.use(
 );
 
 app.use(
-  "/user-and-profile-service",
-  proxy(SERVICE_TARGETS.user, {
+  "/notification-service",
+  proxy(SERVICE_TARGETS.notification, {
     proxyReqPathResolver: (req) =>
-      req.originalUrl.replace("/user-and-profile-service", ""),
-  })
-);
-
-app.use(
-  "/email-service",
-  proxy(SERVICE_TARGETS.email, {
-    proxyReqPathResolver: (req) =>
-      req.originalUrl.replace("/email-service", ""),
-  })
-);
-
-app.use(
-  "/enquiry-service",
-  proxy(SERVICE_TARGETS.enquiry, {
-    proxyReqPathResolver: (req) =>
-      req.originalUrl.replace("/enquiry-service", ""),
-  })
-);
-
-app.use(
-  "/subscription-service",
-  proxy(SERVICE_TARGETS.subscription, {
-    proxyReqPathResolver: (req) =>
-      req.originalUrl.replace("/subscription-service", ""),
+      req.originalUrl.replace("/notification-service", ""),
   })
 );
 

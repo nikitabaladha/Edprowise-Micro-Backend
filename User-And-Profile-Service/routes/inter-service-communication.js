@@ -9,11 +9,14 @@ import {
   requiredFieldFromEdprowise,
   getAllAdminWithRequiredFields,
   getRequiredFieldsBySellerIds,
+  getSchoolsByIds,
 } from "../controllers/Inter-Service-Communication/index.js";
 
 const router = express.Router();
 
 router.post("/check-email-exists", checkEmailExists);
+
+router.get("/get-school-by-ids", getSchoolsByIds);
 
 router.get(
   "/required-field-from-school-profile/:schoolId",

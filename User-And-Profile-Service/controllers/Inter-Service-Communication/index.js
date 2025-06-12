@@ -10,6 +10,8 @@ import requiredFieldFromEdprowise from "./requiredFieldFromEdprowise.js";
 import getAllAdminWithRequiredFields from "./getAllAdminWithRequiredFields.js";
 import getRequiredFieldsBySellerIds from "./getRequiredFieldsBySellerIds.js";
 
+import getSchoolsByIds from "./getSchoolsByIds.js";
+
 export {
   checkEmailExists,
   requiredFieldFromSchoolProfile,
@@ -19,4 +21,5 @@ export {
   requiredFieldFromEdprowise,
   getAllAdminWithRequiredFields,
   getRequiredFieldsBySellerIds,
+  getSchoolsByIds,
 };

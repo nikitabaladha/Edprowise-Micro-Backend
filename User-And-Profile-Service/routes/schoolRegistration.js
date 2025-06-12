@@ -8,7 +8,6 @@ import {
   updateById,
   deleteById,
   getById,
-  getSchoolsByIds,
 } from "../controllers/SchoolRegistration/index.js";
 
 const router = express.Router();
@@ -20,8 +19,6 @@ router.get(
   roleBasedMiddleware("Admin", "School"),
   getById
 );
-
-router.get("/get-school-by-ids", roleBasedMiddleware("Admin"), getSchoolsByIds);
 
 router.put("/school/:id", upload, roleBasedMiddleware("Admin"), updateById);
 

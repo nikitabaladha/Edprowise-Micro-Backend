@@ -14,7 +14,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 import AdminUser from "../../models/AdminUser.js";
-// import { NotificationService } from "../../notificationService.js";
+
+import { sendNotification } from "../AxiosRequestService/notificationServiceRequest.js";
 
 import mongoose from "mongoose";
 
@@ -313,6 +314,7 @@ async function sendSchoolRegistrationEmail(
     };
   }
 }
+
 async function create(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -458,26 +460,26 @@ async function create(req, res) {
 
     const relevantEdprowise = await AdminUser.find({}).session(session);
 
-    // await NotificationService.sendNotification(
-    //   "NEW_SCHOOL_REGISTERED",
-    //   relevantEdprowise.map((admin) => ({
-    //     id: admin._id.toString(),
-    //     type: "edprowise",
-    //   })),
-    //   {
-    //     schoolName: newSchoolRegistration.schoolName,
-    //     schoolId: schoolId,
+    await sendNotification(
+      "NEW_SCHOOL_REGISTERED",
+      relevantEdprowise.map((admin) => ({
+        id: admin._id.toString(),
+        type: "edprowise",
+      })),
+      {
+        schoolName: newSchoolRegistration.schoolName,
+        schoolId: schoolId,
 
-    //     entityId: newSchoolRegistration._id,
-    //     entityType: "School Registred",
-    //     senderType: "school",
-    //     senderId: senderId,
-    //     metadata: {
-    //       schoolId: schoolId,
-    //       type: "school_registered",
-    //     },
-    //   }
-    // );
+        entityId: newSchoolRegistration._id,
+        entityType: "School Registred",
+        senderType: "school",
+        senderId: senderId,
+        metadata: {
+          schoolId: schoolId,
+          type: "school_registered",
+        },
+      }
+    );
 
     await session.commitTransaction();
     session.endSession();

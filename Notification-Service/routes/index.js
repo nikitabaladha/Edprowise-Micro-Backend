@@ -1,9 +1,9 @@
-import subscriptionRoutes from "./subscriptionRoutes.js";
+import Notification from "./notification.js";
 
 import InterServiceCommunication from "./inter-service-communication.js";
 
 export default (app) => {
-  app.use("/api", subscriptionRoutes);
+  app.use("/api", Notification);
 
   app.use("/api", InterServiceCommunication);
 };

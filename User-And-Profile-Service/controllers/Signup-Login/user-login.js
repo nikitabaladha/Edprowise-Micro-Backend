@@ -4,8 +4,8 @@ import User from "../../models/User.js";
 import Seller from "../../models/Seller.js";
 import saltFunction from "../../validators/saltFunction.js";
 import loginValidationSchema from "../../validators/loginValidationSchema.js";
-// import Subscription from "../../models/Subscription.js";
 
+import { getSubscriptionBySchoolId } from "../AxiosRequestService/subscriptionServiceRequest.js";
 dotenv.config();
 
 const jwtSecret = process.env.JWT_SECRET;
@@ -62,12 +62,20 @@ async function userLogin(req, res) {
     if (schemaType === "User") {
       tokenPayload.schoolId = user.schoolId;
 
-      // const subscriptions = await Subscription.find(
-      //   { schoolId: user.schoolId },
-      //   { _id: 0, subscriptionFor: 1, subscriptionEndDate: 1 }
-      // ).lean();
+      const subscriptionResponse = await getSubscriptionBySchoolId(
+        user.schoolId,
+        "subscriptionFor,subscriptionEndDate"
+      );
 
-      // tokenPayload.subscription = subscriptions || [];
+      if (subscriptionResponse.hasError) {
+        return res.status(500).json({
+          hasError: true,
+          message: "Failed to fetch subscription data",
+          error: subscriptionResponse.error,
+        });
+      }
+
+      tokenPayload.subscription = subscriptions || [];
     }
 
     const token = jwt.sign(tokenPayload, jwtSecret, {
