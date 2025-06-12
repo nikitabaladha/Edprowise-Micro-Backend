@@ -57,8 +57,7 @@ async function CancelOrderByBuyer(req, res) {
       });
     }
 
-    // Save the updated QuoteProposal
-    const updatedQuote = await existingQuote.save();
+    const updatedQuote = updatedQuoteProposal.data;
 
     const schoolProfile = await getSchoolById(schoolId);
 

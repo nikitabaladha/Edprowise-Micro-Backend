@@ -3,6 +3,7 @@ import QuoteProposal from "../../models/QuoteProposal.js";
 async function getQuoteProposalBySellerIdEnqNoQuoteNo(req, res) {
   try {
     const { enquiryNumber, quoteNumber, sellerId, fields } = req.query;
+
     if (!sellerId || !enquiryNumber || !quoteNumber) {
       return res.status(400).json({
         hasError: true,
@@ -17,15 +18,22 @@ async function getQuoteProposalBySellerIdEnqNoQuoteNo(req, res) {
       });
     }
 
-    const quotes = await QuoteProposal.find({
+    const quote = await QuoteProposal.findOne({
       enquiryNumber,
       quoteNumber,
       sellerId,
     }).select(projection);
 
+    if (!quote) {
+      return res.status(404).json({
+        hasError: true,
+        message: "Quote Proposal not found.",
+      });
+    }
+
     return res.status(200).json({
       hasError: false,
-      data: quotes,
+      data: quote,
     });
   } catch (error) {
     return res.status(500).json({ hasError: true, message: "Server error" });

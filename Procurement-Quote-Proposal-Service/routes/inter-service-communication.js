@@ -38,7 +38,7 @@ router.get(
 );
 
 router.get(
-  "/quote-proposal-by-Sellerid-and-enqno",
+  "/prepare-quote-by-Sellerid-and-enqno",
   getPrepareQuoteBySellerIdAndEnqNo
 );
 
@@ -59,7 +59,7 @@ router.get(
 
 router.get("/get-prepare-quotes", getPrepareQuotes);
 
-router.get("/get-quote-prposal", getQuoteProposal);
+router.get("/get-quote-proposal", getQuoteProposal);
 
 router.put("/update-submitquote-by-status", updateSubmitQuoteStatus);
 

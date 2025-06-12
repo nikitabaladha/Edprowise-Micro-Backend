@@ -1072,6 +1072,11 @@ async function updateStatus(req, res) {
       Delivered: "In-Transit",
     };
 
+    console.log(
+      "Current Supplier Status:===========================================",
+      currentOrder.supplierStatus
+    );
+
     if (currentOrder.supplierStatus !== statusFlow[supplierStatus]) {
       await session.abortTransaction();
       session.endSession();

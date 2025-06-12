@@ -20,7 +20,7 @@ async function getQuoteProposal(req, res) {
       });
     }
 
-    const quoteProposal = await QuoteProposal.find(
+    const quoteProposal = await QuoteProposal.findOne(
       {
         sellerId: sellerId,
         enquiryNumber: enquiryNumber,

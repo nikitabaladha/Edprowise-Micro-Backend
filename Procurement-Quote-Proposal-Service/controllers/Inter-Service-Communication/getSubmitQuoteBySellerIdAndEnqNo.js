@@ -17,7 +17,7 @@ async function getSubmitQuoteBySellerIdAndEnqNo(req, res) {
       });
     }
 
-    const quotes = await SubmitQuote.find({
+    const quotes = await SubmitQuote.findOne({
       sellerId,
       enquiryNumber,
     }).select(projection);

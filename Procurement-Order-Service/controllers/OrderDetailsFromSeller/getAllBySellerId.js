@@ -1,7 +1,8 @@
 import OrderDetailsFromSeller from "../../models/OrderDetailsFromSeller.js";
+
 import { getQuoteRequestByEnquiryNumber } from "../AxiosRequestService/quoteRequestServiceRequest.js";
 import {
-  getQuoteProposal,
+  getQuoteProposalBySellerIdEnqNoQuoteNo,
   fetchPrepareQuoteBySellerIdAndEnqNo,
   fetchSubmitQuoteBySellerIdAndEnqNo,
 } from "../AxiosRequestService/quoteProposalServiceRequest.js";
@@ -19,10 +20,10 @@ async function getAllBySellerId(req, res) {
 
   try {
     const orderDetails = await OrderDetailsFromSeller.find({ sellerId: id })
-      .select(
-        "orderNumber createdAt actualDeliveryDate enquiryNumber sellerId schoolId invoiceForSchool invoiceForEdprowise"
-      )
       .sort({ createdAt: -1 })
+      .select(
+        "_id orderNumber quoteNumber createdAt actualDeliveryDate enquiryNumber sellerId schoolId invoiceForSchool invoiceForEdprowise"
+      )
       .lean();
 
     if (!orderDetails.length) {
@@ -32,101 +33,104 @@ async function getAllBySellerId(req, res) {
       });
     }
 
-    // Fetch company name from Seller Service
-    const sellerProfileResponse = await getSellerById(id, "companyName");
-    const companyName = sellerProfileResponse?.data?.companyName || null;
-
     const enrichedOrders = await Promise.all(
       orderDetails.map(async (order) => {
-        const { enquiryNumber } = order;
+        const { enquiryNumber, sellerId, quoteNumber } = order;
 
-        // Fetch quote request
-        const quoteRequestResponse = await getQuoteRequestByEnquiryNumber(
-          enquiryNumber,
-          "expectedDeliveryDate"
-        );
-        const quoteRequest = quoteRequestResponse?.data || {};
+        // Field strings
+        const quoteRequestFields = "expectedDeliveryDate";
+        const quoteProposalFields = `
+              totalAmountBeforeGstAndDiscount,
+              totalAmount,
+              totalTaxableValue,
+              totalTaxAmount,
+              finalPayableAmountWithTDS,
+              tDSAmount,
+              tdsValue,
+              supplierStatus,
+              edprowiseStatus,
+              buyerStatus,
+              updatedAt,
+              rating,
+              feedbackComment
+            `;
+        const submitQuoteFields = `
+              advanceRequiredAmount,
+              deliveryCharges
+            `;
+        const prepareQuoteFields = `
+              cgstRate,
+              sgstRate,
+              igstRate
+            `;
+        const sellerFields = "companyName";
 
-        // Fetch quote proposal
-        const quoteProposalResponse = await getQuoteProposal(
-          enquiryNumber,
-          id,
-          [
-            "totalAmountBeforeGstAndDiscount",
-            "totalAmount",
-            "orderStatus",
-            "totalTaxableValue",
-            "totalTaxAmount",
-            "finalPayableAmountWithTDS",
-            "tDSAmount",
-            "tdsValue",
-            "supplierStatus",
-            "edprowiseStatus",
-            "buyerStatus",
-            "totalTaxableValueForEdprowise",
-            "totalAmountForEdprowise",
-            "totalTaxAmountForEdprowise",
-            "tdsValueForEdprowise",
-            "finalPayableAmountWithTDSForEdprowise",
-          ]
-        );
-        const quoteProposal = quoteProposalResponse?.data || {};
+        // Parallel API calls
+        const [
+          quoteRequestRes,
+          quoteProposalRes,
+          submitQuoteRes,
+          sellerProfileRes,
+          prepareQuoteRes,
+        ] = await Promise.all([
+          getQuoteRequestByEnquiryNumber(enquiryNumber, quoteRequestFields),
+          getQuoteProposalBySellerIdEnqNoQuoteNo(
+            enquiryNumber,
+            quoteNumber,
+            sellerId,
+            quoteProposalFields
+          ),
+          fetchSubmitQuoteBySellerIdAndEnqNo(
+            sellerId,
+            enquiryNumber,
+            submitQuoteFields
+          ),
+          getSellerById(sellerId, sellerFields),
+          fetchPrepareQuoteBySellerIdAndEnqNo(
+            sellerId,
+            enquiryNumber,
+            prepareQuoteFields
+          ),
+        ]);
 
-        // Fetch prepare quote
-        const prepareQuoteResponse = await fetchPrepareQuoteBySellerIdAndEnqNo(
-          id,
-          enquiryNumber,
-          [
-            "cgstRate",
-            "sgstRate",
-            "igstRate",
-            "cgstRateForEdprowise",
-            "sgstRateForEdprowise",
-            "igstRateForEdprowise",
-          ]
-        );
-        const prepareQuote = prepareQuoteResponse?.data || {};
-
-        // Fetch submit quote
-        const submitQuoteResponse = await fetchSubmitQuoteBySellerIdAndEnqNo(
-          id,
-          enquiryNumber,
-          ["advanceRequiredAmount", "deliveryCharges"]
-        );
-        const submitQuote = submitQuoteResponse?.data || {};
+        const quoteRequest = quoteRequestRes.data || {};
+        const quoteProposals = quoteProposalRes.data || {};
+        const submitQuote = submitQuoteRes.data || {};
+        const sellerProfile = sellerProfileRes.data || {};
+        const prepareQuote = prepareQuoteRes.data || {};
 
         return {
-          ...order,
-          companyName,
+          _id: order._id,
+          orderNumber: order.orderNumber,
+          enquiryNumber: order.enquiryNumber,
+          quoteNumber: order.quoteNumber,
+          sellerId: order.sellerId,
+          schoolId: order.schoolId,
+          actualDeliveryDate: order.actualDeliveryDate || null,
+          otherCharges: order.otherCharges || 0,
+          createdAt: order.createdAt,
           expectedDeliveryDate: quoteRequest?.expectedDeliveryDate || null,
-          supplierStatus: quoteProposal?.supplierStatus || null,
-          buyerStatus: quoteProposal?.buyerStatus || null,
-          orderStatus: quoteProposal?.orderStatus || null,
-          edprowiseStatus: quoteProposal?.edprowiseStatus || null,
+          supplierStatus: quoteProposals?.supplierStatus || null,
+          buyerStatus: quoteProposals?.buyerStatus || null,
+          edprowiseStatus: quoteProposals?.edprowiseStatus || null,
           totalAmountBeforeGstAndDiscount:
-            quoteProposal?.totalAmountBeforeGstAndDiscount || null,
-          totalAmount: quoteProposal?.totalAmount || null,
-          totalAmountForEdprowise: quoteProposal?.totalAmountForEdprowise || 0,
-          totalTaxableValue: quoteProposal?.totalTaxableValue || null,
-          totalGstAmount: quoteProposal?.totalTaxAmount || null,
-          totalGstAmountForEdprowise:
-            quoteProposal?.totalTaxAmountForEdprowise || 0,
-          totalTaxableValueForEdprowise:
-            quoteProposal?.totalTaxableValueForEdprowise || 0,
-          advanceAdjustment: submitQuote?.advanceRequiredAmount || 0,
-          tdsValue: quoteProposal?.tdsValue || 0,
-          tdsValueForEdprowise: quoteProposal?.tdsValueForEdprowise || 0,
+            quoteProposals?.totalAmountBeforeGstAndDiscount || 0,
+          totalAmount: quoteProposals?.totalAmount || 0,
+          totalTaxableValue: quoteProposals?.totalTaxableValue || 0,
+          totalGstAmount: quoteProposals?.totalTaxAmount || 0,
+          tdsValue: quoteProposals?.tdsValue || 0,
           finalPayableAmountWithTDS:
-            quoteProposal?.finalPayableAmountWithTDS || 0,
-          finalPayableAmountWithTDSForEdprowise:
-            quoteProposal?.finalPayableAmountWithTDSForEdprowise || 0,
-          tDSAmount: quoteProposal?.tDSAmount || 0,
+            quoteProposals?.finalPayableAmountWithTDS || 0,
+          tDSAmount: quoteProposals?.tDSAmount || 0,
+          updatedAt: quoteProposals?.updatedAt,
+          rating: quoteProposals?.rating || 0,
+          feedbackComment: quoteProposals?.feedbackComment || null,
+          advanceAdjustment: submitQuote?.advanceRequiredAmount || 0,
+          deliveryCharges: submitQuote?.deliveryCharges || 0,
+          companyName: sellerProfile?.companyName || "Not Available",
           cgstRate: prepareQuote?.cgstRate || 0,
           sgstRate: prepareQuote?.sgstRate || 0,
           igstRate: prepareQuote?.igstRate || 0,
-          cgstRateForEdprowise: prepareQuote?.cgstRateForEdprowise || 0,
-          sgstRateForEdprowise: prepareQuote?.sgstRateForEdprowise || 0,
-          igstRateForEdprowise: prepareQuote?.igstRateForEdprowise || 0,
         };
       })
     );

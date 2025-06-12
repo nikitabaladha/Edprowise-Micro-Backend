@@ -73,7 +73,7 @@ export async function updateSubmitQuote(enquiryNumber, sellerId, updateData) {
 export async function getQuoteProposal(enquiryNumber, sellerId, fields) {
   try {
     const response = await axios.get(
-      `${process.env.PROCUREMENT_QUOTE_PROPOSAL_SERVICE_URL}/api/get-quote-prposal`,
+      `${process.env.PROCUREMENT_QUOTE_PROPOSAL_SERVICE_URL}/api/get-quote-proposal`,
       {
         params: { enquiryNumber, sellerId, fields },
       }
@@ -117,6 +117,8 @@ export async function getQuoteProposalBySellerIdEnqNoQuoteNo(
         params: { enquiryNumber, quoteNumber, sellerId, fields },
       }
     );
+
+    console.log("Raw service response:", response.data);
 
     if (response.data.hasError) {
       return {
@@ -448,7 +450,7 @@ export async function fetchPrepareQuoteBySellerIdAndEnqNo(
 ) {
   try {
     const response = await axios.get(
-      `${process.env.PROCUREMENT_QUOTE_PROPOSAL_SERVICE_URL}/api/quote-proposal-by-Sellerid-and-enqno`,
+      `${process.env.PROCUREMENT_QUOTE_PROPOSAL_SERVICE_URL}/api/prepare-quote-by-Sellerid-and-enqno`,
       {
         params: {
           sellerId,
