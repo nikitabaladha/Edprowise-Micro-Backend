@@ -1,6 +1,6 @@
 import Subscription from "../../models/Subscription.js";
 
-import axios from "axios";
+import { getSchoolsByIds } from "../AxiosRequestService/userServiceRequest.js";
 
 async function getAllSubscription(req, res) {
   try {
@@ -18,20 +18,17 @@ async function getAllSubscription(req, res) {
       (subscription) => subscription.schoolId
     );
 
-    let schools = [];
+    const schoolResponse = await getSchoolsByIds(schoolIds, [
+      "schoolId",
+      "schoolName",
+      "schoolMobileNo",
+      "schoolEmail",
+      "profileImage",
+      "schoolAddress",
+      "schoolLocation",
+    ]);
 
-    try {
-      const response = await axios.get(
-        `${
-          process.env.USER_SERVICE_URL
-        }/api/get-school-by-ids?ids=${schoolIds.join(",")}`
-      );
-      schools = response.data.data;
-    } catch (error) {
-      console.error("Error fetching schools from User-Service:", error.message);
-      // Continue with empty array if school fetch fails
-      schools = [];
-    }
+    const schools = !schoolResponse.hasError ? schoolResponse.data : [];
 
     const schoolMap = new Map(
       schools.map((school) => [school.schoolId, school])
@@ -57,7 +54,7 @@ async function getAllSubscription(req, res) {
 
     return res.status(200).json({
       hasError: false,
-      message: "Subscriptions retrieved successfully 12345678",
+      message: "Subscriptions retrieved successfully",
       data: formattedSubscriptions,
     });
   } catch (error) {

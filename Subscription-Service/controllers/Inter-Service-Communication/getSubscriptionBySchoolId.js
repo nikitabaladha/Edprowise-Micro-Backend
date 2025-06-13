@@ -32,3 +32,27 @@ async function getSubscriptionBySchoolId(req, res) {
 }
 
 export default getSubscriptionBySchoolId;
+
+// export async function getSchoolById(schoolId, fields) {
+//   try {
+//     const response = await axios.get(
+//       `${process.env.USER_SERVICE_URL}/api/required-field-from-school-profile/${schoolId}`,
+//       {
+//         params: fields ? { fields } : {},
+//       }
+//     );
+//     return response.data;
+//   } catch (err) {
+//     console.error("Error in getSchoolById:", {
+//       message: err.message,
+//       response: err.response?.data,
+//       status: err.response?.status,
+//       config: err.config,
+//     });
+//     return {
+//       hasError: true,
+//       message: "Failed to fetch school profile.",
+//       error: err.message,
+//     };
+//   }
+// }

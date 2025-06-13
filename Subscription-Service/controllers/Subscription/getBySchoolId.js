@@ -1,4 +1,5 @@
 import Subscription from "../../models/Subscription.js";
+import { getSchoolById } from "../AxiosRequestService/userServiceRequest.js";
 
 async function getBySchoolId(req, res) {
   try {
@@ -11,16 +12,26 @@ async function getBySchoolId(req, res) {
       });
     }
 
-    const subscriptions = await Subscription.find({ schoolId })
-      .populate("schoolId", "schoolName schoolEmail schoolMobileNo")
-      .exec();
+    const subscriptions = await Subscription.find({ schoolId }).sort({
+      createdAt: -1,
+    });
 
-    if (subscriptions.length === 0) {
+    if (!subscriptions.length) {
       return res.status(404).json({
         success: false,
         message: "No subscriptions found for this school.",
       });
     }
+
+    // Fetch school data from User Service
+    const schoolResponse = await getSchoolById(schoolId, [
+      "schoolId",
+      "schoolName",
+      "schoolEmail",
+      "schoolMobileNo",
+    ]);
+
+    const schoolData = !schoolResponse.hasError ? schoolResponse.data : {};
 
     // Map the subscriptions to the desired format
     const formattedData = subscriptions.map((subscription) => ({
@@ -32,17 +43,19 @@ async function getBySchoolId(req, res) {
       monthlyRate: subscription.monthlyRate,
       createdAt: subscription.createdAt,
       updatedAt: subscription.updatedAt,
-      __v: subscription.__v,
+      schoolName: schoolData?.schoolName || null,
+      schoolEmail: schoolData?.schoolEmail || null,
+      schoolMobileNo: schoolData?.schoolMobileNo || null,
     }));
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Subscriptions retrieved successfully.",
       data: formattedData,
     });
   } catch (error) {
     console.error("Error fetching subscriptions:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "An error occurred while fetching subscriptions.",
     });

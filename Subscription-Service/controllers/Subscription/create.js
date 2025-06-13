@@ -2,12 +2,12 @@ import Subscription from "../../models/Subscription.js";
 import SubscriptionValidator from "../../validators/SubscriptionValidator.js";
 import mongoose from "mongoose";
 
-import axios from "axios";
+import { sendNotification } from "../AxiosRequestService/notificationServiceRequest.js";
 
-// import School from "../../../models/School.js";
-// import AdminUser from "../../../models/AdminUser.js";
-
-// import { NotificationService } from "../../../notificationService.js";
+import {
+  getSchoolById,
+  getAllEdprowiseAdmins,
+} from "../AxiosRequestService/userServiceRequest.js";
 
 async function create(req, res) {
   const session = await mongoose.startSession();
@@ -32,46 +32,37 @@ async function create(req, res) {
       monthlyRate,
     } = req.body;
 
-    let schoolExists;
+    // try {
+    //   const response = await axios.get(
+    //     `${process.env.USER_SERVICE_URL}/api/school/${schoolId}`,
+    //     {
+    //       headers: {
+    //         access_token: accessToken,
+    //       },
+    //     }
+    //   );
+    //   schoolExists = response.data.data;
+    // } catch (err) {
+    //   await session.abortTransaction();
+    //   session.endSession();
 
-    const accessToken = req.headers["access_token"];
+    //   if (err.response && err.response.status === 404) {
+    //     return res.status(404).json({
+    //       hasError: true,
+    //       message: "School not found.",
+    //     });
+    //   }
 
-    if (!accessToken) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(401).json({
-        hasError: true,
-        message: "Access token is missing",
-      });
-    }
+    //   console.error("Error fetching school from User-Service:", err.message);
+    //   return res.status(500).json({
+    //     hasError: true,
+    //     message: "Failed to fetch school details from User-Service.",
+    //   });
+    // }
 
-    try {
-      const response = await axios.get(
-        `${process.env.USER_SERVICE_URL}/api/school/${schoolId}`,
-        {
-          headers: {
-            access_token: accessToken,
-          },
-        }
-      );
-      schoolExists = response.data.data;
-    } catch (err) {
-      await session.abortTransaction();
-      session.endSession();
+    const schoolResponse = await getSchoolById(schoolId);
 
-      if (err.response && err.response.status === 404) {
-        return res.status(404).json({
-          hasError: true,
-          message: "School not found.",
-        });
-      }
-
-      console.error("Error fetching school from User-Service:", err.message);
-      return res.status(500).json({
-        hasError: true,
-        message: "Failed to fetch school details from User-Service.",
-      });
-    }
+    const schoolExists = schoolResponse.data;
 
     if (!schoolExists) {
       await session.abortTransaction();
@@ -139,62 +130,64 @@ async function create(req, res) {
 
     const senderId = req.user.id;
 
-    // const relevantEdprowise = await AdminUser.find({});
+    const adminResponse = await getAllEdprowiseAdmins("email _id");
+
+    const relevantEdprowise = adminResponse.data;
 
     const formatDate = (date) =>
       date.toDateString() + " " + date.toTimeString().split(" ")[0];
 
-    // await NotificationService.sendNotification(
-    //   "SCHOOL_SUbCRPTION_BY_EDPROWISE",
-    //   relevantEdprowise.map((admin) => ({
-    //     id: admin._id.toString(),
-    //     type: "edprowise",
-    //   })),
-    //   {
-    //     schoolName: schoolExists.schoolName,
-    //     schoolId: schoolId,
-    //     subscriptionFor: newSubscription.subscriptionFor,
-    //     subscriptionStartDate: formatDate(
-    //       newSubscription.subscriptionStartDate
-    //     ),
-    //     subscriptionEndDate: formatDate(newSubscription.subscriptionEndDate),
-    //     entityId: newSubscription._id,
-    //     entityType: "School Subscription",
-    //     senderType: "edprowise",
-    //     senderId: senderId,
-    //     metadata: {
-    //       subscriptionId: newSubscription._id,
-    //       type: "school_subscription",
-    //     },
-    //   }
-    // );
+    await await sendNotification(
+      "SCHOOL_SUbCRPTION_BY_EDPROWISE",
+      relevantEdprowise.map((admin) => ({
+        id: admin._id.toString(),
+        type: "edprowise",
+      })),
+      {
+        schoolName: schoolExists.schoolName,
+        schoolId: schoolId,
+        subscriptionFor: newSubscription.subscriptionFor,
+        subscriptionStartDate: formatDate(
+          newSubscription.subscriptionStartDate
+        ),
+        subscriptionEndDate: formatDate(newSubscription.subscriptionEndDate),
+        entityId: newSubscription._id,
+        entityType: "School Subscription",
+        senderType: "edprowise",
+        senderId: senderId,
+        metadata: {
+          subscriptionId: newSubscription._id,
+          type: "school_subscription",
+        },
+      }
+    );
 
-    // await NotificationService.sendNotification(
-    //   "SCHOOL_SUbCRPTION",
-    //   [
-    //     {
-    //       id: schoolExists.schoolId.toString(),
-    //       type: "school",
-    //     },
-    //   ],
-    //   {
-    //     schoolName: schoolExists.schoolName,
-    //     schoolId: schoolId,
-    //     subscriptionFor: newSubscription.subscriptionFor,
-    //     subscriptionStartDate: formatDate(
-    //       newSubscription.subscriptionStartDate
-    //     ),
-    //     subscriptionEndDate: formatDate(newSubscription.subscriptionEndDate),
-    //     entityId: newSubscription._id,
-    //     entityType: "School Subscription",
-    //     senderType: "edprowise",
-    //     senderId: senderId,
-    //     metadata: {
-    //       subscriptionId: newSubscription._id,
-    //       type: "school_subscription",
-    //     },
-    //   }
-    // );
+    await sendNotification(
+      "SCHOOL_SUbCRPTION",
+      [
+        {
+          id: schoolExists.schoolId.toString(),
+          type: "school",
+        },
+      ],
+      {
+        schoolName: schoolExists.schoolName,
+        schoolId: schoolId,
+        subscriptionFor: newSubscription.subscriptionFor,
+        subscriptionStartDate: formatDate(
+          newSubscription.subscriptionStartDate
+        ),
+        subscriptionEndDate: formatDate(newSubscription.subscriptionEndDate),
+        entityId: newSubscription._id,
+        entityType: "School Subscription",
+        senderType: "edprowise",
+        senderId: senderId,
+        metadata: {
+          subscriptionId: newSubscription._id,
+          type: "school_subscription",
+        },
+      }
+    );
 
     await session.commitTransaction();
     session.endSession();

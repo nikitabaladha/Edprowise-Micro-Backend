@@ -1,5 +1,3 @@
-// Edprowise-Micro-Backend\User-And-Profile-Service\controllers\SchoolRegistration\requiredFieldFromSchoolProfile.js
-
 import School from "../../models/School.js";
 
 async function requiredFieldFromSchoolProfile(req, res) {

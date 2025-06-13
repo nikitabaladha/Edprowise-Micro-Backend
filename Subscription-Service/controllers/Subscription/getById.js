@@ -1,6 +1,5 @@
 import Subscription from "../../models/Subscription.js";
-
-import axios from "axios";
+import { getSchoolById } from "../AxiosRequestService/userServiceRequest.js";
 
 async function getById(req, res) {
   try {
@@ -22,41 +21,31 @@ async function getById(req, res) {
       });
     }
 
-    const accessToken = req.headers["access_token"];
+    const schoolResponse = await getSchoolById(subscription.schoolId, [
+      "schoolId",
+      "schoolName",
+      "schoolMobileNo",
+      "schoolEmail",
+      "profileImage",
+      "schoolAddress",
+    ]);
 
-    if (!accessToken) {
-      return res.status(401).json({
-        hasError: true,
-        message: "Access token is missing",
-      });
-    }
-
-    let school;
-
-    try {
-      const response = await axios.get(
-        `${process.env.USER_SERVICE_URL}/api/school/${subscription.schoolId}`,
-        {
-          headers: {
-            access_token: accessToken,
-          },
-        }
-      );
-      school = response.data.data;
-    } catch (err) {
-      if (err.response && err.response.status === 404) {
+    if (schoolResponse.hasError) {
+      if (schoolResponse.status === 404) {
         return res.status(404).json({
           hasError: true,
           message: "School not found.",
         });
       }
 
-      console.error("Error fetching school from User-Service:", err.message);
       return res.status(500).json({
         hasError: true,
         message: "Failed to fetch school details from User-Service.",
+        error: schoolResponse.error,
       });
     }
+
+    const school = schoolResponse.data;
 
     const formattedSubscription = {
       id: subscription._id,
