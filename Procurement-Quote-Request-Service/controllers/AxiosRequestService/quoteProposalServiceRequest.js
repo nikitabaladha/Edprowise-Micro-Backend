@@ -181,50 +181,6 @@ export async function fetchPrepareQuotes(enquiryNumber, ids, fields) {
   }
 }
 
-export async function fetchSubmitQuoteBySellerIdAndEnqNos(
-  sellerId,
-  enquiryNumbers,
-  fields
-) {
-  try {
-    const response = await axios.get(
-      `${process.env.PROCUREMENT_QUOTE_PROPOSAL_SERVICE_URL}/api/submitquote-by-Sellerid-and-enq-nos`,
-      {
-        params: {
-          sellerId,
-          enquiryNumbers: Array.isArray(enquiryNumbers)
-            ? enquiryNumbers.join(",")
-            : enquiryNumbers,
-          fields,
-        },
-      }
-    );
-
-    if (response.data.hasError) {
-      return {
-        hasError: true,
-        message: "Failed to get submit quotes.",
-        error: response.data.error || "Unknown error",
-      };
-    }
-
-    return response.data;
-  } catch (err) {
-    console.error("Error getting submit quotes:", {
-      message: err.message,
-      response: err.response?.data,
-      status: err.response?.status,
-      config: err.config,
-    });
-
-    return {
-      hasError: true,
-      message: "Failed to get submit quotes.",
-      error: err.message,
-    };
-  }
-}
-
 export async function fetchSubmitQuoteBySellerIdAndEnqNo(
   sellerId,
   enquiryNumber,
@@ -478,6 +434,50 @@ export async function fetchPrepareQuoteBySellerIdAndEnqNo(
     return {
       hasError: true,
       message: "Failed to get prepare quote.",
+      error: err.message,
+    };
+  }
+}
+
+export async function fetchSubmitQuoteBySellerIdAndEnqNos(
+  sellerId,
+  enquiryNumbers,
+  fields
+) {
+  try {
+    const response = await axios.get(
+      `${process.env.PROCUREMENT_QUOTE_PROPOSAL_SERVICE_URL}/api/submitquote-by-Sellerid-and-enq-nos`,
+      {
+        params: {
+          sellerId,
+          enquiryNumbers: Array.isArray(enquiryNumbers)
+            ? enquiryNumbers.join(",")
+            : enquiryNumbers,
+          fields,
+        },
+      }
+    );
+
+    if (response.data.hasError) {
+      return {
+        hasError: true,
+        message: "Failed to get submit quotes.",
+        error: response.data.error || "Unknown error",
+      };
+    }
+
+    return response.data;
+  } catch (err) {
+    console.error("Error getting submit quotes:", {
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status,
+      config: err.config,
+    });
+
+    return {
+      hasError: true,
+      message: "Failed to get submit quotes.",
       error: err.message,
     };
   }

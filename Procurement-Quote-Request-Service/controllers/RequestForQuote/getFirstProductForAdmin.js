@@ -1,7 +1,10 @@
 import QuoteRequest from "../../models/QuoteRequest.js";
 import Product from "../../models/Product.js";
 
-import axios from "axios";
+import {
+  getCategoryById,
+  getSubCategoriesByIds,
+} from "../AxiosRequestService/categoryServiceRequest.js";
 
 async function getFirstProductForAdmin(req, res) {
   try {
@@ -17,24 +20,22 @@ async function getFirstProductForAdmin(req, res) {
         let subCategoryData = null;
 
         if (product?.categoryId) {
-          try {
-            const categoryRes = await axios.get(
-              `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/categories/${product.categoryId}`
-            );
-            categoryData = categoryRes.data?.data || null;
-          } catch (err) {
-            console.error("Failed to fetch category:", err.message);
+          const categoryRes = await getCategoryById(product.categoryId);
+          if (!categoryRes.hasError) {
+            categoryData = categoryRes.data || null;
+          } else {
+            console.error("Failed to fetch category:", categoryRes.error);
           }
         }
 
         if (product?.subCategoryId) {
-          try {
-            const subCategoryRes = await axios.get(
-              `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/subcategories/?ids=${product.subCategoryId}`
-            );
-            subCategoryData = subCategoryRes.data?.data?.[0] || null;
-          } catch (err) {
-            console.error("Failed to fetch subcategory:", err.message);
+          const subCategoryRes = await getSubCategoriesByIds([
+            product.subCategoryId,
+          ]);
+          if (!subCategoryRes.hasError) {
+            subCategoryData = subCategoryRes.data?.[0] || null;
+          } else {
+            console.error("Failed to fetch subcategory:", subCategoryRes.error);
           }
         }
 

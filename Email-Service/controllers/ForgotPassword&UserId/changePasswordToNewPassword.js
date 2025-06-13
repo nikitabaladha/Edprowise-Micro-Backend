@@ -266,7 +266,7 @@ const sendPasswordUpdateEmail = async (
   }
 };
 
-const resetUserOrSellerPassword = async (req, res) => {
+const resetUpdateUserOrSellerPassword = async (req, res) => {
   try {
     const { userId, newPassword } = req.body;
 
@@ -302,4 +302,4 @@ const resetUserOrSellerPassword = async (req, res) => {
   }
 };
 
-export default resetUserOrSellerPassword;
+export default resetUpdateUserOrSellerPassword;

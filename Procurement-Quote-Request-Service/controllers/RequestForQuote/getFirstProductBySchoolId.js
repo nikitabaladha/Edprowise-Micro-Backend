@@ -1,7 +1,10 @@
 import QuoteRequest from "../../models/QuoteRequest.js";
 import Product from "../../models/Product.js";
 
-import axios from "axios";
+import {
+  getCategoryById,
+  getSubCategoriesByIds,
+} from "../AxiosRequestService/categoryServiceRequest.js";
 
 async function getBySchoolId(req, res) {
   const schoolId = req.user?.schoolId;
@@ -25,7 +28,6 @@ async function getBySchoolId(req, res) {
           enquiryNumber: quote.enquiryNumber,
         }).exec();
 
-        // Get only the first product if available
         const firstProduct = products.length > 0 ? products[0] : null;
 
         let categoryName = null;
@@ -33,21 +35,19 @@ async function getBySchoolId(req, res) {
 
         if (firstProduct) {
           try {
-            // Fetch category data
             if (firstProduct.categoryId) {
-              const categoryResponse = await axios.get(
-                `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/categories/${firstProduct.categoryId}`
+              const categoryResponse = await getCategoryById(
+                firstProduct.categoryId
               );
-              categoryName = categoryResponse.data.data?.categoryName || null;
+              categoryName = categoryResponse?.data?.categoryName || null;
             }
 
-            // Fetch subcategory data
             if (firstProduct.subCategoryId) {
-              const subCategoryResponse = await axios.get(
-                `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/subcategories?ids=${firstProduct.subCategoryId}`
-              );
+              const subCategoryResponse = await getSubCategoriesByIds([
+                firstProduct.subCategoryId,
+              ]);
               subCategoryName =
-                subCategoryResponse.data.data?.[0]?.subCategoryName || null;
+                subCategoryResponse?.data?.[0]?.subCategoryName || null;
             }
           } catch (error) {
             console.error("Error fetching category/subcategory data:", {

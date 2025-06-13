@@ -2,7 +2,8 @@ import SellerProfile from "../../models/SellerProfile.js";
 
 async function sellersByProducts(req, res) {
   try {
-    const { categoryIds, subCategoryIds } = req.body;
+    const categoryIds = req.query.categoryIds?.split(",") || [];
+    const subCategoryIds = req.query.subCategoryIds?.split(",") || [];
 
     const sellers = await SellerProfile.find({
       "dealingProducts.categoryId": { $in: categoryIds },

@@ -5,7 +5,6 @@ import updateById from "./updateById.js";
 import getAll from "./getAll.js";
 import getByIdForAdmin from "./getByIdForAdmin.js";
 import deleteBySellerId from "./deleteBySellerId.js";
-import sellersByProducts from "./sellersByProducts.js";
 
 export {
   create,
@@ -15,5 +14,4 @@ export {
   getAll,
   getByIdForAdmin,
   deleteBySellerId,
-  sellersByProducts,
 };

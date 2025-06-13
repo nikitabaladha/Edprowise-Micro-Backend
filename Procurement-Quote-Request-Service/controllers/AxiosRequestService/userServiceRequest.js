@@ -1,17 +1,5 @@
 import axios from "axios";
 
-async function getSchoolDetails(schoolId, accessToken) {
-  const url = `${process.env.USER_SERVICE_URL}/api/school/${schoolId}`;
-  const response = await axios.get(url, {
-    headers: {
-      access_token: accessToken,
-    },
-  });
-  return response.data.data;
-}
-
-// ===================
-
 export async function getallSellersByIds(sellerIds, fields) {
   try {
     const response = await axios.get(
@@ -178,6 +166,38 @@ export async function getSellerByDealingProducts(sellerId) {
     const response = await axios.get(
       `${process.env.USER_SERVICE_URL}/api/seller-by-dealing-products/${sellerId}`
     );
+    return response.data;
+  } catch (err) {
+    console.error("Error in get Seller by dealing products", {
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status,
+      config: err.config,
+    });
+
+    return {
+      hasError: true,
+      message: "Failed to fetch seller by dealing products.",
+      error: err.message,
+    };
+  }
+}
+
+export async function getsellersByProducts(
+  categoryIds = [],
+  subCategoryIds = []
+) {
+  try {
+    const response = await axios.get(
+      `${process.env.USER_SERVICE_URL}/api/sellers-by-products`,
+      {
+        params: {
+          categoryIds: categoryIds.join(","),
+          subCategoryIds: subCategoryIds.join(","),
+        },
+      }
+    );
+
     return response.data;
   } catch (err) {
     console.error("Error in get Seller by dealing products", {

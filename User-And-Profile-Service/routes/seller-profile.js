@@ -11,7 +11,6 @@ import {
   getAll,
   getByIdForAdmin,
   deleteBySellerId,
-  sellersByProducts,
 } from "../controllers/SellerProfile/index.js";
 
 router.post("/seller-profile", upload, roleBasedMiddleware("Seller"), create);
@@ -22,8 +21,6 @@ router.post(
   roleBasedMiddleware("Admin"),
   createByAdmin
 );
-
-router.post("/sellers-by-products", sellersByProducts);
 
 router.put(
   "/seller-profile/:sellerId",

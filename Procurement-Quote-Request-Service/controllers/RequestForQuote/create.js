@@ -7,16 +7,18 @@ import ProductValidator from "../../validators/Product.js";
 import nodemailer from "nodemailer";
 import smtpServiceClient from "../Inter-Service-Communication/smtpServiceClient.js";
 
-import axios from "axios";
+import { sendNotification } from "../AxiosRequestService/notificationServiceRequest.js";
 
-// import SellerProfile from "../../../models/SellerProfile.js";
-// import AdminUser from "../../models/AdminUser.js";
-// import School from "../../../models/School.js";
+import {
+  getCategoryById,
+  getSubCategoriesByIds,
+} from "../AxiosRequestService/categoryServiceRequest.js";
 
-// import { NotificationService } from "../../../notificationService.js";
-
-// import Category from "../../models/Category.js";
-// import SubCategory from "../../models/SubCategory.js";
+import {
+  getSchoolById,
+  getAllEdprowiseAdmins,
+  getsellersByProducts,
+} from "../AxiosRequestService/userServiceRequest.js";
 
 import path from "path";
 import fs from "fs";
@@ -32,7 +34,7 @@ async function generateEnquiryNumber() {
   // Get current date
   const now = new Date();
   const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1; // Months are 0-indexed
+  const currentMonth = now.getMonth() + 1;
 
   // Determine financial year (April to March)
   let financialYearStart, financialYearEnd;
@@ -482,10 +484,18 @@ async function sendEmailsToSellers({
 
     for (const product of enrichedProducts) {
       // Corrected query to match dealingProducts structure
-      const matchedSellers = await SellerProfile.find({
-        "dealingProducts.categoryId": product.categoryId,
-        "dealingProducts.subCategoryIds": product.subCategoryId,
-      });
+      const sellersResponse = await getsellersByProducts(
+        [product.categoryId],
+        [product.subCategoryId]
+      );
+
+      if (sellersResponse.hasError) {
+        console.error("Failed to fetch sellers:", sellersResponse.error);
+        // handle gracefully, maybe return or continue
+        return [];
+      }
+
+      const matchedSellers = sellersResponse.data || [];
 
       console.log(`Found ${matchedSellers.length} sellers for this product`);
       totalMatchedSellers += matchedSellers.length;
@@ -980,60 +990,28 @@ async function create(req, res) {
 
     await newQuoteRequest.save({ session });
 
-    let schoolDetail;
-    try {
-      const response = await axios.get(
-        `${process.env.USER_SERVICE_URL}/api/school/${schoolId}`,
-        {
-          headers: {
-            access_token: accessToken,
-          },
-        }
-      );
-      schoolDetail = response.data.data;
-    } catch (error) {
-      await session.abortTransaction();
-      session.endSession();
-      console.error("Error fetching school details:", {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        config: error.config,
-      });
-      return res.status(500).json({
-        hasError: true,
-        message: "Failed to fetch school information",
-      });
-    }
-
-    const schoolEmail = schoolDetail.schoolEmail;
-    const schoolName = schoolDetail.schoolName;
-
     const enrichedProducts = await Promise.all(
       createdEntries.map(async (product) => {
         try {
-          // Fetch category from procurement-category service
-          const categoryResponse = await axios.get(
-            `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/categories/${product.categoryId}`
-          );
+          const categoryResponse = await getCategoryById(product.categoryId);
 
-          // Fetch subcategory using the batch endpoint (more efficient)
-          const subCategoryResponse = await axios.get(
-            `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/subcategories?ids=${product.subCategoryId}`
-          );
+          const subCategoryResponse = await getSubCategoriesByIds([
+            product.subCategoryId,
+          ]);
 
-          // Since your batch endpoint returns an array, we take the first (and only) item
-          const subCategory = subCategoryResponse.data.data?.[0] || {};
+          const categoryName =
+            categoryResponse?.data?.categoryName || "Unknown Category";
+          const subCategory = subCategoryResponse?.data?.[0] || {};
+          const subCategoryName =
+            subCategory?.subCategoryName || "Unknown SubCategory";
 
           return {
             ...product.toObject(),
-            categoryName:
-              categoryResponse.data.data?.categoryName || "Unknown Category",
-            subCategoryName:
-              subCategory.subCategoryName || "Unknown SubCategory",
+            categoryName,
+            subCategoryName,
           };
         } catch (error) {
-          console.error("Error fetching category/subcategory:", error.message);
+          console.error("Error enriching product:", error.message);
           return {
             ...product.toObject(),
             categoryName: "Unknown Category",
@@ -1042,6 +1020,23 @@ async function create(req, res) {
         }
       })
     );
+
+    const schoolResponse = await getSchoolById(schoolId);
+
+    if (schoolResponse.hasError) {
+      await session.abortTransaction();
+      session.endSession();
+      console.error("Error fetching school details:", schoolResponse.message);
+      return res.status(500).json({
+        hasError: true,
+        message: "Failed to fetch school information",
+      });
+    }
+
+    const schoolDetail = schoolResponse.data;
+    const schoolEmail = schoolDetail.schoolEmail;
+    const schoolName = schoolDetail.schoolName;
+
     await sendSchoolRequestQuoteEmail(
       schoolName,
       schoolEmail,
@@ -1069,91 +1064,88 @@ async function create(req, res) {
     ];
 
     let relevantSellers = [];
-    try {
-      const response = await axios.post(
-        `${process.env.USER_SERVICE_URL}/api/sellers-by-products`,
-        { categoryIds, subCategoryIds },
-        {
-          headers: {
-            access_token: accessToken,
-          },
-        }
-      );
-      relevantSellers = response.data.data;
-    } catch (error) {
-      console.error("Error fetching relevant sellers:", error.message);
-      // Continue with empty array if seller fetch fails
+
+    const sellersRes = await getsellersByProducts(categoryIds, subCategoryIds);
+
+    if (!sellersRes.hasError) {
+      relevantSellers = sellersRes.data;
+    } else {
+      console.error("Error fetching relevant sellers:", sellersRes.message);
     }
 
-    // Send notifications to relevant school
+    await sendNotification(
+      "SCHOOL_QUOTE_REQUESTED",
+      [
+        {
+          id: schoolId,
+          type: "school",
+        },
+      ],
+      {
+        schoolName,
+        enquiryNumber,
+        entityId: newQuoteRequest._id,
+        entityType: "QuoteRequest",
+        senderType: "school",
+        senderId: schoolId,
+        metadata: {
+          enquiryNumber: enquiryNumber,
+          type: "quote_requested",
+        },
+      }
+    );
 
-    // await NotificationService.sendNotification(
-    //   "SCHOOL_QUOTE_REQUESTED",
-    //   [
-    //     {
-    //       id: schoolId,
-    //       type: "school",
-    //     },
-    //   ],
-    //   {
-    //     schoolName,
-    //     enquiryNumber,
-    //     entityId: newQuoteRequest._id,
-    //     entityType: "QuoteRequest",
-    //     senderType: "school",
-    //     senderId: schoolId,
-    //     metadata: {
-    //       enquiryNumber: enquiryNumber,
-    //       type: "quote_requested",
-    //     },
-    //   }
-    // );
+    await sendNotification(
+      "SELLER_QUOTE_RECEIVED",
+      relevantSellers.map((seller) => ({
+        id: seller.sellerId.toString(),
+        type: "seller",
+      })),
+      {
+        schoolName,
+        enquiryNumber,
+        entityId: newQuoteRequest._id,
+        entityType: "QuoteRequest",
+        senderType: "school",
+        senderId: schoolId,
+        metadata: {
+          enquiryNumber: enquiryNumber,
+          type: "quote_received",
+        },
+      }
+    );
 
-    // // Send notifications to relevant sellers
+    const edprowiseResponse = await getAllEdprowiseAdmins();
 
-    // await NotificationService.sendNotification(
-    //   "SELLER_QUOTE_RECEIVED",
-    //   relevantSellers.map((seller) => ({
-    //     id: seller.sellerId.toString(),
-    //     type: "seller",
-    //   })),
-    //   {
-    //     schoolName,
-    //     enquiryNumber,
-    //     entityId: newQuoteRequest._id,
-    //     entityType: "QuoteRequest",
-    //     senderType: "school",
-    //     senderId: schoolId,
-    //     metadata: {
-    //       enquiryNumber: enquiryNumber,
-    //       type: "quote_received",
-    //     },
-    //   }
-    // );
+    if (edprowiseResponse.hasError) {
+      console.error("Failed to fetch Edprowise admins:", response.message);
+      return res.status(500).json({
+        hasError: true,
+        message: "Failed to fetch Edprowise admins",
+      });
+    }
 
-    // // Send notifications to edprowise
+    const relevantEdprowise = edprowiseResponse.data;
 
-    // const relevantEdprowise = await AdminUser.find({});
-
-    // await NotificationService.sendNotification(
-    //   "EDPROWISE_QUOTE_REQUESTED_FROM_SCHOOL",
-    //   relevantEdprowise.map((admin) => ({
-    //     id: admin._id.toString(),
-    //     type: "edprowise",
-    //   })),
-    //   {
-    //     schoolName,
-    //     enquiryNumber,
-    //     entityId: newQuoteRequest._id,
-    //     entityType: "QuoteRequest",
-    //     senderType: "school",
-    //     senderId: schoolId,
-    //     metadata: {
-    //       enquiryNumber: enquiryNumber,
-    //       type: "quote_received",
-    //     },
-    //   }
-    // );
+    await sendNotification(
+      "EDPROWISE_QUOTE_REQUESTED_FROM_SCHOOL",
+      relevantEdprowise.map((admin) => ({
+        id: admin._id.toString(),
+        type: "edprowise",
+      })),
+      {
+        schoolName,
+        enquiryNumber,
+        entityId: newQuoteRequest._id,
+        entityType: "QuoteRequest",
+        senderType: "school",
+        senderId: schoolId,
+        metadata: {
+          enquiryNumber: enquiryNumber,
+          type: "quote_received",
+        },
+      }
+    );
 
     await session.commitTransaction();
     session.endSession();
@@ -1167,7 +1159,6 @@ async function create(req, res) {
       },
     });
   } catch (error) {
-    // Only abort transaction if it hasn't been committed yet
     await session.abortTransaction();
     session.endSession();
 

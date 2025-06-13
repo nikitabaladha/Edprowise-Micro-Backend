@@ -75,7 +75,7 @@ async function userLogin(req, res) {
         });
       }
 
-      tokenPayload.subscription = subscriptions || [];
+      tokenPayload.subscription = subscriptionResponse.data || [];
     }
 
     const token = jwt.sign(tokenPayload, jwtSecret, {

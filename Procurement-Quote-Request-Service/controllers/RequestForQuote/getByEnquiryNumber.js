@@ -1,7 +1,10 @@
-import axios from "axios";
-
 import Product from "../../models/Product.js";
 import QuoteRequest from "../../models/QuoteRequest.js";
+
+import {
+  getCategoryById,
+  getSubCategoriesByIds,
+} from "../AxiosRequestService/categoryServiceRequest.js";
 
 async function getByEnquiryNumber(req, res) {
   try {
@@ -23,33 +26,29 @@ async function getByEnquiryNumber(req, res) {
       let categoryName = null;
       let subCategoryName = null;
 
-      // Fetch category name
       if (product.categoryId) {
-        try {
-          const categoryResponse = await axios.get(
-            `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/categories/${product.categoryId}`
-          );
-          categoryName = categoryResponse.data.data?.categoryName || null;
-        } catch (error) {
+        const categoryResponse = await getCategoryById(product.categoryId);
+        if (!categoryResponse.hasError) {
+          categoryName = categoryResponse.data?.categoryName || null;
+        } else {
           console.error(
             `Error fetching category for ${product.categoryId}:`,
-            error.message
+            categoryResponse.error
           );
         }
       }
 
-      // Fetch subcategory name
       if (product.subCategoryId) {
-        try {
-          const subCategoryResponse = await axios.get(
-            `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/subcategories?ids=${product.subCategoryId}`
-          );
+        const subCategoryResponse = await getSubCategoriesByIds([
+          product.subCategoryId,
+        ]);
+        if (!subCategoryResponse.hasError) {
           subCategoryName =
-            subCategoryResponse.data.data?.[0]?.subCategoryName || null;
-        } catch (error) {
+            subCategoryResponse.data?.[0]?.subCategoryName || null;
+        } else {
           console.error(
             `Error fetching subcategory for ${product.subCategoryId}:`,
-            error.message
+            subCategoryResponse.error
           );
         }
       }
@@ -66,8 +65,6 @@ async function getByEnquiryNumber(req, res) {
         unit: product.unit,
         quantity: product.quantity,
         enquiryNumber: product.enquiryNumber,
-
-        // quote request table data
         quoteRequestId: quoteRequest._id,
         deliveryAddress: quoteRequest.deliveryAddress,
         deliveryLocation: quoteRequest.deliveryLocation,
