@@ -13,6 +13,7 @@ import {
   getQuoteProposalBySellerIdEnqNoQuoteNo,
   getSubmitQuoteBySellerIdAndEnqNo,
   getPrepareQuoteBySellerIdAndEnqNo,
+  getQuoteProposalBySellerId,
 } from "../controllers/Inter-Service-Communication/index.js";
 
 const router = express.Router();
@@ -64,5 +65,10 @@ router.get("/get-quote-proposal", getQuoteProposal);
 router.put("/update-submitquote-by-status", updateSubmitQuoteStatus);
 
 router.put("/update-quote-proposal", updateQuoteProposal);
+
+router.get(
+  "/quote-proposal-by-seller-id/:sellerId",
+  getQuoteProposalBySellerId
+);
 
 export default router;

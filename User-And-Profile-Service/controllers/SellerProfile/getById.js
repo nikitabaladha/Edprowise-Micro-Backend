@@ -1,6 +1,12 @@
 import SellerProfile from "../../models/SellerProfile.js";
 import Seller from "../../models/Seller.js";
-import axios from "axios";
+
+import {
+  getCategoryById,
+  getSubCategoriesByIds,
+} from "../AxiosRequestService/categoryServiceRequest.js";
+
+import { getQuoteProposalBySellerId } from "../AxiosRequestService/quoteProposalServiceRequest.js";
 
 async function getById(req, res) {
   try {
@@ -38,34 +44,23 @@ async function getById(req, res) {
       await Promise.all(
         sellerProfile.dealingProducts.map(async (product) => {
           try {
-            // Fetch category name with auth header
-
-            const categoryRes = await axios.get(
-              `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/categories/${product.categoryId}`
-            );
-
-            if (!categoryRes.data.hasError && categoryRes.data.data) {
-              product.categoryName = categoryRes.data.data.categoryName;
+            const categoryRes = await getCategoryById(product.categoryId);
+            if (!categoryRes.hasError && categoryRes.data) {
+              product.categoryName = categoryRes.data.categoryName;
             }
 
-            // Fetch subcategory names with auth header
             if (product.subCategoryIds?.length > 0) {
-              const subIds = product.subCategoryIds
-                .map((id) => id.toString())
-                .join(",");
-
-              const subRes = await axios.get(
-                `${process.env.PROCUREMENT_CATEGORY_SERVICE_URL}/api/subcategories?ids=${subIds}`
+              const subRes = await getSubCategoriesByIds(
+                product.subCategoryIds
               );
-
-              if (!subRes.data.hasError && subRes.data.data) {
-                product.subCategoryName = subRes.data.data.map(
+              if (!subRes.hasError && subRes.data) {
+                product.subCategoryName = subRes.data.map(
                   (sub) => sub.subCategoryName
                 );
               }
             }
           } catch (error) {
-            console.error("Error fetching category data:", error.message);
+            console.error("Error enriching dealing products:", error.message);
           }
         })
       );
@@ -73,15 +68,14 @@ async function getById(req, res) {
 
     let totalCount = 0;
     let averageRating = 0;
-
     try {
-      const response = await axios.get(
-        `${process.env.PROCUREMENT_QUOTE_PROPOSAL_SERVICE_URL}/api/quote-proposal-by-seller-id/${sellerId}?include=ratings`
-      );
+      const ratingRes = await getQuoteProposalBySellerId(sellerId, {
+        include: "ratings",
+      });
 
-      if (!response.data.hasError && response.data.data) {
-        totalCount = response.data.data.totalCount || 0;
-        averageRating = response.data.data.averageRating || 0;
+      if (!ratingRes.hasError && ratingRes.data) {
+        totalCount = ratingRes.data.totalCount || 0;
+        averageRating = ratingRes.data.averageRating || 0;
       }
     } catch (error) {
       console.error(

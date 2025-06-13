@@ -2,7 +2,7 @@
 
 import QuoteProposal from "../../models/QuoteProposal.js";
 
-async function getBySellerId(req, res) {
+async function getQuoteProposalBySellerId(req, res) {
   try {
     const { sellerId } = req.params;
     const { fields, include } = req.query;
@@ -68,4 +68,4 @@ async function getBySellerId(req, res) {
   }
 }
 
-export default getBySellerId;
+export default getQuoteProposalBySellerId;

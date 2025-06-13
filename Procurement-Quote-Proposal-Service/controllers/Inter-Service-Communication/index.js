@@ -12,6 +12,7 @@ import getSubmitQuoteBySellerIdsAndEnqNos from "./getSubmitQuoteBySellerIdsAndEn
 import getQuoteProposalBySellerIdsAndEnqNos from "./getQuoteProposalBySellerIdsAndEnqNos.js";
 import getQuoteProposalBySellerIdEnqNoQuoteNo from "./getQuoteProposalBySellerIdEnqNoQuoteNo.js";
 import getSubmitQuoteBySellerIdAndEnqNo from "./getSubmitQuoteBySellerIdAndEnqNo.js";
+import getQuoteProposalBySellerId from "./getQuoteProposalBySellerId.js";
 
 export {
   getSubmitQuoteBySellerIdAndEnqNos,
@@ -26,4 +27,5 @@ export {
   getQuoteProposalBySellerIdEnqNoQuoteNo,
   getSubmitQuoteBySellerIdAndEnqNo,
   getPrepareQuoteBySellerIdAndEnqNo,
+  getQuoteProposalBySellerId,
 };
