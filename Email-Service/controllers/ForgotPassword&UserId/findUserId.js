@@ -1,10 +1,8 @@
-// Edprowise-Micro-Backend\Email-Service\controllers\ForgotPassword&UserId\findUserId.js
-
 import nodemailer from "nodemailer";
 import SMTPEmailSetting from "../../models/SMTPEmailSetting.js";
 import VerificationCode from "../../models/VerificationCode.js";
 
-import axios from "axios";
+import { getUserByEmailId } from "../AxiosRequestService/userServiceRequest.js";
 
 import path from "path";
 import fs from "fs";
@@ -22,26 +20,16 @@ async function sendVerificationCode(req, res) {
   const { userId } = req.body;
 
   try {
-    let userEmail = null;
+    const response = await getUserByEmailId(userId);
 
-    try {
-      const response = await axios.get(
-        `${process.env.USER_SERVICE_URL}/api/get-user-email-by-userId/${userId}`
-      );
-      if (response.data && !response.data.hasError) {
-        userEmail = response.data.email;
-      } else {
-        return res.status(404).json({
-          hasError: true,
-          message: response.data.message || "Email not found.",
-        });
-      }
-    } catch (err) {
-      return res.status(500).json({
+    if (response.hasError || !response.email) {
+      return res.status(404).json({
         hasError: true,
-        message: "Error communicating with User Service.",
+        message: response.message || "Email not found.",
       });
     }
+
+    const userEmail = response.email;
 
     // Generate a new verification code
     const verificationCode = generateVerificationCode();

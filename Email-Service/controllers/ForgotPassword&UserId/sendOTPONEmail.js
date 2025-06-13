@@ -5,6 +5,8 @@ import SMTPEmailSetting from "../../models/SMTPEmailSetting.js";
 import VerificationCodeForEmail from "../../models/VerificationCodeForEmail.js";
 import axios from "axios";
 
+import { checkEmailExists } from "../AxiosRequestService/userServiceRequest.js";
+
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -20,12 +22,9 @@ function generateVerificationCode() {
 async function sendOTPOnEmail(req, res) {
   const { email } = req.body;
   try {
-    const emailCheck = await axios.post(
-      `${process.env.USER_SERVICE_URL}/api/check-email-exists`,
-      { email }
-    );
+    const emailCheck = await checkEmailExists(email);
 
-    if (emailCheck.data.exists) {
+    if (emailCheck.exists) {
       return res.status(400).json({
         hasError: true,
         message: "Email already in use.",

@@ -1,10 +1,14 @@
 import nodemailer from "nodemailer";
 import SMTPEmailSetting from "../../models/SMTPEmailSetting.js";
 import VerificationCode from "../../models/VerificationCode.js";
-// import SellerProfile from "../../models/SellerProfile.js";
-// import School from "../../models/School.js";
-// import User from "../../models/User.js";
-// import Seller from "../../models/Seller.js";
+
+import {
+  getSchoolByEmailId,
+  getSellerProfileByEmailId,
+  getUserBySchoolId,
+  getSellerBymongooseid,
+} from "../AxiosRequestService/userServiceRequest.js";
+
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -20,37 +24,40 @@ function generateVerificationCode() {
 async function findUserByEmail(req, res) {
   const { email } = req.body;
   try {
-    let user = await SellerProfile.findOne({ emailId: email });
     let userId = null;
-    let userEmail = email;
-    if (user) {
-      const sellerDetails = await Seller.findOne({ _id: user.sellerId });
-      if (sellerDetails) {
-        userId = sellerDetails.userId;
+
+    const sellerProfileResp = await getSellerProfileByEmailId(
+      email,
+      "sellerId"
+    );
+    if (!sellerProfileResp.hasError && sellerProfileResp.data?.sellerId) {
+      const sellerResp = await getSellerBymongooseid(
+        sellerProfileResp.data.sellerId,
+        "userId"
+      );
+      if (!sellerResp.hasError && sellerResp.data?.userId) {
+        userId = sellerResp.data.userId;
       }
     } else {
-      user = await School.findOne({ schoolEmail: email });
-
-      if (user) {
-        const schoolDetails = await User.findOne({
-          schoolId: user.schoolId,
-          role: "School",
-        });
-        console.log("School Details:", schoolDetails);
-
-        if (schoolDetails) {
-          userId = schoolDetails.userId;
+      const schoolResp = await getSchoolByEmailId(email, "schoolId");
+      if (!schoolResp.hasError && schoolResp.data?.schoolId) {
+        const userResp = await getUserBySchoolId(
+          schoolResp.data.schoolId,
+          "userId"
+        );
+        if (!userResp.hasError && userResp.data?.userId) {
+          userId = userResp.data.userId;
         }
       }
     }
 
-    if (!user || !userId) {
-      return res
-        .status(404)
-        .json({ hasError: true, message: "User not found or email missing." });
+    if (!userId) {
+      return res.status(404).json({
+        hasError: true,
+        message: "User not found or email missing.",
+      });
     }
 
-    // Generate a new verification code
     const verificationCode = generateVerificationCode();
 
     const smtpSettings = await SMTPEmailSetting.findOne();

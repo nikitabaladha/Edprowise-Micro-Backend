@@ -1,9 +1,12 @@
 import nodemailer from "nodemailer";
 import SMTPEmailSetting from "../../models/SMTPEmailSetting.js";
-// import SellerProfile from "../../models/SellerProfile.js";
-// import School from "../../models/School.js";
-// import User from "../../models/User.js";
-// import Seller from "../../models/Seller.js";
+
+import {
+  getSchoolById,
+  getSellerById,
+  getUserById,
+  getUserSelleById,
+} from "../AxiosRequestService/userServiceRequest.js";
 
 import path from "path";
 import fs from "fs";
@@ -280,14 +283,16 @@ const resetUserOrSellerUserId = async (req, res) => {
       });
     }
 
-    // Try school user
-    let user = await User.findOne({ userId });
+    let userResponse = await getUserById(userId);
+    let user = userResponse?.data;
     if (user) {
       user.userId = NewUserId;
 
       await user.save();
 
-      const school = await School.findOne({ schoolId: user.schoolId });
+      const schoolResponse = await getSchoolById(user.schoolId);
+      const school = schoolResponse?.data;
+
       if (school) {
         await sendUserIdUpdateEmail(
           school.schoolName,
@@ -303,15 +308,18 @@ const resetUserOrSellerUserId = async (req, res) => {
       });
     }
 
-    // Try seller
-    let seller = await Seller.findOne({ userId });
+    let sellerResponse = await getUserSelleById(userId);
+    let seller = sellerResponse?.data;
     if (seller) {
       seller.userId = NewUserId;
       await seller.save();
 
-      const sellerProfile = await SellerProfile.findOne({
-        sellerId: seller._id,
-      });
+      const sellerProfileResponse = await getSellerById(
+        seller._id,
+        "companyName,emailId"
+      );
+      const sellerProfile = sellerProfileResponse?.data;
+
       if (sellerProfile) {
         await sendUserIdUpdateEmail(
           sellerProfile.companyName,

@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import SMTPEmailSetting from "../../models/SMTPEmailSetting.js";
 
-import axios from "axios";
+import { resetUserOrSellerPassword } from "../AxiosRequestService/userServiceRequest.js";
 
 import path from "path";
 import fs from "fs";
@@ -270,19 +270,13 @@ const resetUserOrSellerPassword = async (req, res) => {
   try {
     const { userId, newPassword } = req.body;
 
-    const response = await axios.put(
-      `${process.env.USER_SERVICE_URL}/api/reset-user-or-seller-password`,
-      {
-        userId,
-        newPassword,
-      }
-    );
+    const response = await resetUserOrSellerPassword(userId, newPassword);
 
-    if (response.data.hasError) {
+    if (response.hasError) {
       return res.status(400).json(response.data);
     }
 
-    const { email, companyName, userName, role } = response.data.data;
+    const { email, companyName, userName, role } = response.data;
 
     const emailResult = await sendPasswordUpdateEmail(
       companyName,

@@ -11,35 +11,38 @@ async function getUserEmailByUserId(req, res) {
     let email = null;
 
     const seller = await Seller.findOne({ userId });
-
     if (seller) {
       const sellerProfile = await SellerProfile.findOne({
         sellerId: seller._id,
       });
-
-      email = sellerProfile?.emailId;
+      email = sellerProfile?.emailId || null;
     } else {
       const user = await User.findOne({ userId });
-
       if (user) {
         const school = await School.findOne({ schoolId: user.schoolId });
-
-        email = school?.schoolEmail;
+        email = school?.schoolEmail || null;
       }
     }
 
     if (!email) {
-      return res
-        .status(404)
-        .json({ hasError: true, message: "Email not found" });
+      return res.status(404).json({
+        hasError: true,
+        message: "Email not found for provided userId",
+      });
     }
 
-    return res.json({ hasError: false, email });
+    return res.status(200).json({
+      hasError: false,
+      message: "Email retrieved successfully",
+      email,
+    });
   } catch (error) {
     console.error("Error in getUserEmailByUserId:", error);
-    return res
-      .status(500)
-      .json({ hasError: true, message: "Internal Server Error" });
+    return res.status(500).json({
+      hasError: true,
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 }
 

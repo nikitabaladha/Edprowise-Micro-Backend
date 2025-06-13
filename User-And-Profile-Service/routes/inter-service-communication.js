@@ -10,23 +10,41 @@ import {
   getAllAdminWithRequiredFields,
   getRequiredFieldsBySellerIds,
   getSchoolsByIds,
+  requiredFieldFromUser,
+  requiredFieldFromSeller,
+  getSchoolByEmailId,
+  getSellerProfileByEmailId,
+  getUserBySchoolId,
+  getSellerById,
 } from "../controllers/Inter-Service-Communication/index.js";
 
 const router = express.Router();
 
-router.post("/check-email-exists", checkEmailExists);
+router.get("/get-school-by-emailid/:schoolEmail", getSchoolByEmailId);
+
+router.get("/get-sellerprofile-by-emailid/:emailId", getSellerProfileByEmailId);
+
+router.get("/get-user-by-schoolid/:schoolId", getUserBySchoolId);
+
+router.get("/get-seller-by-id/:_id", getSellerById);
+
+router.get("/check-email-exists", checkEmailExists);
 
 router.get("/get-school-by-ids", getSchoolsByIds);
+
+router.get(
+  "/required-field-from-seller-profile/:sellerId",
+  requiredFieldFromSellerProfile
+);
+
+router.get("/required-field-from-user/:userId", requiredFieldFromUser);
 
 router.get(
   "/required-field-from-school-profile/:schoolId",
   requiredFieldFromSchoolProfile
 );
 
-router.get(
-  "/required-field-from-seller-profile/:sellerId",
-  requiredFieldFromSellerProfile
-);
+router.get("/required-field-from-seller/:userId", requiredFieldFromSeller);
 
 router.get(
   "/bulk-required-fields-from-seller-profile",
