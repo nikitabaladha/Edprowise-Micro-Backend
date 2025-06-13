@@ -3,7 +3,6 @@
 import nodemailer from "nodemailer";
 import SMTPEmailSetting from "../../models/SMTPEmailSetting.js";
 import VerificationCodeForEmail from "../../models/VerificationCodeForEmail.js";
-import axios from "axios";
 
 import { checkEmailExists } from "../AxiosRequestService/userServiceRequest.js";
 

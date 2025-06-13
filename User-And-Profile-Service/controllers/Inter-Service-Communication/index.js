@@ -7,7 +7,6 @@ import requiredFieldFromSellerProfile from "./requiredFieldFromSellerProfile.js"
 import bulkRequiredFieldsFromSellerProfile from "./bulkRequiredFieldsFromSellerProfile.js";
 
 import requiredFieldFromEdprowise from "./requiredFieldFromEdprowise.js";
-import getAllAdminWithRequiredFields from "./getAllAdminWithRequiredFields.js";
 import getRequiredFieldsBySellerIds from "./getRequiredFieldsBySellerIds.js";
 
 import getSchoolsByIds from "./getSchoolsByIds.js";
@@ -20,6 +19,10 @@ import getSellerProfileByEmailId from "./getSellerProfileByEmailId.js";
 import getUserBySchoolId from "./getUserBySchoolId.js";
 import getSellerById from "./getSellerById.js";
 
+import getAllAdminWithRequiredFields from "./getAllAdminWithRequiredFields.js";
+import getAllSchoolWithRequiredFields from "./getAllSchoolWithRequiredFields.js";
+import getAllSellerWithRequiredFields from "./getAllSellerWithRequiredFields.js";
+
 export {
   checkEmailExists,
   requiredFieldFromSchoolProfile,
@@ -27,7 +30,6 @@ export {
   requiredFieldFromSellerProfile,
   bulkRequiredFieldsFromSellerProfile,
   requiredFieldFromEdprowise,
-  getAllAdminWithRequiredFields,
   getRequiredFieldsBySellerIds,
   getSchoolsByIds,
   requiredFieldFromUser,
@@ -36,4 +38,7 @@ export {
   getSellerProfileByEmailId,
   getUserBySchoolId,
   getSellerById,
+  getAllAdminWithRequiredFields,
+  getAllSchoolWithRequiredFields,
+  getAllSellerWithRequiredFields,
 };

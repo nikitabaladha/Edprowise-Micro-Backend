@@ -16,6 +16,8 @@ import {
   getSellerProfileByEmailId,
   getUserBySchoolId,
   getSellerById,
+  getAllSchoolWithRequiredFields,
+  getAllSellerWithRequiredFields,
 } from "../controllers/Inter-Service-Communication/index.js";
 
 const router = express.Router();
@@ -61,5 +63,9 @@ router.get(
 router.get("/required-field-by-sellerids", getRequiredFieldsBySellerIds);
 
 router.get("/required-field-from-all-admins", getAllAdminWithRequiredFields);
+
+router.get("/required-field-from-all-schools", getAllSchoolWithRequiredFields);
+
+router.get("/required-field-from-all-sellers", getAllSellerWithRequiredFields);
 
 export default router;

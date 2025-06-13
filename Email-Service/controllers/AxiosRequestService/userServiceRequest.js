@@ -291,3 +291,75 @@ export async function checkEmailExists(email) {
     };
   }
 }
+
+export async function getAllEdprowiseAdmins(fields) {
+  try {
+    const response = await axios.get(
+      `${process.env.USER_SERVICE_URL}/api/required-field-from-all-admins`,
+      {
+        params: fields ? { fields } : {},
+      }
+    );
+    return response.data;
+  } catch (err) {
+    console.error("Error in Get All Edprowise Admins:", {
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status,
+      config: err.config,
+    });
+    return {
+      hasError: true,
+      message: "Failed to fetch All Edprowise Admins.",
+      error: err.message,
+    };
+  }
+}
+
+export async function getAllSchoolProfiles(fields) {
+  try {
+    const response = await axios.get(
+      `${process.env.USER_SERVICE_URL}/api/required-field-from-all-schools`,
+      {
+        params: fields ? { fields } : {},
+      }
+    );
+    return response.data;
+  } catch (err) {
+    console.error("Error in Get All School Profile:", {
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status,
+      config: err.config,
+    });
+    return {
+      hasError: true,
+      message: "Failed to fetch All School Profile.",
+      error: err.message,
+    };
+  }
+}
+
+export async function getAllSellerProfiles(fields) {
+  try {
+    const response = await axios.get(
+      `${process.env.USER_SERVICE_URL}/api/required-field-from-all-sellers`,
+      {
+        params: fields ? { fields } : {},
+      }
+    );
+    return response.data;
+  } catch (err) {
+    console.error("Error in Get All Seller Profile:", {
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status,
+      config: err.config,
+    });
+    return {
+      hasError: true,
+      message: "Failed to fetch All Seller Profile.",
+      error: err.message,
+    };
+  }
+}

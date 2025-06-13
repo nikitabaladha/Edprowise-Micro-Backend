@@ -1,24 +1,48 @@
-// import School from "../../models/School.js";
-// import SellerProfile from "../../models/SellerProfile.js";
-// import AdminUser from "../../models/AdminUser.js";
+import {
+  getAllEdprowiseAdmins,
+  getAllSchoolProfiles,
+  getAllSellerProfiles,
+} from "../AxiosRequestService/userServiceRequest.js";
 
 export const getAllEmails = async (req, res) => {
   try {
-    const schoolEmails = await School.find({}, "schoolEmail").lean();
-    const sellerEmails = await SellerProfile.find({}, "emailId").lean();
-    const adminEmails = await AdminUser.find({}, "email").lean();
+    const [schoolRes, sellerRes, adminRes] = await Promise.all([
+      getAllSchoolProfiles("schoolEmail"),
+      getAllSellerProfiles("emailId"),
+      getAllEdprowiseAdmins("email"),
+    ]);
 
-    const allEmails = [
-      ...schoolEmails.map((obj) => obj.schoolEmail),
-      ...sellerEmails.map((obj) => obj.emailId),
-      ...adminEmails.map((obj) => obj.email),
-    ];
+    if (schoolRes.hasError || sellerRes.hasError || adminRes.hasError) {
+      return res.status(500).json({
+        hasError: true,
+        message: "Failed to fetch some or all email lists",
+        details: {
+          schoolError: schoolRes.hasError ? schoolRes.message : null,
+          sellerError: sellerRes.hasError ? sellerRes.message : null,
+          adminError: adminRes.hasError ? adminRes.message : null,
+        },
+      });
+    }
 
-    const uniqueEmails = [...new Set(allEmails.filter(Boolean))]; // remove undefined/null
+    const schoolEmails = schoolRes.data.map((obj) => obj.schoolEmail);
+    const sellerEmails = sellerRes.data.map((obj) => obj.emailId);
+    const adminEmails = adminRes.data.map((obj) => obj.email);
 
-    res.status(200).json({ hasError: false, data: uniqueEmails });
+    const allEmails = [...schoolEmails, ...sellerEmails, ...adminEmails];
+
+    const uniqueEmails = [...new Set(allEmails.filter(Boolean))];
+
+    return res.status(200).json({
+      hasError: false,
+      data: uniqueEmails,
+    });
   } catch (error) {
-    res.status(500).json({ hasError: true, message: error.message });
+    console.error("Error in getAllEmails:", error);
+    return res.status(500).json({
+      hasError: true,
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 };
 
