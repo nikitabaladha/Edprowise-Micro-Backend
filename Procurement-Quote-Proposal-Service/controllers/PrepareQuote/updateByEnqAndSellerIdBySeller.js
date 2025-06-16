@@ -1,17 +1,18 @@
-import axios from "axios";
-
 import PrepareQuote from "../../models/PrepareQuote.js";
 import PrepareQuoteValidator from "../../validators/PrepareQuote.js";
 import QuoteProposal from "../../models/QuoteProposal.js";
 import SubmitQuote from "../../models/SubmitQuote.js";
 
-// import QuoteRequest from "../../models/QuoteRequest.js";
+import { sendNotification } from "../AxiosRequestService/notificationServiceRequest.js";
 
-// import SellerProfile from "../../../models/SellerProfile.js";
-// import EdprowiseProfile from "../../../models/EdprowiseProfile.js";
-// import School from "../../../models/School.js";
-// import AdminUser from "../../../models/AdminUser.js";
-// import { NotificationService } from "../../../notificationService.js";
+import { getQuoteRequestByEnquiryNumber } from "../AxiosRequestService/quoteRequestServiceRequest.js";
+
+import {
+  getSellerById,
+  getrequiredFieldsFromEdprowiseProfile,
+  getSchoolById,
+  getAllEdprowiseAdmins,
+} from "../AxiosRequestService/userServiceRequest.js";
 
 async function updateSingleProduct(req, res) {
   try {
@@ -60,38 +61,37 @@ async function updateSingleProduct(req, res) {
       });
     }
 
-    const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
+    const [
+      quoteRequestResponse,
+      sellerResponse,
+      edprowiseResponse,
+      schoolResponse,
+      edprowiseAdminsResponse,
+    ] = await Promise.all([
+      getQuoteRequestByEnquiryNumber(
+        enquiryNumber,
+        "deliveryState,schoolId"
+      ).catch(() => ({ data: null })),
+      getSellerById(sellerId).catch(() => ({ data: null })),
+      getrequiredFieldsFromEdprowiseProfile().catch(() => ({ data: null })),
+      getSchoolById(schoolId, "schoolName").catch(() => ({ data: null })),
+      getAllEdprowiseAdmins("userId").catch(() => ({ data: [] })),
+    ]);
 
-    const [quoteRequestResponse, sellerResponse, edprowiseResponse] =
-      await Promise.all([
-        axios
-          .get(
-            `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}`,
-            {
-              params: { fields: "deliveryState, schoolId" },
-            }
-          )
-          .catch(() => ({ data: { data: null } })),
+    const quoteRequest = quoteRequestResponse?.data;
+    const sellerProfile = sellerResponse?.data;
+    const edprowiseProfile = edprowiseResponse?.data;
+    const schoolProfile = schoolResponse?.data;
+    const relevantEdprowise = edprowiseAdminsResponse?.data;
 
-        // User-Service calls
-        axios
-          .get(
-            `${process.env.USER_SERVICE_URL}/api/required-field-from-seller-profile/${sellerId}`
-          )
-          .catch(() => ({ data: { data: null } })),
-
-        axios
-          .get(
-            `${process.env.USER_SERVICE_URL}/api/required-field-from-edprowise-profile`
-          )
-          .catch(() => ({ data: { data: null } })),
-      ]);
-
-    const sellerProfile = sellerResponse.data.data;
-    const edprowiseProfile = edprowiseResponse.data.data;
-    const quoteRequest = quoteRequestResponse?.data?.data;
-
-    if (!quoteRequest || !sellerProfile || !edprowiseProfile) {
+    if (
+      !quoteRequest ||
+      !sellerProfile ||
+      !edprowiseProfile ||
+      !schoolProfile ||
+      !relevantEdprowise ||
+      !Array.isArray(relevantEdprowise)
+    ) {
       return res.status(404).json({
         hasError: true,
         message: "Required profile data not found.",
@@ -374,70 +374,67 @@ async function updateSingleProduct(req, res) {
     existingSubmitted.quotedAmount = totalAmount;
     await existingSubmitted.save();
 
-    // await NotificationService.sendNotification(
-    //   "SCHOOL_RECEIVED_UPDATED_QUOTE_FROM_SELLER",
-    //   [{ id: quoteRequest.schoolId, type: "school" }],
-    //   {
-    //     companyName: sellerProfile.companyName,
-    //     quoteNumber: existingQuoteProposal.quoteNumber,
-    //     enquiryNumber: existingQuoteProposal.enquiryNumber,
-    //     entityId: existingQuoteProposal._id,
-    //     entityType: "QuoteProposal From Seller",
-    //     senderType: "seller",
-    //     senderId: sellerId,
-    //     metadata: {
-    //       enquiryNumber,
-    //       sellerId: sellerId,
-    //       type: "quote_updated_from_seller",
-    //     },
-    //   }
-    // );
-    // const schoolId = quoteRequest.schoolId;
+    await sendNotification(
+      "SCHOOL_RECEIVED_UPDATED_QUOTE_FROM_SELLER",
+      [{ id: quoteRequest.schoolId, type: "school" }],
+      {
+        companyName: sellerProfile.companyName,
+        quoteNumber: existingQuoteProposal.quoteNumber,
+        enquiryNumber: existingQuoteProposal.enquiryNumber,
+        entityId: existingQuoteProposal._id,
+        entityType: "QuoteProposal From Seller",
+        senderType: "seller",
+        senderId: sellerId,
+        metadata: {
+          enquiryNumber,
+          sellerId: sellerId,
+          type: "quote_updated_from_seller",
+        },
+      }
+    );
 
-    // const schoolProfile = await School.findOne({ schoolId });
+    const schoolId = quoteRequest.schoolId;
 
-    // await NotificationService.sendNotification(
-    //   "SELLER_RECEIVED_UPDATED_QUOTE_BY_OWN",
-    //   [{ id: sellerId, type: "seller" }],
-    //   {
-    //     schoolName: schoolProfile.schoolName,
-    //     quoteNumber: existingQuoteProposal.quoteNumber,
-    //     enquiryNumber: existingQuoteProposal.enquiryNumber,
-    //     entityId: existingQuoteProposal._id,
-    //     entityType: "QuoteProposal",
-    //     senderType: "seller",
-    //     senderId: sellerId,
-    //     metadata: {
-    //       enquiryNumber,
-    //       type: "quote_updated_from_seller",
-    //     },
-    //   }
-    // );
+    await sendNotification(
+      "SELLER_RECEIVED_UPDATED_QUOTE_BY_OWN",
+      [{ id: sellerId, type: "seller" }],
+      {
+        schoolName: schoolProfile.schoolName,
+        quoteNumber: existingQuoteProposal.quoteNumber,
+        enquiryNumber: existingQuoteProposal.enquiryNumber,
+        entityId: existingQuoteProposal._id,
+        entityType: "QuoteProposal",
+        senderType: "seller",
+        senderId: sellerId,
+        metadata: {
+          enquiryNumber,
+          type: "quote_updated_from_seller",
+        },
+      }
+    );
 
-    // const relevantEdprowise = await AdminUser.find({});
-
-    // await NotificationService.sendNotification(
-    //   "EDPROWISE_RECEIVED_UPDATED_QUOTE",
-    //   relevantEdprowise.map((admin) => ({
-    //     id: admin._id.toString(),
-    //     type: "edprowise",
-    //   })),
-    //   {
-    //     companyName: sellerProfile.companyName,
-    //     schoolName: schoolProfile.schoolName,
-    //     quoteNumber: existingQuoteProposal.quoteNumber,
-    //     enquiryNumber: existingQuoteProposal.enquiryNumber,
-    //     entityId: existingQuoteProposal._id,
-    //     entityType: "QuoteProposal From Seller",
-    //     senderType: "seller",
-    //     senderId: sellerId,
-    //     metadata: {
-    //       enquiryNumber,
-    //       sellerId: sellerId,
-    //       type: "quote_updated_from_edprowise",
-    //     },
-    //   }
-    // );
+    await sendNotification(
+      "EDPROWISE_RECEIVED_UPDATED_QUOTE",
+      relevantEdprowise.map((admin) => ({
+        id: admin._id.toString(),
+        type: "edprowise",
+      })),
+      {
+        companyName: sellerProfile.companyName,
+        schoolName: schoolProfile.schoolName,
+        quoteNumber: existingQuoteProposal.quoteNumber,
+        enquiryNumber: existingQuoteProposal.enquiryNumber,
+        entityId: existingQuoteProposal._id,
+        entityType: "QuoteProposal From Seller",
+        senderType: "seller",
+        senderId: sellerId,
+        metadata: {
+          enquiryNumber,
+          sellerId: sellerId,
+          type: "quote_updated_from_edprowise",
+        },
+      }
+    );
 
     return res.status(200).json({
       hasError: false,

@@ -1,5 +1,3 @@
-import axios from "axios";
-
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -14,7 +12,15 @@ import PrepareQuote from "../../models/PrepareQuote.js";
 import nodemailer from "nodemailer";
 import smtpServiceClient from "../Inter-Service-Communication/smtpServiceClient.js";
 
-// import QuoteRequest from "../../models/QuoteRequest.js";
+import {
+  getSchoolById,
+  getSellerById,
+} from "../AxiosRequestService/userServiceRequest.js";
+
+import {
+  updateQuoteRequestStatus,
+  getQuoteRequestByEnquiryNumber,
+} from "../AxiosRequestService/quoteRequestServiceRequest.js";
 
 async function sendSchoolRequestQuoteEmail(
   schoolName,
@@ -86,77 +92,6 @@ async function sendSchoolRequestQuoteEmail(
     // 4. Destructure required values
     const { enquiryNumber, products, sellerCompanyName, quoteDetails } =
       usersWithCredentials;
-
-    // 5. Proposal details as HTML - Detailed quote information
-    // const proposalDetailsHtml = `
-    //   <h3 style="font-size: 17px;">Quote Request Details:</h3>
-    //   <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%;" class="table-show">
-    //     <thead>
-    //       <tr>
-    //         <th>S.No</th>
-    //         <th>Category</th>
-    //         <th>Quantity</th>
-    //         <th>Listing Rate</th>
-    //         <th>Discount (%)</th>
-    //         <th>Final Rate</th>
-    //         <th>Total Amount</th>
-    //       </tr>
-    //     </thead>
-    //     <tbody>
-    //       ${quoteDetails
-    //         .map(
-    //           (item, index) => `
-    //         <tr>
-    //           <td style="text-align: center;">${index + 1}</td>
-    //           <td style="text-align: center;">${item.subcategoryName}</td>
-    //           <td style="text-align: center;">${item.quantity}</td>
-    //           <td style="text-align: center;">${
-    //             item.finalRateBeforeDiscount
-    //           }</td>
-    //           <td style="text-align: center;">${item.discount}</td>
-    //           <td style="text-align: center;">${item.finalRate}</td>
-    //           <td style="text-align: center;">${item.totalAmount}</td>
-    //         </tr>
-    //       `
-    //         )
-    //         .join("")}
-    //     </tbody>
-    //   </table>
-    //   <br/>
-    //   <h3 style="font-size: 17px;">Additional Information from Seller</h3>
-    //   <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%;">
-    //       ${products
-    //         .map(
-    //           (product, index) => `
-    //         <tr>
-    //           <th>Description</th>
-    //           <td>${product.description || "-"}</td>
-    //         </tr>
-    //         <tr>
-    //           <th>Quoted Amount</th>
-    //           <td>${product.quotedAmount || "-"}</td>
-    //         </tr>
-    //         <tr>
-    //           <th>Payment Terms</th>
-    //           <td >${product.paymentTerms || "-"}</td>
-    //         </tr>
-    //         <tr>
-    //           <th>Advance Required (Rs)</th>
-    //           <td >${product.advanceRequiredAmount || "-"}</td>
-    //         </tr>
-    //         <tr>
-    //           <th>Expected Delivery Date</th>
-    //           <td>${product.expectedDeliveryDateBySeller || "-"}</td>
-    //         </tr>
-    //         <tr>
-    //           <th>Remarks</th>
-    //           <td>${product.remarksFromSupplier || "-"}</td>
-    //         </tr>
-    //       `
-    //         )
-    //         .join("")}
-    //   </table>
-    // `;
 
     const proposalDetailsHtml = `
       <h3 style="font-size: 17px;">Quote Request Details:</h3>
@@ -542,7 +477,6 @@ async function updateVenderStatus(req, res) {
       });
     }
 
-    // 1. Check existing quote (local service)
     const existingQuote = await SubmitQuote.findOne({
       enquiryNumber,
       sellerId,
@@ -555,22 +489,15 @@ async function updateVenderStatus(req, res) {
       });
     }
 
-    // 2. Fetch quote request from external service
-    let existingQuoteRequest;
-    try {
-      const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
-      const response = await axios.get(
-        `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}`
-      );
-      existingQuoteRequest = response.data.data;
-    } catch (error) {
-      console.error("Error fetching quote request:", error.message);
-      return res.status(error.response?.status || 500).json({
-        hasError: true,
-        message: "Failed to fetch quote request",
-        error: error.message,
-      });
+    const quoteRequestResponse = await getQuoteRequestByEnquiryNumber(
+      enquiryNumber
+    );
+
+    if (quoteRequestResponse.hasError) {
+      return res.status(500).json(quoteRequestResponse);
     }
+
+    const existingQuoteRequest = quoteRequestResponse.data;
 
     if (!existingQuoteRequest) {
       return res.status(404).json({
@@ -579,70 +506,36 @@ async function updateVenderStatus(req, res) {
       });
     }
 
-    // 3. Update local quote status
     existingQuote.venderStatus = venderStatus;
     await existingQuote.save();
 
     if (venderStatus === "Quote Accepted") {
-      // 4. Update quote request status in external service
-      try {
-        const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
-        await axios.put(
-          `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}/status`,
-          { buyerStatus: "Quote Received", edprowiseStatus: "Quote Accepted" }
-        );
-      } catch (error) {
-        console.error("Error updating quote request status:", {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status,
-          config: error.config,
-        });
-        return res.status(error.response?.status || 500).json({
-          hasError: true,
-          message: "Failed to update quote request status",
-          error: error.message,
-        });
-      }
-
-      // Rest of your existing code for sending emails remains the same...
-      let school;
-      try {
-        const schoolResponse = await axios.get(
-          `${process.env.USER_SERVICE_URL}/api/required-field-from-school-profile/${existingQuoteRequest.schoolId}`,
-          {
-            params: { fields: "schoolName,schoolId,schoolEmail" },
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          }
-        );
-        school = schoolResponse?.data?.data;
-      } catch (err) {
-        console.error("Error fetching School profile:", err.message);
-        return res.status(err.response?.status || 500).json({
-          hasError: true,
-          message: "Failed to fetch school profile",
-          error: err.message,
-        });
-      }
-
-      if (!school) {
-        return res.status(404).json({
-          hasError: true,
-          message: "School not found for this quote request.",
-        });
-      }
-
-      const schoolName = school.schoolName;
-      const schoolId = school.schoolId;
-      const schoolEmail = school.schoolEmail;
-
-      const quoteDetails = await PrepareQuote.find({
-        enquiryNumber,
-        sellerId,
+      const updateResult = await updateQuoteRequestStatus(enquiryNumber, {
+        buyerStatus: "Quote Received",
+        edprowiseStatus: "Quote Accepted",
       });
 
+      if (updateResult.hasError) {
+        return res.status(500).json(updateResult);
+      }
+
+      const schoolResponse = await getSchoolById(
+        existingQuoteRequest.schoolId,
+        "schoolName,schoolId,schoolEmail"
+      );
+
+      if (schoolResponse.hasError || !schoolResponse.data) {
+        return res.status(404).json({
+          hasError: true,
+          message:
+            schoolResponse.message ||
+            "School not found for this quote request.",
+        });
+      }
+
+      const { schoolName, schoolId, schoolEmail } = schoolResponse.data;
+
+      const quoteDetails = await PrepareQuote.find({ enquiryNumber, sellerId });
       const sellerSubmittedQuotes = await SubmitQuote.find({
         enquiryNumber,
         sellerId,
@@ -667,26 +560,18 @@ async function updateVenderStatus(req, res) {
           .replace(",", ","),
       }));
 
-      let sellerCompanyName = null;
-      try {
-        const sellerResponse = await axios.get(
-          `${process.env.USER_SERVICE_URL}/api/required-field-from-seller-profile/${sellerId}`,
-          {
-            params: { fields: "companyName" },
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          }
-        );
-        sellerCompanyName = sellerResponse?.data?.data?.companyName || null;
-      } catch (err) {
-        console.error("Error fetching seller profile:", err.message);
-        return res.status(err.response?.status || 500).json({
+      const sellerResponse = await getSellerById(sellerId, "companyName");
+
+      if (sellerResponse.hasError || !sellerResponse.data) {
+        return res.status(404).json({
           hasError: true,
-          message: "Failed to fetch seller profile",
-          error: err.message,
+          message:
+            sellerResponse.message ||
+            "Seller not found for this quote request.",
         });
       }
+
+      const sellerCompanyName = sellerResponse.data.companyName || null;
 
       await sendSchoolRequestQuoteEmail(
         schoolName,

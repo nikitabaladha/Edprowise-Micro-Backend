@@ -1,10 +1,8 @@
 import SubmitQuote from "../../models/SubmitQuote.js";
 import QuoteProposal from "../../models/QuoteProposal.js";
-import axios from "axios";
 
-// import SellerProfile from "../../../models/SellerProfile.js";
-
-// import QuoteRequest from "../../models/QuoteRequest.js";
+import { getSellerById } from "../AxiosRequestService/userService.js";
+import { getQuoteRequestByEnquiryNumber } from "../AxiosRequestService/quoteRequestServiceRequest.js";
 
 async function getOneByEnquiryNumberAndSellerIdAccordingToStatus(req, res) {
   try {
@@ -30,38 +28,14 @@ async function getOneByEnquiryNumberAndSellerIdAccordingToStatus(req, res) {
       });
     }
 
-    let companyName = null;
-    try {
-      const userServiceResponse = await axios.get(
-        `${process.env.USER_SERVICE_URL}/api/required-field-from-seller-profile/${sellerId}`,
-        {
-          params: { fields: "companyName" },
-        }
-      );
-      companyName = userServiceResponse?.data?.data?.companyName || null;
-    } catch (error) {
-      console.error(
-        "Error fetching seller company name from User Service:",
-        error.message
-      );
-    }
+    const sellerResponse = await getSellerById(sellerId, "companyName");
+    const companyName = sellerResponse?.data?.companyName || null;
 
-    let quoteRequestData = null;
-    try {
-      const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
-      const response = await axios.get(
-        `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}`,
-        {
-          params: { fields: "buyerStatus,supplierStatus,edprowiseStatus" },
-        }
-      );
-      quoteRequestData = response.data?.data || null;
-    } catch (error) {
-      console.error(
-        "Error fetching quote request from quote-request service:",
-        error.message
-      );
-    }
+    const quoteRequestResponse = await getQuoteRequestByEnquiryNumber(
+      enquiryNumber,
+      "buyerStatus,supplierStatus,edprowiseStatus"
+    );
+    const quoteRequestData = quoteRequestResponse?.data || null;
 
     const quoteProposal = await QuoteProposal.findOne({
       enquiryNumber,

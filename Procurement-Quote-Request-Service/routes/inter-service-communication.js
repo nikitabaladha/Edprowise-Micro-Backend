@@ -5,6 +5,7 @@ import {
   updateQuoteRequestStatus,
   updateQuoteRequest,
   getQuoteRequestByEnqNos,
+  getQuoteRequestBySchoolIdAndEnqNos,
 } from "../controllers/Inter-Service-Communication/index.js";
 
 const router = express.Router();
@@ -12,6 +13,11 @@ const router = express.Router();
 router.get("/quote-requests/:enquiryNumber", getQuoteRequestByEnquiryNumber);
 
 router.get("/quote-request-by-enqnos", getQuoteRequestByEnqNos);
+
+router.get(
+  "/quote-request-by-schoolid-enqnos",
+  getQuoteRequestBySchoolIdAndEnqNos
+);
 
 router.put("/quote-requests/:enquiryNumber/status", updateQuoteRequestStatus);
 

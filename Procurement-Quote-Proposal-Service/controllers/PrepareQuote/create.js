@@ -5,13 +5,18 @@ import PrepareQuote from "../../models/PrepareQuote.js";
 import QuoteProposal from "../../models/QuoteProposal.js";
 import SubmitQuote from "../../models/SubmitQuote.js";
 
-// import QuoteRequest from "../../models/QuoteRequest.js";
+import { sendNotification } from "../AxiosRequestService/notificationServiceRequest.js";
 
-// import SellerProfile from "../../../models/SellerProfile.js";
-// import EdprowiseProfile from "../../../models/EdprowiseProfile.js";
-// import AdminUser from "../../../models/AdminUser.js";
+import {
+  getSellerById,
+  getrequiredFieldsFromEdprowiseProfile,
+  getAllEdprowiseAdmins,
+} from "../AxiosRequestService/userServiceRequest.js";
 
-// import { NotificationService } from "../../../notificationService.js";
+import {
+  getQuoteRequestById,
+  updateQuoteRequestStatus,
+} from "../AxiosRequestService/quoteRequestServiceRequest.js";
 
 import mongoose from "mongoose";
 
@@ -120,18 +125,9 @@ async function create(req, res) {
 
     let quoteRequest;
     try {
-      const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
-      const response = await axios.get(
-        `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}`
-      );
-      quoteRequest = response.data.data;
+      const quoteResponse = await getQuoteRequestById(enquiryNumber);
+      quoteRequest = quoteResponse.data;
     } catch (error) {
-      console.error("Error fetching quote request:", {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        config: error.config,
-      });
       await session.abortTransaction();
       session.endSession();
       return res.status(error.response?.status || 500).json({
@@ -142,22 +138,12 @@ async function create(req, res) {
     }
 
     const [sellerResponse, edprowiseResponse] = await Promise.all([
-      // User-Service calls
-      axios
-        .get(
-          `${process.env.USER_SERVICE_URL}/api/required-field-from-seller-profile/${sellerId}`
-        )
-        .catch(() => ({ data: { data: null } })),
-
-      axios
-        .get(
-          `${process.env.USER_SERVICE_URL}/api/required-field-from-edprowise-profile`
-        )
-        .catch(() => ({ data: { data: null } })),
+      getSellerById(sellerId).catch(() => ({ data: null })),
+      getrequiredFieldsFromEdprowiseProfile().catch(() => ({ data: null })),
     ]);
 
-    const sellerProfile = sellerResponse.data.data;
-    const edprowiseProfile = edprowiseResponse.data.data;
+    const sellerProfile = sellerResponse?.data;
+    const edprowiseProfile = edprowiseResponse?.data;
 
     if (!quoteRequest || !sellerProfile || !edprowiseProfile) {
       await session.abortTransaction();
@@ -451,25 +437,21 @@ async function create(req, res) {
 
     await newQuoteProposal.save({ session });
 
-    try {
-      const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
-      await axios.put(
-        `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}/status`,
-        { edprowiseStatus: "Quote Received" }
+    const statusUpdateResult = await updateQuoteRequestStatus(enquiryNumber, {
+      edprowiseStatus: "Quote Received",
+    });
+
+    if (statusUpdateResult.hasError) {
+      console.error(
+        "Error updating quote request status:",
+        statusUpdateResult.error
       );
-    } catch (error) {
-      console.error("Error updating quote request status:", {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        config: error.config,
-      });
       await session.abortTransaction();
       session.endSession();
-      return res.status(error.response?.status || 500).json({
+      return res.status(500).json({
         hasError: true,
         message: "Failed to update quote request status",
-        error: error.message,
+        error: statusUpdateResult.error,
       });
     }
 
@@ -483,54 +465,55 @@ async function create(req, res) {
 
     await newSubmitQuote.save({ session });
 
-    // Commit the transaction before sending notifications
     await session.commitTransaction();
     session.endSession();
 
+    const edprowiseAdminsResponse = await getAllEdprowiseAdmins("name,email");
+
+    const relevantEdprowise = edprowiseAdminsResponse?.data || [];
+
     // Send notifications after transaction is committed
-    // try {
-    //   await NotificationService.sendNotification(
-    //     "SELLER_QUOTE_PREPARED",
-    //     [{ id: sellerId, type: "seller" }],
-    //     {
-    //       enquiryNumber: enquiryNumber,
-    //       quoteNumber: newQuoteProposal.quoteNumber,
-    //       entityId: newQuoteProposal._id,
-    //       entityType: "QuoteProposal",
-    //       senderType: "seller",
-    //       senderId: sellerId,
-    //       metadata: {
-    //         enquiryNumber,
-    //         type: "quote_prepared",
-    //       },
-    //     }
-    //   );
+    try {
+      await sendNotification(
+        "SELLER_QUOTE_PREPARED",
+        [{ id: sellerId, type: "seller" }],
+        {
+          enquiryNumber: enquiryNumber,
+          quoteNumber: newQuoteProposal.quoteNumber,
+          entityId: newQuoteProposal._id,
+          entityType: "QuoteProposal",
+          senderType: "seller",
+          senderId: sellerId,
+          metadata: {
+            enquiryNumber,
+            type: "quote_prepared",
+          },
+        }
+      );
 
-    //   const relevantEdprowise = await AdminUser.find({});
-
-    //   await NotificationService.sendNotification(
-    //     "EDPROWISE_QUOTE_RECEIVED_FROM_SELLER",
-    //     relevantEdprowise.map((admin) => ({
-    //       id: admin._id.toString(),
-    //       type: "edprowise",
-    //     })),
-    //     {
-    //       companyName: sellerProfile.companyName,
-    //       enquiryNumber: enquiryNumber,
-    //       quoteNumber: newQuoteProposal.quoteNumber,
-    //       entityId: newQuoteProposal._id,
-    //       entityType: "QuoteProposal From Seller",
-    //       senderType: "seller",
-    //       senderId: sellerId,
-    //       metadata: {
-    //         enquiryNumber,
-    //         type: "quote_received_from_seller",
-    //       },
-    //     }
-    //   );
-    // } catch (notificationError) {
-    //   console.error("Error sending notifications:", notificationError);
-    // }
+      await sendNotification(
+        "EDPROWISE_QUOTE_RECEIVED_FROM_SELLER",
+        relevantEdprowise.map((admin) => ({
+          id: admin._id?.toString(),
+          type: "edprowise",
+        })),
+        {
+          companyName: sellerProfile.companyName,
+          enquiryNumber: enquiryNumber,
+          quoteNumber: newQuoteProposal.quoteNumber,
+          entityId: newQuoteProposal._id,
+          entityType: "QuoteProposal From Seller",
+          senderType: "seller",
+          senderId: sellerId,
+          metadata: {
+            enquiryNumber,
+            type: "quote_received_from_seller",
+          },
+        }
+      );
+    } catch (notificationError) {
+      console.error("Error sending notifications:", notificationError);
+    }
 
     return res.status(201).json({
       hasError: false,
@@ -542,7 +525,6 @@ async function create(req, res) {
       },
     });
   } catch (error) {
-    // Only abort transaction if it hasn't been committed yet
     if (session.inTransaction()) {
       await session.abortTransaction();
     }

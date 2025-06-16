@@ -8,13 +8,15 @@ import QuoteProposal from "../../models/QuoteProposal.js";
 import SubmitQuote from "../../models/SubmitQuote.js";
 import GeneratePDFMail from "./generatePDFMail.js";
 
-// import QuoteRequest from "../../../models/QuoteRequest.js";
+import {
+  getSchoolById,
+  getSellerById,
+  getrequiredFieldsFromEdprowiseProfile,
+} from "../AxiosRequestService/userServiceRequest.js";
 
-// import SchoolRegistration from "../../../models/School.js";
-// import SellerProfile from "../../../models/SellerProfile.js";
-// import EdprowiseProfile from "../../../models/EdprowiseProfile.js";
+import { getQuoteRequestBySchoolIdAndEnqNo } from "../AxiosRequestService/quoteRequestServiceRequest.js";
 
-// import OrderDetailsFromSeller from "../../../models/ProcurementService/OrderDetailsFromSeller.js";
+import { getOrderDetailsFromSellerBySchooIdSellerId } from "../AxiosRequestService/orderServiceRequest.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,52 +32,97 @@ async function invoiceForEdprowisePDFRequirementsForEmail(params) {
     }
 
     const [
-      school,
-      quoteRequest,
+      schoolData,
+      quoteRequestData,
       quoteProposal,
       submitQuote,
-      sellerProfile,
-      edprowiseProfile,
-      orderDetails,
-      prepareQuotes,
+      sellerProfileData,
+      edprowiseProfileData,
+      orderDetailsData,
+      prepareQuotesData,
     ] = await Promise.all([
-      SchoolRegistration.findOne({ schoolId }).select(
+      getSchoolById(
+        schoolId,
         "schoolName schoolEmail schoolMobileNo panNo schoolAddress city state country landMark schoolPincode"
       ),
-      QuoteRequest.findOne({ schoolId, enquiryNumber }).select(
-        "deliveryAddress deliveryLandMark deliveryCity deliveryState deliveryCountry createdAt enquiryNumber"
+      getQuoteRequestBySchoolIdAndEnqNo(
+        enquiryNumber,
+        schoolId,
+        "deliveryAddress,deliveryLandMark,deliveryCountry,deliveryState,deliveryCity,createdAt,enquiryNumber"
       ),
+
       QuoteProposal.findOne({ enquiryNumber, sellerId }).lean(),
       SubmitQuote.findOne({ enquiryNumber, sellerId }).select(
         "paymentTerms advanceRequiredAmount expectedDeliveryDateBySeller advanceRequiredAmount"
       ),
-      SellerProfile.findOne({ sellerId }).select(
-        "companyName address landmark city state country gstin pan contactNo emailId signature"
+
+      getSellerById(
+        sellerId,
+        "companyName address landmark cit state country gstin pan contactNo emailId"
       ),
-      EdprowiseProfile.findOne().select(
+
+      getrequiredFieldsFromEdprowiseProfile(
         "companyName companyType gstin pan tan cin address city state country landmark pincode contactNo alternateContactNo emailId"
       ),
-      OrderDetailsFromSeller.findOne({ schoolId, sellerId }).select(
+
+      getOrderDetailsFromSellerBySchooIdSellerId(
+        schoolId,
+        sellerId,
         "invoiceDate invoiceForSchool invoiceForEdprowise"
       ),
       PrepareQuote.find({ sellerId, enquiryNumber }),
     ]);
 
-    if (
-      !school ||
-      !quoteRequest ||
-      !quoteProposal ||
-      !sellerProfile ||
-      !edprowiseProfile ||
-      !prepareQuotes.length
-    ) {
-      return {
+    if (!schoolData || schoolData.hasError) {
+      return res.status(404).json({
         hasError: true,
-        message: "Required data not found for PDF generation.",
-      };
+        message: "School data not found or has error.",
+      });
     }
 
-    const prepareQuotesWithStatus = prepareQuotes.map((quote) => ({
+    if (!quoteRequestData || quoteRequestData.hasError) {
+      return res.status(404).json({
+        hasError: true,
+        message: "Quote request data not found or has error.",
+      });
+    }
+
+    if (!quoteProposal) {
+      return res.status(404).json({
+        hasError: true,
+        message: "Quote proposal data not found.",
+      });
+    }
+
+    if (!sellerProfileData || sellerProfileData.hasError) {
+      return res.status(404).json({
+        hasError: true,
+        message: "Seller profile data not found or has error.",
+      });
+    }
+
+    if (!edprowiseProfileData || edprowiseProfileData.hasError) {
+      return res.status(404).json({
+        hasError: true,
+        message: "Edprowise profile data not found or has error.",
+      });
+    }
+
+    if (!orderDetailsData || orderDetailsData.hasError) {
+      return res.status(404).json({
+        hasError: true,
+        message: "Order details from seller not found or has error.",
+      });
+    }
+
+    if (!prepareQuotesData || !prepareQuotesData.length) {
+      return res.status(404).json({
+        hasError: true,
+        message: "No prepared quote data found for the given enquiry.",
+      });
+    }
+
+    const prepareQuotesWithStatus = prepareQuotesData.map((quote) => ({
       ...quote.toObject(),
       supplierStatus: quoteProposal?.supplierStatus || null,
     }));
@@ -203,6 +250,12 @@ async function invoiceForEdprowisePDFRequirementsForEmail(params) {
         console.error("Error processing signature:", error);
       }
     }
+
+    const school = schoolData.data;
+    const quoteRequest = quoteRequestData.data;
+    const sellerProfile = sellerProfileData.data;
+    const edprowiseProfile = edprowiseProfileData.data;
+    const orderDetails = orderDetailsData.data;
 
     const dynamicData = {
       prepareQuoteData: prepareQuotesWithStatus,

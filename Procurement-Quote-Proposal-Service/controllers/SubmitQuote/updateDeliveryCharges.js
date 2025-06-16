@@ -5,12 +5,15 @@ import SubmitQuote from "../../models/SubmitQuote.js";
 import SubmitQuoteValidator from "../../validators/SubmitQuote.js";
 import QuoteProposal from "../../models/QuoteProposal.js";
 
-// import QuoteRequest from "../../models/QuoteRequest.js";
+import { getQuoteRequestByEnquiryNumber } from "../AxiosRequestService/quoteRequestServiceRequest.js";
 
-// import SellerProfile from "../../../models/SellerProfile.js";
-// import EdprowiseProfile from "../../../models/EdprowiseProfile.js";
-// import AdminUser from "../../../models/AdminUser.js";
-// import { NotificationService } from "../../../notificationService.js";
+import {
+  getSellerById,
+  getrequiredFieldsFromEdprowiseProfile,
+  getAllEdprowiseAdmins,
+} from "../AxiosRequestService/userServiceRequest.js";
+
+import { sendNotification } from "../AxiosRequestService/notificationServiceRequest.js";
 
 async function updateDeliveryCharges(req, res) {
   const session = await mongoose.startSession();
@@ -53,49 +56,22 @@ async function updateDeliveryCharges(req, res) {
       });
     }
 
-    const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
+    const [quoteRequestRes, sellerRes, edprowiseRes, existingQuoteProposal] =
+      await Promise.all([
+        getQuoteRequestByEnquiryNumber(enquiryNumber, "deliveryState,schoolId"),
+        getSellerById(sellerId, "companyName,state"),
+        getrequiredFieldsFromEdprowiseProfile("state"),
+        QuoteProposal.findOne({ enquiryNumber, sellerId }).session(session),
+      ]);
 
-    const [
-      quoteRequestResponse,
-      sellerResponse,
-      edprowiseResponse,
-      existingQuoteProposal,
-    ] = await Promise.all([
-      // Local query
-
-      axios
-        .get(
-          `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}`,
-          {
-            params: { fields: "deliveryState,schoolId" },
-          }
-        )
-        .catch(() => ({ data: { data: null } })),
-
-      // User-Service calls
-      axios
-        .get(
-          `${process.env.USER_SERVICE_URL}/api/required-field-from-seller-profile/${sellerId}`
-        )
-        .catch(() => ({ data: { data: null } })),
-
-      axios
-        .get(
-          `${process.env.USER_SERVICE_URL}/api/required-field-from-edprowise-profile`
-        )
-        .catch(() => ({ data: { data: null } })),
-
-      QuoteProposal.findOne({ enquiryNumber, sellerId }).session(session),
-    ]);
-
-    const quoteRequest = quoteRequestResponse?.data?.data;
-    const sellerProfile = sellerResponse.data.data;
-    const edprowiseProfile = edprowiseResponse.data.data;
+    const quoteRequest = quoteRequestRes?.data;
+    const sellerProfile = sellerRes?.data;
+    const edprowiseProfile = edprowiseRes?.data;
 
     if (
-      !quoteRequest ||
-      !sellerProfile ||
-      !edprowiseProfile ||
+      quoteRequestRes.hasError ||
+      sellerRes.hasError ||
+      edprowiseRes.hasError ||
       !existingQuoteProposal
     ) {
       await session.abortTransaction();
@@ -193,52 +169,64 @@ async function updateDeliveryCharges(req, res) {
       });
     }
 
-    // const relevantEdprowise = await AdminUser.find({}).session(session);
+    const adminResponse = await getAllEdprowiseAdmins("id");
 
-    // try {
-    //   await NotificationService.sendNotification(
-    //     "SCHOOL_QUOTE_RECEIVED_FROM_EDPROWISE",
-    //     schoolId ? [{ id: schoolId.toString(), type: "school" }] : [],
-    //     {
-    //       companyName: sellerProfile.companyName,
-    //       enquiryNumber: quoteProposal.enquiryNumber,
-    //       quoteNumber: quoteProposal.quoteNumber,
-    //       entityId: quoteProposal._id,
-    //       entityType: "QuoteProposal From Edprowise",
-    //       senderType: "edprowise",
-    //       senderId: senderId,
-    //       metadata: {
-    //         enquiryNumber,
-    //         sellerId: quoteProposal.sellerId,
-    //         type: "quote_received_from_edprowise",
-    //       },
-    //     }
-    //   );
+    if (adminResponse.hasError || !adminResponse.data) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(500).json({
+        hasError: true,
+        message: "Failed to fetch Edprowise admins.",
+        error: adminResponse.error,
+      });
+    }
 
-    //   await NotificationService.sendNotification(
-    //     "EDPROWISE_ACCEPTED_QUOTE",
-    //     relevantEdprowise.map((admin) => ({
-    //       id: admin._id.toString(),
-    //       type: "edprowise",
-    //     })),
-    //     {
-    //       companyName: sellerProfile.companyName,
-    //       quoteNumber: quoteProposal.quoteNumber,
-    //       enquiryNumber: quoteProposal.enquiryNumber,
-    //       entityId: quoteProposal._id,
-    //       entityType: "QuoteProposal From Edprowise",
-    //       senderType: "edprowise",
-    //       senderId: senderId,
-    //       metadata: {
-    //         enquiryNumber,
-    //         sellerId: quoteProposal.sellerId,
-    //         type: "quote_accepted_from_edprowise",
-    //       },
-    //     }
-    //   );
-    // } catch (notificationError) {
-    //   throw new Error("Notification failed: " + notificationError.message);
-    // }
+    const relevantEdprowise = adminResponse.data;
+
+    try {
+      await sendNotification(
+        "SCHOOL_QUOTE_RECEIVED_FROM_EDPROWISE",
+        schoolId ? [{ id: schoolId.toString(), type: "school" }] : [],
+        {
+          companyName: sellerProfile.companyName,
+          enquiryNumber: quoteProposal.enquiryNumber,
+          quoteNumber: quoteProposal.quoteNumber,
+          entityId: quoteProposal._id,
+          entityType: "QuoteProposal From Edprowise",
+          senderType: "edprowise",
+          senderId: senderId,
+          metadata: {
+            enquiryNumber,
+            sellerId: quoteProposal.sellerId,
+            type: "quote_received_from_edprowise",
+          },
+        }
+      );
+
+      await sendNotification(
+        "EDPROWISE_ACCEPTED_QUOTE",
+        relevantEdprowise.map((admin) => ({
+          id: admin._id.toString(),
+          type: "edprowise",
+        })),
+        {
+          companyName: sellerProfile.companyName,
+          quoteNumber: quoteProposal.quoteNumber,
+          enquiryNumber: quoteProposal.enquiryNumber,
+          entityId: quoteProposal._id,
+          entityType: "QuoteProposal From Edprowise",
+          senderType: "edprowise",
+          senderId: senderId,
+          metadata: {
+            enquiryNumber,
+            sellerId: quoteProposal.sellerId,
+            type: "quote_accepted_from_edprowise",
+          },
+        }
+      );
+    } catch (notificationError) {
+      throw new Error("Notification failed: " + notificationError.message);
+    }
 
     await session.commitTransaction();
     session.endSession();

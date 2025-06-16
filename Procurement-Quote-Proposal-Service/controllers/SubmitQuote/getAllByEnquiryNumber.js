@@ -1,7 +1,8 @@
-import axios from "axios";
-
 import SubmitQuote from "../../models/SubmitQuote.js";
 import QuoteProposal from "../../models/QuoteProposal.js";
+
+import { getQuoteRequestByEnquiryNumber } from "../AxiosRequestService/quoteRequestService.js";
+import { getallSellersByIds } from "../AxiosRequestService/userService.js";
 
 async function getAllByEnquiryNumber(req, res) {
   try {
@@ -23,47 +24,29 @@ async function getAllByEnquiryNumber(req, res) {
       });
     }
 
-    let quoteRequestData = null;
-    try {
-      const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
-      const response = await axios.get(
-        `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}`,
-        {
-          params: { fields: "buyerStatus,supplierStatus,edprowiseStatus" },
-        }
-      );
-      quoteRequestData = response.data?.data || null;
-    } catch (error) {
+    const quoteRequestResponse = await getQuoteRequestByEnquiryNumber(
+      enquiryNumber,
+      "buyerStatus,supplierStatus,edprowiseStatus"
+    );
+
+    let buyerStatus = null;
+    let edprowiseStatus = null;
+
+    if (!quoteRequestResponse.hasError && quoteRequestResponse.data) {
+      buyerStatus = quoteRequestResponse.data.buyerStatus || null;
+      edprowiseStatus = quoteRequestResponse.data.edprowiseStatus || null;
+    } else {
       console.error(
-        "Error fetching quote request from quote-request service:",
-        error.message
+        "Failed to fetch quote request:",
+        quoteRequestResponse.error
       );
     }
-
-    const buyerStatus = quoteRequestData?.buyerStatus || null;
-
-    const edprowiseStatus = quoteRequestData?.edprowiseStatus || null;
 
     const sellerIds = quotes.map((quote) => quote.sellerId);
 
-    let sellerProfiles = [];
-    try {
-      const response = await axios.get(
-        `${process.env.USER_SERVICE_URL}/api/bulk-required-fields-from-seller-profile`,
-        {
-          params: {
-            ids: sellerIds.join(","),
-            fields: "companyName",
-          },
-        }
-      );
-      sellerProfiles = response.data?.data || [];
-    } catch (err) {
-      console.error(
-        "Error fetching seller profiles from User Service:",
-        err.message
-      );
-    }
+    const sellerResponse = await getallSellersByIds(sellerIds, "companyName");
+
+    const sellerProfiles = sellerResponse?.data || [];
 
     const sellerProfileMap = sellerProfiles.reduce((acc, profile) => {
       acc[profile.sellerId] = profile.companyName;
