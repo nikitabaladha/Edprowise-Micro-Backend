@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 import axios from "axios";
 import Cart from "../../models/Cart.js";
 
+import {
+  fetchPrepareQuotes,
+  updateSubmitQuote,
+} from "../AxiosRequestService/quoteProposalServiceRequest.js";
+
 async function create(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -55,30 +60,23 @@ async function create(req, res) {
       });
     }
 
-    // 1. Fetch PrepareQuotes from quote-proposal-service
-    let prepareQuotes;
-    try {
-      const response = await axios.get(
-        `${process.env.PROCUREMENT_QUOTE_PROPOSAL_SERVICE_URL}/api/get-prepare-quotes`,
-        {
-          params: {
-            ids: selectedPrepareQuoteIds.join(","),
-            enquiryNumber,
-            fields: "",
-          },
-        }
-      );
-      prepareQuotes = response.data.data || [];
-    } catch (error) {
-      console.error("Error fetching prepare quotes:", error.message);
+    const quoteResponse = await fetchPrepareQuotes(
+      enquiryNumber,
+      selectedPrepareQuoteIds,
+      ""
+    );
+
+    if (quoteResponse.hasError) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(error.response?.status || 500).json({
+      return res.status(500).json({
         hasError: true,
         message: "Failed to fetch prepare quotes",
-        error: error.message,
+        error: quoteResponse.error,
       });
     }
+
+    const prepareQuotes = quoteResponse.data || [];
 
     const prepareQuoteMap = new Map(
       prepareQuotes.map((pq) => [pq._id.toString(), pq])
@@ -140,28 +138,21 @@ async function create(req, res) {
 
     const savedEntries = await Cart.insertMany(cartEntries, { session });
 
-    // 2. Update SubmitQuote in quote-proposal-service
-    try {
-      await axios.put(
-        `${process.env.PROCUREMENT_QUOTE_PROPOSAL_SERVICE_URL}/api/update-submitquote-by-status`,
-        {
-          venderStatusFromBuyer: "Quote Accepted",
-        },
-        {
-          params: {
-            enquiryNumber,
-            sellerId: cartEntries[0].sellerId,
-          },
-        }
-      );
-    } catch (error) {
-      console.error("Error updating submit quote status:", error.message);
+    const updateResponse = await updateSubmitQuote(
+      enquiryNumber,
+      cartEntries[0].sellerId,
+      {
+        venderStatusFromBuyer: "Quote Accepted",
+      }
+    );
+
+    if (updateResponse.hasError) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(error.response?.status || 500).json({
+      return res.status(500).json({
         hasError: true,
         message: "Failed to update quote status",
-        error: error.message,
+        error: updateResponse.error,
       });
     }
 
