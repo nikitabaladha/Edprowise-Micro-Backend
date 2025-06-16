@@ -3,9 +3,12 @@ import OrderFromBuyer from "../../models/OrderFromBuyer.js";
 
 import smtpServiceClient from "../Inter-Service-Communication/smtpServiceClient.js";
 
-// import invoiceForBuyerPDFRequirementsForEmail from "../PDFForFrontend/invoiceForBuyerPDFRequirementsForEmail.js";
+import {
+  fetchInvoiceForBuyerPDFRequirementsForEmail,
+  fetchInvoiceForEdprowisePDFRequirementsForEmail,
+} from "../AxiosRequestService/quoteProposalServiceRequest.js";
 
-// import { NotificationService } from "../../../notificationService.js";
+import { sendNotification } from "../AxiosRequestService/notificationServiceRequest.js";
 
 import { getQuoteRequestByEnquiryNumber } from "../AxiosRequestService/quoteRequestServiceRequest.js";
 
@@ -38,7 +41,6 @@ async function sendSchooldeliverdEmail({
   productDetails,
   deliveryDetails,
   sellerId,
-  accessToken,
 }) {
   let pdfResult;
   let edPdfResult;
@@ -47,20 +49,20 @@ async function sendSchooldeliverdEmail({
 
   try {
     // 1. SMTP settings
-    const smtpSettings = await smtpServiceClient.getSettings(accessToken);
+    const smtpSettings = await smtpServiceClient.getSettings();
 
     if (!smtpSettings) {
       console.error("SMTP settings not found");
       return { hasError: true, message: "Email configuration error" };
     }
 
-    pdfResult = await invoiceForBuyerPDFRequirementsForEmail({
+    pdfResult = await fetchInvoiceForBuyerPDFRequirementsForEmail({
       sellerId,
       enquiryNumber: deliveryDetails.enquiryNumber,
       schoolId: schoolDetails.schoolId,
     });
 
-    edPdfResult = await invoiceForEdprowisePDFRequirementsForMail({
+    edPdfResult = await fetchInvoiceForEdprowisePDFRequirementsForEmail({
       sellerId,
       enquiryNumber: deliveryDetails.enquiryNumber,
       schoolId: schoolDetails.schoolId,
@@ -671,10 +673,9 @@ async function sendEmailsToSellers({
   sellerDetails,
   productDetails,
   deliveryDetails,
-  accessToken,
 }) {
   try {
-    const smtpSettings = await smtpServiceClient.getSettings(accessToken);
+    const smtpSettings = await smtpServiceClient.getSettings();
 
     if (!smtpSettings) {
       console.error("SMTP settings not found");
@@ -1187,26 +1188,18 @@ async function updateStatus(req, res) {
       }
       schoolDetails = schoolDetailsResponse.data;
 
-      const accessToken = req.headers["access_token"];
+      await sendSchooldeliverdEmail({
+        schoolDetails,
+        productDetails,
+        deliveryDetails,
+        sellerId,
+      });
 
-      await sendSchooldeliverdEmail(
-        {
-          schoolDetails,
-          productDetails,
-          deliveryDetails,
-          sellerId,
-        },
-        accessToken
-      );
-
-      await sendEmailsToSellers(
-        {
-          sellerDetails,
-          productDetails,
-          deliveryDetails,
-        },
-        accessToken
-      );
+      await sendEmailsToSellers({
+        sellerDetails,
+        productDetails,
+        deliveryDetails,
+      });
     }
 
     const existingOrderDetailsFromSeller = await OrderDetailsFromSeller.findOne(
@@ -1270,78 +1263,78 @@ async function updateStatus(req, res) {
     }
     const relevantEdprowise = edprowiseAdminsResponse.data;
 
-    // await NotificationService.sendNotification(
-    //   "ORDER_PROGRESS_BY_SELLER_FOR_EDPROWISE",
-    //   relevantEdprowise.map((admin) => ({
-    //     id: admin._id.toString(),
-    //     type: "edprowise",
-    //   })),
-    //   {
-    //     companyName: sellerProfile.companyName,
-    //     schoolName: schoolProfile.schoolName,
-    //     orderNumber: existingOrderDetailsFromSeller.orderNumber,
-    //     enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
-    //     status: supplierStatus,
-    //     entityId: existingOrderDetailsFromSeller._id,
-    //     entityType: "Order Progress",
-    //     senderType: "seller",
-    //     senderId: senderId,
-    //     metadata: {
-    //       orderNumber: existingOrderDetailsFromSeller.orderNumber,
-    //       type: "order_progress_by_seller",
-    //     },
-    //   }
-    // );
+    await sendNotification(
+      "ORDER_PROGRESS_BY_SELLER_FOR_EDPROWISE",
+      relevantEdprowise.map((admin) => ({
+        id: admin._id.toString(),
+        type: "edprowise",
+      })),
+      {
+        companyName: sellerProfile.companyName,
+        schoolName: schoolProfile.schoolName,
+        orderNumber: existingOrderDetailsFromSeller.orderNumber,
+        enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
+        status: supplierStatus,
+        entityId: existingOrderDetailsFromSeller._id,
+        entityType: "Order Progress",
+        senderType: "seller",
+        senderId: senderId,
+        metadata: {
+          orderNumber: existingOrderDetailsFromSeller.orderNumber,
+          type: "order_progress_by_seller",
+        },
+      }
+    );
 
-    // await NotificationService.sendNotification(
-    //   "ORDER_PROGRESS_BY_SELLER_FOR_SCHOOL",
-    //   [
-    //     {
-    //       id: schoolId?.toString(),
-    //       type: "school",
-    //     },
-    //   ],
-    //   {
-    //     companyName: sellerProfile.companyName,
-    //     schoolName: schoolProfile.schoolName,
-    //     orderNumber: existingOrderDetailsFromSeller.orderNumber,
-    //     enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
-    //     status: supplierStatus,
-    //     entityId: existingOrderDetailsFromSeller._id,
-    //     entityType: "Order Progress",
-    //     senderType: "seller",
-    //     senderId: senderId,
-    //     metadata: {
-    //       orderNumber: existingOrderDetailsFromSeller.orderNumber,
-    //       type: "order_progress_by_seller",
-    //     },
-    //   }
-    // );
+    await sendNotification(
+      "ORDER_PROGRESS_BY_SELLER_FOR_SCHOOL",
+      [
+        {
+          id: schoolId?.toString(),
+          type: "school",
+        },
+      ],
+      {
+        companyName: sellerProfile.companyName,
+        schoolName: schoolProfile.schoolName,
+        orderNumber: existingOrderDetailsFromSeller.orderNumber,
+        enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
+        status: supplierStatus,
+        entityId: existingOrderDetailsFromSeller._id,
+        entityType: "Order Progress",
+        senderType: "seller",
+        senderId: senderId,
+        metadata: {
+          orderNumber: existingOrderDetailsFromSeller.orderNumber,
+          type: "order_progress_by_seller",
+        },
+      }
+    );
 
-    // await NotificationService.sendNotification(
-    //   "ORDER_PROGRESS_BY_SELLER_FOR_SELLER",
-    //   [
-    //     {
-    //       id: sellerId.toString(),
-    //       type: "seller",
-    //     },
-    //   ],
-    //   {
-    //     companyName: sellerProfile.companyName,
-    //     schoolName: schoolProfile.schoolName,
-    //     orderNumber: existingOrderDetailsFromSeller.orderNumber,
-    //     enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
-    //     status: supplierStatus,
-    //     entityId: existingOrderDetailsFromSeller._id,
-    //     entityType: "Order Progress",
-    //     senderType: "seller",
-    //     senderId: senderId,
-    //     metadata: {
-    //       orderNumber: existingOrderDetailsFromSeller.orderNumber,
-    //       type: "order_progress_by_seller",
-    //     },
-    //   }
-    // );
+    await sendNotification(
+      "ORDER_PROGRESS_BY_SELLER_FOR_SELLER",
+      [
+        {
+          id: sellerId.toString(),
+          type: "seller",
+        },
+      ],
+      {
+        companyName: sellerProfile.companyName,
+        schoolName: schoolProfile.schoolName,
+        orderNumber: existingOrderDetailsFromSeller.orderNumber,
+        enquiryNumber: existingOrderDetailsFromSeller.enquiryNumber,
+        status: supplierStatus,
+        entityId: existingOrderDetailsFromSeller._id,
+        entityType: "Order Progress",
+        senderType: "seller",
+        senderId: senderId,
+        metadata: {
+          orderNumber: existingOrderDetailsFromSeller.orderNumber,
+          type: "order_progress_by_seller",
+        },
+      }
+    );
 
     await session.commitTransaction();
     session.endSession();

@@ -1081,6 +1081,16 @@ async function create(req, res) {
       ),
     });
 
+    // for (const [sellerId, orderNumber] of orderFromBuyerEntries.entries()) {
+    //   const sellerProducts = orderEntries.filter(
+    //     (o) => o.sellerId.toString() === sellerId
+    //   );
+    //   await sendSchoolRequestQuoteEmail(schoolName, schoolEmail, {
+    //     orderNumber,
+    //     products: sellerProducts,
+    //   });
+    // }
+
     for (const [sellerId, orderNumber] of sellerOrderNumbers.entries()) {
       const sellerDetails = await getSellerById(sellerId);
 
@@ -1091,6 +1101,7 @@ async function create(req, res) {
 
       const allSellerIds = Array.from(sellerOrderNumbers.keys());
 
+      // Then fetch all sellers in one go
       const allSellersResponse = await getallSellersByIds(allSellerIds);
       if (!allSellersResponse || allSellersResponse.hasError) {
         console.error("Failed to fetch seller profiles");
@@ -1104,22 +1115,22 @@ async function create(req, res) {
         (o) => o.sellerId.toString() === sellerId
       );
 
-      await sendEmailsToSellers(
-        allSellers.companyName,
-        allSellers.emailId,
-        schoolName,
-        {
-          orderNumber,
-          products: sellerProducts,
-          deliveryAddress,
-          deliveryCountry,
-          deliveryState,
-          deliveryCity,
-          deliveryLandMark,
-          deliveryPincode,
-          expectedDeliveryDate,
-        }
-      );
+      // await sendEmailsToSellers(
+      //   allSellers.companyName,
+      //   allSellers.emailId,
+      //   schoolName,
+      //   {
+      //     orderNumber,
+      //     products: sellerProducts,
+      //     deliveryAddress,
+      //     deliveryCountry,
+      //     deliveryState,
+      //     deliveryCity,
+      //     deliveryLandMark,
+      //     deliveryPincode,
+      //     expectedDeliveryDate,
+      //   }
+      // );
     }
 
     for (const savedEntry of savedOrderDetails) {

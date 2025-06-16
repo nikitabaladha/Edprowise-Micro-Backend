@@ -484,3 +484,80 @@ export async function fetchPrepareQuoteBySellerIdAndEnqNo(
     };
   }
 }
+
+export async function fetchInvoiceForBuyerPDFRequirementsForEmail(
+  sellerId,
+  enquiryNumber,
+  schoolId
+) {
+  try {
+    const response = await axios.get(
+      `${process.env.PROCUREMENT_QUOTE_PROPOSAL_SERVICE_URL}/api/invoiceForBuyerPDFRequirementsForEmail/${sellerId}/${enquiryNumber}/${schoolId}`
+    );
+
+    if (response.data.hasError) {
+      return {
+        hasError: true,
+        message: "Failed to get Invoice For Buyer PDFRequirements For Email.",
+        error: response.data.error || "Unknown error",
+      };
+    }
+
+    return response.data;
+  } catch (err) {
+    console.error(
+      "Error getting Invoice For Buyer PDFRequirements For Email:",
+      {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        config: err.config,
+      }
+    );
+
+    return {
+      hasError: true,
+      message: "Failed to get Invoice For Buyer PDFRequirements For Email.",
+      error: err.message,
+    };
+  }
+}
+
+export async function fetchInvoiceForEdprowisePDFRequirementsForEmail(
+  sellerId,
+  enquiryNumber,
+  schoolId
+) {
+  try {
+    const response = await axios.get(
+      `${process.env.PROCUREMENT_QUOTE_PROPOSAL_SERVICE_URL}/api/invoice-for-buyer-PDF-requirements-for-email/${sellerId}/${enquiryNumber}/${schoolId}`
+    );
+
+    if (response.data.hasError) {
+      return {
+        hasError: true,
+        message:
+          "Failed to get Invoice For Edprowise PDFRequirements For Email.",
+        error: response.data.error || "Unknown error",
+      };
+    }
+
+    return response.data;
+  } catch (err) {
+    console.error(
+      "Error getting Invoice For Edprowise PDFRequirements For Email:",
+      {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        config: err.config,
+      }
+    );
+
+    return {
+      hasError: true,
+      message: "Failed to get Invoice For Edprowise PDFRequirements For Email.",
+      error: err.message,
+    };
+  }
+}

@@ -22,7 +22,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function invoiceForBuyerPDFRequirementsForEmail(params) {
   try {
-    const { sellerId, enquiryNumber, schoolId } = params;
+    const { sellerId, enquiryNumber, schoolId } = req.params;
 
     if (!sellerId || !enquiryNumber || !schoolId) {
       return {
@@ -303,12 +303,6 @@ async function invoiceForBuyerPDFRequirementsForEmail(params) {
       convertToWords,
     };
 
-    // await GeneratePDF(htmlPath, dynamicData, outputPath);
-
-    // const fileData = fs.readFileSync(outputPath);
-    // fs.unlinkSync(outputPath);
-
-    // Generate the PDF
     await GeneratePDFMail(templatePath, dynamicData, outputPath);
 
     // Verify PDF was created

@@ -22,7 +22,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function invoiceForEdprowisePDFRequirementsForEmail(params) {
   try {
-    const { sellerId, enquiryNumber, schoolId } = params;
+    const { sellerId, enquiryNumber, schoolId } = req.params;
 
     if (!sellerId || !enquiryNumber || !schoolId) {
       return {

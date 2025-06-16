@@ -6,6 +6,8 @@ import {
   invoiceForEdprowisePDFRequirements,
   invoiceForBuyerPDFRequirements,
   quotePDFRequirementsForBuyer,
+  invoiceForBuyerPDFRequirementsForEmail,
+  invoiceForEdprowisePDFRequirementsForEmail,
 } from "../controllers/PDFForFrontend/index.js";
 
 const router = express.Router();
@@ -32,6 +34,16 @@ router.get(
   "/generate-buyer-invoice-pdf",
   roleBasedMiddleware("Admin", "School", "Seller"),
   invoiceForBuyerPDFRequirements
+);
+
+router.get(
+  "/invoice-for-buyer-PDF-requirements-for-email/:sellerId/:enquiryNumber/:schoolId",
+  invoiceForBuyerPDFRequirementsForEmail
+);
+
+router.get(
+  "/invoice-for-buyer-PDF-requirements-for-email/:sellerId/:enquiryNumber/:schoolId",
+  invoiceForEdprowisePDFRequirementsForEmail
 );
 
 export default router;
