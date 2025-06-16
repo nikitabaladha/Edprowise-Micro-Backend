@@ -2,7 +2,7 @@ import SubmitQuote from "../../models/SubmitQuote.js";
 import QuoteProposal from "../../models/QuoteProposal.js";
 
 import { getQuoteRequestByEnquiryNumber } from "../AxiosRequestService/quoteRequestServiceRequest.js";
-import { getallSellersByIds } from "../AxiosRequestService/userService.js";
+import { getallSellersByIds } from "../AxiosRequestService/userServiceRequest.js";
 
 async function getAllByEnquiryNumberAccordingToStatus(req, res) {
   try {
@@ -76,6 +76,8 @@ async function getAllByEnquiryNumberAccordingToStatus(req, res) {
       edprowiseStatus: edprowiseStatus || null,
       quoteNumber: statusMap[quote.sellerId]?.quoteNumber || null,
     }));
+
+    console.log("data=============", quotesWithCompanyName);
 
     return res.status(200).json({
       hasError: false,

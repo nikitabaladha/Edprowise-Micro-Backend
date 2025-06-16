@@ -14,12 +14,7 @@ class SMTPServiceClient {
 
     try {
       const response = await axios.get(
-        `${process.env.EMAIL_SERVICE_URL}/api/get-smtp-email-settings`,
-        {
-          headers: {
-            access_token: accessToken,
-          },
-        }
+        `${process.env.EMAIL_SERVICE_URL}/api/get-smtp-email-settings`
       );
 
       http: if (response.data.hasError || !response.data.data) {

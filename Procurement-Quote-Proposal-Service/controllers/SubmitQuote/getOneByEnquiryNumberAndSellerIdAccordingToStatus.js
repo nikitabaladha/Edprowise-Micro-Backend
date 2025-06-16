@@ -1,7 +1,7 @@
 import SubmitQuote from "../../models/SubmitQuote.js";
 import QuoteProposal from "../../models/QuoteProposal.js";
 
-import { getSellerById } from "../AxiosRequestService/userService.js";
+import { getSellerById } from "../AxiosRequestService/userServiceRequest.js";
 import { getQuoteRequestByEnquiryNumber } from "../AxiosRequestService/quoteRequestServiceRequest.js";
 
 async function getOneByEnquiryNumberAndSellerIdAccordingToStatus(req, res) {

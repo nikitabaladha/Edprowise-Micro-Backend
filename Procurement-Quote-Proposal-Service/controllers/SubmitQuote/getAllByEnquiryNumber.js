@@ -1,8 +1,8 @@
 import SubmitQuote from "../../models/SubmitQuote.js";
 import QuoteProposal from "../../models/QuoteProposal.js";
 
-import { getQuoteRequestByEnquiryNumber } from "../AxiosRequestService/quoteRequestService.js";
-import { getallSellersByIds } from "../AxiosRequestService/userService.js";
+import { getQuoteRequestByEnquiryNumber } from "../AxiosRequestService/quoteRequestServiceRequest.js";
+import { getallSellersByIds } from "../AxiosRequestService/userServiceRequest.js";
 
 async function getAllByEnquiryNumber(req, res) {
   try {
@@ -58,7 +58,6 @@ async function getAllByEnquiryNumber(req, res) {
       sellerId: { $in: sellerIds },
     });
 
-    // i want quoteNumber from quoteProposal Table
     const statusMap = quoteProposals.reduce((acc, proposal) => {
       acc[proposal.sellerId] = {
         supplierStatus: proposal.supplierStatus,

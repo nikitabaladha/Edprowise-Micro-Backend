@@ -50,13 +50,10 @@ async function updateSingleProduct(req, res) {
       });
     }
 
-    // const encodedEnquiryNumber = encodeURIComponent(enquiryNumber);
-
     const [
       quoteRequestResponse,
       sellerResponse,
       edprowiseResponse,
-      schoolResponse,
       edprowiseAdminsResponse,
     ] = await Promise.all([
       getQuoteRequestByEnquiryNumber(
@@ -65,52 +62,39 @@ async function updateSingleProduct(req, res) {
       ).catch(() => ({ data: null })),
       getSellerById(sellerId).catch(() => ({ data: null })),
       getrequiredFieldsFromEdprowiseProfile().catch(() => ({ data: null })),
-      getSchoolById(schoolId, "schoolName").catch(() => ({ data: null })),
       getAllEdprowiseAdmins("userId").catch(() => ({ data: [] })),
     ]);
-
-    // const [quoteRequestResponse, sellerResponse, edprowiseResponse] =
-    //   await Promise.all([
-    //     axios
-    //       .get(
-    //         `${process.env.PROCUREMENT_QUOTE_REQUEST_SERVICE_URL}/api/quote-requests/${encodedEnquiryNumber}`,
-    //         {
-    //           params: { fields: "deliveryState, schoolId" },
-    //         }
-    //       )
-    //       .catch(() => ({ data: { data: null } })),
-
-    //     // User-Service calls
-    //     axios
-    //       .get(
-    //         `${process.env.USER_SERVICE_URL}/api/required-field-from-seller-profile/${sellerId}`
-    //       )
-    //       .catch(() => ({ data: { data: null } })),
-
-    //     axios
-    //       .get(
-    //         `${process.env.USER_SERVICE_URL}/api/required-field-from-edprowise-profile`
-    //       )
-    //       .catch(() => ({ data: { data: null } })),
-    //   ]);
 
     const quoteRequest = quoteRequestResponse?.data;
     const sellerProfile = sellerResponse?.data;
     const edprowiseProfile = edprowiseResponse?.data;
-    const schoolProfile = schoolResponse?.data;
     const relevantEdprowise = edprowiseAdminsResponse?.data;
 
     if (
       !quoteRequest ||
       !sellerProfile ||
       !edprowiseProfile ||
-      !schoolProfile ||
       !relevantEdprowise ||
       !Array.isArray(relevantEdprowise)
     ) {
       return res.status(404).json({
         hasError: true,
         message: "Required profile data not found.",
+      });
+    }
+
+    const schoolId = quoteRequest.schoolId;
+
+    const schoolResponse = await getSchoolById(schoolId, "schoolName").catch(
+      () => ({ data: null })
+    );
+
+    const schoolProfile = schoolResponse?.data;
+
+    if (!schoolProfile) {
+      return res.status(404).json({
+        hasError: true,
+        message: "School profile not found.",
       });
     }
 

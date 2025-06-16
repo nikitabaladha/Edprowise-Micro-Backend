@@ -54,8 +54,10 @@ export async function getallSellersByIds(sellerIds, fields) {
     const response = await axios.get(
       `${process.env.USER_SERVICE_URL}/api/bulk-required-fields-from-seller-profile`,
       {
-        params: { ids: sellerIds.join(",") },
-        fields,
+        params: {
+          ids: sellerIds.join(","),
+          fields,
+        },
       }
     );
     return response.data;

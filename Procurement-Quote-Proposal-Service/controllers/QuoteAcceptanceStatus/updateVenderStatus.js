@@ -25,15 +25,15 @@ import {
 async function sendSchoolRequestQuoteEmail(
   schoolName,
   schoolEmail,
-  usersWithCredentials,
-  accessToken
+  schoolId,
+  usersWithCredentials
 ) {
   let hasError = false;
   let message = "";
 
   try {
     // 1. SMTP settings
-    const smtpSettings = await smtpServiceClient.getSettings(accessToken);
+    const smtpSettings = await smtpServiceClient.getSettings();
 
     if (!smtpSettings) {
       console.error("SMTP settings not found");
@@ -521,7 +521,7 @@ async function updateVenderStatus(req, res) {
 
       const schoolResponse = await getSchoolById(
         existingQuoteRequest.schoolId,
-        "schoolName,schoolId,schoolEmail"
+        "schoolName schoolId schoolEmail"
       );
 
       if (schoolResponse.hasError || !schoolResponse.data) {
@@ -573,19 +573,13 @@ async function updateVenderStatus(req, res) {
 
       const sellerCompanyName = sellerResponse.data.companyName || null;
 
-      await sendSchoolRequestQuoteEmail(
-        schoolName,
-        schoolEmail,
-        schoolId,
-        {
-          enquiryNumber,
-          products,
-          sellerCompanyName,
-          quoteDetails,
-          sellerId,
-        },
-        accessToken
-      );
+      await sendSchoolRequestQuoteEmail(schoolName, schoolEmail, schoolId, {
+        enquiryNumber,
+        products,
+        sellerCompanyName,
+        quoteDetails,
+        sellerId,
+      });
     }
 
     return res.status(200).json({

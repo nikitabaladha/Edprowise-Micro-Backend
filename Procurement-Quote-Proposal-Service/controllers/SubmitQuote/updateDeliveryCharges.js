@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import axios from "axios";
 
 import SubmitQuote from "../../models/SubmitQuote.js";
 import SubmitQuoteValidator from "../../validators/SubmitQuote.js";
@@ -59,7 +58,7 @@ async function updateDeliveryCharges(req, res) {
     const [quoteRequestRes, sellerRes, edprowiseRes, existingQuoteProposal] =
       await Promise.all([
         getQuoteRequestByEnquiryNumber(enquiryNumber, "deliveryState,schoolId"),
-        getSellerById(sellerId, "companyName,state"),
+        getSellerById(sellerId, "companyName state"),
         getrequiredFieldsFromEdprowiseProfile("state"),
         QuoteProposal.findOne({ enquiryNumber, sellerId }).session(session),
       ]);
@@ -68,6 +67,11 @@ async function updateDeliveryCharges(req, res) {
     const sellerProfile = sellerRes?.data;
     const edprowiseProfile = edprowiseRes?.data;
 
+    console.log("quoteRequest====================", quoteRequest);
+
+    console.log("sellerProfile====================", sellerProfile);
+
+    console.log("edprowiseProfile====================", edprowiseProfile);
     if (
       quoteRequestRes.hasError ||
       sellerRes.hasError ||
@@ -87,12 +91,30 @@ async function updateDeliveryCharges(req, res) {
     const sellerState = sellerProfile.state;
     const edprowiseState = edprowiseProfile.state;
 
-    if (!schoolState || !sellerState || !edprowiseState) {
+    if (!schoolState) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
         hasError: true,
-        message: "Location data is incomplete.",
+        message: "School location data is incomplete.",
+      });
+    }
+
+    if (!sellerState) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        hasError: true,
+        message: "Seller location data is incomplete.",
+      });
+    }
+
+    if (!edprowiseState) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        hasError: true,
+        message: "Edprowise location data is incomplete.",
       });
     }
 

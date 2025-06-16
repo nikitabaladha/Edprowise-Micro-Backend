@@ -1,5 +1,3 @@
-import axios from "axios";
-
 import PrepareQuoteValidator from "../../validators/PrepareQuote.js";
 import PrepareQuote from "../../models/PrepareQuote.js";
 import QuoteProposal from "../../models/QuoteProposal.js";
@@ -14,7 +12,7 @@ import {
 } from "../AxiosRequestService/userServiceRequest.js";
 
 import {
-  getQuoteRequestById,
+  getQuoteRequestByEnquiryNumber,
   updateQuoteRequestStatus,
 } from "../AxiosRequestService/quoteRequestServiceRequest.js";
 
@@ -125,7 +123,7 @@ async function create(req, res) {
 
     let quoteRequest;
     try {
-      const quoteResponse = await getQuoteRequestById(enquiryNumber);
+      const quoteResponse = await getQuoteRequestByEnquiryNumber(enquiryNumber);
       quoteRequest = quoteResponse.data;
     } catch (error) {
       await session.abortTransaction();

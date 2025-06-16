@@ -65,7 +65,6 @@ async function updateSingleProduct(req, res) {
       quoteRequestResponse,
       sellerResponse,
       edprowiseResponse,
-      schoolResponse,
       edprowiseAdminsResponse,
     ] = await Promise.all([
       getQuoteRequestByEnquiryNumber(
@@ -74,21 +73,19 @@ async function updateSingleProduct(req, res) {
       ).catch(() => ({ data: null })),
       getSellerById(sellerId).catch(() => ({ data: null })),
       getrequiredFieldsFromEdprowiseProfile().catch(() => ({ data: null })),
-      getSchoolById(schoolId, "schoolName").catch(() => ({ data: null })),
       getAllEdprowiseAdmins("userId").catch(() => ({ data: [] })),
     ]);
 
     const quoteRequest = quoteRequestResponse?.data;
     const sellerProfile = sellerResponse?.data;
     const edprowiseProfile = edprowiseResponse?.data;
-    const schoolProfile = schoolResponse?.data;
+
     const relevantEdprowise = edprowiseAdminsResponse?.data;
 
     if (
       !quoteRequest ||
       !sellerProfile ||
       !edprowiseProfile ||
-      !schoolProfile ||
       !relevantEdprowise ||
       !Array.isArray(relevantEdprowise)
     ) {
@@ -98,6 +95,20 @@ async function updateSingleProduct(req, res) {
       });
     }
 
+    const schoolId = quoteRequest.schoolId;
+
+    const schoolResponse = await getSchoolById(schoolId, "schoolName").catch(
+      () => ({ data: null })
+    );
+
+    const schoolProfile = schoolResponse?.data;
+
+    if (!schoolProfile) {
+      return res.status(404).json({
+        hasError: true,
+        message: "School profile not found.",
+      });
+    }
     // Extract states from location strings
     const schoolState = quoteRequest.deliveryState;
     const sellerState = sellerProfile.state;
@@ -392,8 +403,6 @@ async function updateSingleProduct(req, res) {
         },
       }
     );
-
-    const schoolId = quoteRequest.schoolId;
 
     await sendNotification(
       "SELLER_RECEIVED_UPDATED_QUOTE_BY_OWN",
