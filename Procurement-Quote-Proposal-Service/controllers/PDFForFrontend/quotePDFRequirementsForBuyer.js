@@ -66,7 +66,7 @@ async function quotePDFRequirementsForBuyer(req, res) {
       getOrderDetailsFromSellerBySchooIdSellerId(
         schoolId,
         sellerId,
-        "invoiceDate invoiceForSchool invoiceForEdprowise"
+        "invoiceDate,nvoiceForSchool,nvoiceForEdprowise,orderNumber"
       ),
       PrepareQuote.find({ sellerId, enquiryNumber }),
     ]);

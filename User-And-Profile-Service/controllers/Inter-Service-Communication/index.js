@@ -25,6 +25,9 @@ import getAllSellerWithRequiredFields from "./getAllSellerWithRequiredFields.js"
 
 import sellersByProducts from "./sellersByProducts.js";
 
+import searchSchools from "./searchSchools.js";
+import searchSellers from "./searchSellers.js";
+
 export {
   checkEmailExists,
   requiredFieldFromSchoolProfile,
@@ -44,4 +47,6 @@ export {
   getAllSchoolWithRequiredFields,
   getAllSellerWithRequiredFields,
   sellersByProducts,
+  searchSchools,
+  searchSellers,
 };

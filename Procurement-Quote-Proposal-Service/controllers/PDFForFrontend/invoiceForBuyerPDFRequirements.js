@@ -50,7 +50,7 @@ async function invoiceForBuyerPDFRequirements(req, res) {
 
       QuoteProposal.findOne({ enquiryNumber, sellerId }).lean(),
       SubmitQuote.findOne({ enquiryNumber, sellerId }).select(
-        "paymentTerms advanceRequiredAmount expectedDeliveryDateBySeller advanceRequiredAmount"
+        "paymentTerms advanceRequiredAmount expectedDeliveryDateBySeller"
       ),
 
       getSellerById(
@@ -65,7 +65,7 @@ async function invoiceForBuyerPDFRequirements(req, res) {
       getOrderDetailsFromSellerBySchooIdSellerId(
         schoolId,
         sellerId,
-        "invoiceDate invoiceForSchool invoiceForEdprowise"
+        "invoiceDate,invoiceForSchool,invoiceForEdprowise,orderNumber"
       ),
       PrepareQuote.find({ sellerId, enquiryNumber }),
     ]);
@@ -119,18 +119,29 @@ async function invoiceForBuyerPDFRequirements(req, res) {
       });
     }
 
+    const school = schoolData.data;
+    const quoteRequest = quoteRequestData.data;
+    const sellerProfile = sellerProfileData.data;
+    const edprowiseProfile = edprowiseProfileData.data;
+    const orderDetails = orderDetailsData.data;
+
+    console.log(
+      "Submit quotes==============",
+      SubmitQuote.advanceRequiredAmount
+    );
+
     const prepareQuotesWithStatus = prepareQuotesData.map((quote) => ({
       ...quote.toObject(),
       supplierStatus: quoteProposal?.supplierStatus || null,
     }));
 
     const fileName = "PDF-Invoive-Buyer-Format.ejs";
+
     const __dirname = path.resolve();
 
     const htmlPath = path.join(
       __dirname,
       "controllers",
-      "ProcurementService",
       "PDFForFrontend",
       fileName
     );
@@ -216,12 +227,6 @@ async function invoiceForBuyerPDFRequirements(req, res) {
       }
       return words.trim();
     };
-
-    const school = schoolData.data;
-    const quoteRequest = quoteRequestData.data;
-    const sellerProfile = sellerProfileData.data;
-    const edprowiseProfile = edprowiseProfileData.data;
-    const orderDetails = orderDetailsData.data;
 
     const dynamicData = {
       prepareQuoteData: prepareQuotesWithStatus,

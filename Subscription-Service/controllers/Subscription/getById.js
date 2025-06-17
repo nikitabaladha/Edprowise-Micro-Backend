@@ -21,6 +21,8 @@ async function getById(req, res) {
       });
     }
 
+    console.log("subscription.schoolId=====", subscription.schoolId);
+
     const schoolResponse = await getSchoolById(subscription.schoolId, [
       "schoolId",
       "schoolName",
@@ -29,6 +31,8 @@ async function getById(req, res) {
       "profileImage",
       "schoolAddress",
     ]);
+
+    console.log("schoolResponse=====", schoolResponse);
 
     if (schoolResponse.hasError) {
       if (schoolResponse.status === 404) {

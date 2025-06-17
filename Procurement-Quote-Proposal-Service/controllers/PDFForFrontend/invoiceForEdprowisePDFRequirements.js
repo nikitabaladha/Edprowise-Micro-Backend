@@ -66,7 +66,7 @@ async function invoiceForEdprowisePDFRequirements(req, res) {
       getOrderDetailsFromSellerBySchooIdSellerId(
         schoolId,
         sellerId,
-        "invoiceDate invoiceForSchool invoiceForEdprowise"
+        "invoiceDate,invoiceForSchool,invoiceForEdprowise,orderNumber"
       ),
       PrepareQuote.find({ sellerId, enquiryNumber }),
     ]);
@@ -126,6 +126,7 @@ async function invoiceForEdprowisePDFRequirements(req, res) {
     }));
 
     const fileName = "PDF-Invoive-Edprowise-Format.ejs";
+
     const __dirname = path.resolve();
 
     const htmlPath = path.join(

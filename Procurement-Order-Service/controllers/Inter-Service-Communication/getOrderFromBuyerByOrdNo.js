@@ -1,13 +1,13 @@
-import OrderDetailsFromSeller from "../../models/OrderDetailsFromSeller.js";
+import OrderFromBuyer from "../../models/OrderFromBuyer.js";
 
-async function getOrderDetailsFromSellerBySchooIdSellerId(req, res) {
+async function getOrderFromBuyerByOrdNo(req, res) {
   try {
-    const { sellerId, schoolId, fields } = req.query;
+    const { orderNumber, fields } = req.query;
 
-    if (!sellerId || !schoolId) {
+    if (!orderNumber) {
       return res.status(400).json({
         hasError: true,
-        message: "SchoolId and SellerId are required",
+        message: "enquiryNumber parameter is required",
       });
     }
 
@@ -19,9 +19,8 @@ async function getOrderDetailsFromSellerBySchooIdSellerId(req, res) {
       });
     }
 
-    const orders = await OrderDetailsFromSeller.findOne({
-      schoolId,
-      sellerId,
+    const orders = await OrderFromBuyer.findOne({
+      orderNumber,
     }).select(selectFields);
 
     return res.status(200).json({
@@ -38,4 +37,4 @@ async function getOrderDetailsFromSellerBySchooIdSellerId(req, res) {
   }
 }
 
-export default getOrderDetailsFromSellerBySchooIdSellerId;
+export default getOrderFromBuyerByOrdNo;

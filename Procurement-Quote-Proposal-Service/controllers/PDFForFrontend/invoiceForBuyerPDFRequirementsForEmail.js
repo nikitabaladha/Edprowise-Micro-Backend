@@ -68,7 +68,7 @@ async function invoiceForBuyerPDFRequirementsForEmail(params) {
       getOrderDetailsFromSellerBySchooIdSellerId(
         schoolId,
         sellerId,
-        "invoiceDate invoiceForSchool invoiceForEdprowise"
+        "invoiceDate,invoiceForSchool,invoiceForEdprowise,orderNumber"
       ),
       PrepareQuote.find({ sellerId, enquiryNumber }),
     ]);
