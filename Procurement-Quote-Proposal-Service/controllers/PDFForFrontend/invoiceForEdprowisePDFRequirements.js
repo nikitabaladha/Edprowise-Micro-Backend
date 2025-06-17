@@ -217,11 +217,16 @@ async function invoiceForEdprowisePDFRequirements(req, res) {
       return words.trim();
     };
 
+    const school = schoolData.data;
+    const quoteRequest = quoteRequestData.data;
+    const sellerProfile = sellerProfileData.data;
+    const edprowiseProfile = edprowiseProfileData.data;
+    const orderDetails = orderDetailsData.data;
+
     const signaturePath = path.join(
       __dirname,
       "Images",
       "SellerSignature",
-      // Remove any existing path segments from the signature filename
       path.basename(sellerProfile.signature)
     );
 
@@ -233,12 +238,6 @@ async function invoiceForEdprowisePDFRequirements(req, res) {
         "base64"
       )}`;
     }
-
-    const school = schoolData.data;
-    const quoteRequest = quoteRequestData.data;
-    const sellerProfile = sellerProfileData.data;
-    const edprowiseProfile = edprowiseProfileData.data;
-    const orderDetails = orderDetailsData.data;
 
     const dynamicData = {
       prepareQuoteData: prepareQuotesWithStatus,
