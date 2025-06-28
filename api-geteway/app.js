@@ -27,6 +27,8 @@ const SERVICE_TARGETS = {
   procurementOrder: process.env.PROCUREMENT_ORDER_SERVICE_URL,
 
   notification: process.env.NOTIFICATION_SERVICE_URL,
+
+  bankdetailsAndPaymentService: process.env.BANKDETAILS_AND_PAYMENT_SERVICE_URL,
 };
 
 // Route specific API prefixes
@@ -109,6 +111,14 @@ app.use(
   })
 );
 
+app.use(
+  "/api/bankdetailsAndPaymentService",
+  proxy(SERVICE_TARGETS.bankdetailsAndPaymentService, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/api/bankdetailsAndPaymentService", "/api"),
+  })
+);
+
 // ======================================
 
 app.use(
@@ -188,6 +198,14 @@ app.use(
   proxy(SERVICE_TARGETS.notification, {
     proxyReqPathResolver: (req) =>
       req.originalUrl.replace("/notification-service", ""),
+  })
+);
+
+app.use(
+  "/bankdetailsAndPayment-service",
+  proxy(SERVICE_TARGETS.bankdetailsAndPaymentService, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/bankdetailsAndPayment-service", ""),
   })
 );
 
