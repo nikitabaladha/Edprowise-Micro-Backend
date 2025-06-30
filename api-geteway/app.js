@@ -29,6 +29,8 @@ const SERVICE_TARGETS = {
   notification: process.env.NOTIFICATION_SERVICE_URL,
 
   bankdetailsAndPaymentService: process.env.BANKDETAILS_AND_PAYMENT_SERVICE_URL,
+
+  financeModule: process.env.FINANCE_MODULE_URL,
 };
 
 // Route specific API prefixes
@@ -119,6 +121,14 @@ app.use(
   })
 );
 
+app.use(
+  "/api/financeModule",
+  proxy(SERVICE_TARGETS.financeModule, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/api/financeModule", "/api"),
+  })
+);
+
 // ======================================
 
 app.use(
@@ -206,6 +216,14 @@ app.use(
   proxy(SERVICE_TARGETS.bankdetailsAndPaymentService, {
     proxyReqPathResolver: (req) =>
       req.originalUrl.replace("/bankdetailsAndPayment-service", ""),
+  })
+);
+
+app.use(
+  "/financeModule",
+  proxy(SERVICE_TARGETS.financeModule, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/financeModule", ""),
   })
 );
 
