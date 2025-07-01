@@ -95,4 +95,31 @@ router.delete(
   deleteGroupLedgerById
 );
 
+import {
+  createLedger,
+  getAllLedgerBySchoolId,
+  updateLedgerById,
+  deleteLedgerById,
+} from "../controllers/Setting/Ledger/Ledger/index.js";
+
+router.post("/create-ledger", roleBasedMiddleware("School"), createLedger);
+
+router.get(
+  "/get-all-ledger",
+  roleBasedMiddleware("School"),
+  getAllLedgerBySchoolId
+);
+
+router.put(
+  "/update-ledger-by-id/:id",
+  roleBasedMiddleware("School"),
+  updateLedgerById
+);
+
+router.delete(
+  "/delete-ledger-by-id/:id",
+  roleBasedMiddleware("School"),
+  deleteLedgerById
+);
+
 export default router;
