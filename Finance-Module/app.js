@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 import path from "path";
 import express from "express";
 import connectDB from "./config/db.js";
-// import routes from "./routes/index.js";
+import routes from "./routes/index.js";
 import configureServer from "../shared/config/server-config.js";
 
 dotenv.config();
@@ -19,7 +19,7 @@ app.use("/Images", express.static(path.resolve("Images")));
 app.use("/Documents", express.static(path.resolve("Documents")));
 
 // Routes
-// routes(app);
+routes(app);
 
 // Health check endpoint
 app.get("/health", (req, res) => {
