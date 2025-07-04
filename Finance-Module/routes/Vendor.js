@@ -7,6 +7,7 @@ import {
   getAllVendorBySchoolId,
   updateVendorById,
   deleteVendorById,
+  getOneByVendorCode,
 } from "../controllers/Setting/Vendor/index.js";
 
 router.post("/create-Vendor", roleBasedMiddleware("School"), createVendor);
@@ -15,6 +16,12 @@ router.get(
   "/get-all-vendor",
   roleBasedMiddleware("School"),
   getAllVendorBySchoolId
+);
+
+router.get(
+  "/get-one-by-vendor-code/:vendorCode",
+  roleBasedMiddleware("School"),
+  getOneByVendorCode
 );
 
 router.put(

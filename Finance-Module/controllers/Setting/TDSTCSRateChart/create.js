@@ -1,5 +1,5 @@
-import GroupLedger from "../../../../models/GroupLedger.js";
-import GroupLedgerValidator from "../../../../validators/GroupLedgerValidator.js";
+import TDSTCSRateChart from "../../../models/TDSTCSRateChart.js";
+import TDSTCSRateChartValidator from "../../../validators/TDSTCSRateChartValidator.js";
 
 async function create(req, res) {
   try {
@@ -8,14 +8,12 @@ async function create(req, res) {
     if (!schoolId) {
       return res.status(401).json({
         hasError: true,
-        message:
-          "Access denied: You do not have permission to request for a quote.",
+        message: "Access denied: You do not have permission.",
       });
     }
 
-    const { error } = GroupLedgerValidator.GroupLedgerValidator.validate(
-      req.body
-    );
+    const { error } =
+      TDSTCSRateChartValidator.TDSTCSRateChartValidator.validate(req.body);
     if (error) {
       const errorMessages = error.details.map((err) => err.message).join(", ");
       return res.status(400).json({
@@ -24,20 +22,21 @@ async function create(req, res) {
       });
     }
 
-    const { groupLedgerName, headOfAccountId } = req.body;
+    const { TDSorTCS, rate, natureOfTransaction } = req.body;
 
-    const newGroupLedger = new GroupLedger({
+    const newTDSTCSRateChart = new TDSTCSRateChart({
       schoolId,
-      headOfAccountId,
-      groupLedgerName,
+      TDSorTCS,
+      rate,
+      natureOfTransaction,
     });
 
-    await newGroupLedger.save();
+    await newTDSTCSRateChart.save();
 
     return res.status(201).json({
       hasError: false,
-      message: "Group Ledger Created successfully!",
-      data: newGroupLedger,
+      message: "TDS/TCS Rate Chart Created successfully!",
+      data: newTDSTCSRateChart,
     });
   } catch (error) {
     if (error.code === 11000) {
@@ -46,11 +45,11 @@ async function create(req, res) {
         .join(", ");
       return res.status(400).json({
         hasError: true,
-        message: `Duplicate entry for ${field}.Group Ledger already exists.`,
+        message: `Duplicate entry for ${field}. TDS/TCS Rate Chart already exists.`,
       });
     }
 
-    console.error("Error Creating Group Ledger:", error);
+    console.error("Error Creating TDS/TCS Rate Chart:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",

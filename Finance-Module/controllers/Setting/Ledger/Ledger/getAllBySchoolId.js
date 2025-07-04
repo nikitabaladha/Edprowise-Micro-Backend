@@ -11,12 +11,31 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    const ledgers = await Ledger.find({ schoolId }).sort({ createdAt: -1 });
+    const ledgers = await Ledger.find({ schoolId })
+      .populate({ path: "headOfAccountId", select: "headOfAccountName" })
+      .populate({ path: "groupLedgerId", select: "groupLedgerName" })
+      .populate({ path: "bSPLLedgerId", select: "bSPLLedgerName" })
+      .sort({ createdAt: -1 });
+
+    const simplifiedLedgers = ledgers.map((ledger) => ({
+      _id: ledger._id,
+      schoolId: ledger.schoolId,
+      ledgerName: ledger.ledgerName,
+      openingBalance: ledger.openingBalance,
+      headOfAccountId: ledger.headOfAccountId?._id ?? null,
+      headOfAccountName: ledger.headOfAccountId?.headOfAccountName ?? null,
+      groupLedgerId: ledger.groupLedgerId?._id ?? null,
+      groupLedgerName: ledger.groupLedgerId?.groupLedgerName ?? null,
+      bSPLLedgerId: ledger.bSPLLedgerId?._id ?? null,
+      bSPLLedgerName: ledger.bSPLLedgerId?.bSPLLedgerName ?? null,
+      createdAt: ledger.createdAt,
+      updatedAt: ledger.updatedAt,
+    }));
 
     return res.status(200).json({
       hasError: false,
       message: "Ledgers fetched successfully!",
-      data: ledgers,
+      data: simplifiedLedgers,
     });
   } catch (error) {
     console.error("Error fetching Ledgers:", error);
