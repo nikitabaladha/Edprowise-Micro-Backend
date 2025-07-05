@@ -21,9 +21,8 @@ const LedgerValidator = Joi.object({
     "string.empty": "B/S & P&L Ledger Id cannot be empty.",
     "any.required": "B/S & P&L Ledger Id is required.",
   }),
-  openingBalance: Joi.number().required().messages({
+  openingBalance: Joi.number().optional().messages({
     "number.base": "Opening Balance must be a number.",
-    "any.required": "Opening Balance is required.",
   }),
 });
 

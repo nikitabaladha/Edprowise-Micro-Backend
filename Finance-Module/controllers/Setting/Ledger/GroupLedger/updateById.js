@@ -22,7 +22,7 @@ async function updateById(req, res) {
       return res.status(400).json({ hasError: true, message: errorMessages });
     }
 
-    const { groupLedgerName, headOfAccountId } = req.body;
+    const { groupLedgerName, headOfAccountId, bSPLLedgerId } = req.body;
 
     const existingGroupLedger = await GroupLedger.findOne({
       _id: id,
@@ -40,6 +40,9 @@ async function updateById(req, res) {
 
     existingGroupLedger.headOfAccountId =
       headOfAccountId || existingGroupLedger.headOfAccountId;
+
+    existingGroupLedger.bSPLLedgerId =
+      bSPLLedgerId || existingGroupLedger.bSPLLedgerId;
 
     await existingGroupLedger.save();
 

@@ -24,11 +24,12 @@ async function create(req, res) {
       });
     }
 
-    const { groupLedgerName, headOfAccountId } = req.body;
+    const { groupLedgerName, headOfAccountId, bSPLLedgerId } = req.body;
 
     const newGroupLedger = new GroupLedger({
       schoolId,
       headOfAccountId,
+      bSPLLedgerId,
       groupLedgerName,
     });
 

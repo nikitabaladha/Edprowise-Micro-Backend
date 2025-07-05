@@ -106,8 +106,6 @@ async function updateById(req, res) {
       deliveryCity: deliveryCity || existingSchool.deliveryCity,
     };
 
-    console.log("Updated Data:", updatedData);
-
     const updatedSchool = await SchoolRegistration.findOneAndUpdate(
       { schoolId },
       {

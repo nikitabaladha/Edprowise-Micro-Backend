@@ -46,10 +46,8 @@ const PaymentEntryValidator = Joi.object({
     "string.empty": "Invoice number cannot be empty",
   }),
 
-  poNumber: Joi.string().required().messages({
-    "any.required": "PO number is required",
+  poNumber: Joi.string().allow(null, "").optional().messages({
     "string.base": "PO number must be a string",
-    "string.empty": "PO number cannot be empty",
   }),
 
   dueDate: Joi.date().required().messages({

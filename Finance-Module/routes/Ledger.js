@@ -38,6 +38,7 @@ import {
   getAllBSPLLedgerBySchoolId,
   updateBSPLLedgerById,
   deleteBSPLLedgerById,
+  getAllByHeadOfAccountId,
 } from "../controllers/Setting/Ledger/BSPLLedger/index.js";
 
 router.post(
@@ -50,6 +51,12 @@ router.get(
   "/get-all-bs-pl-ledger",
   roleBasedMiddleware("School"),
   getAllBSPLLedgerBySchoolId
+);
+
+router.get(
+  "/get-all-bs-pl-ledger-by-head-of-account-id/:headOfAccountId",
+  roleBasedMiddleware("School"),
+  getAllByHeadOfAccountId
 );
 
 router.put(
@@ -69,6 +76,7 @@ import {
   getAllGroupLedgerBySchoolId,
   updateGroupLedgerById,
   deleteGroupLedgerById,
+  getAllByBSPLLedgerId,
 } from "../controllers/Setting/Ledger/GroupLedger/index.js";
 
 router.post(
@@ -81,6 +89,12 @@ router.get(
   "/get-all-group-ledger",
   roleBasedMiddleware("School"),
   getAllGroupLedgerBySchoolId
+);
+
+router.get(
+  "/get-all-group-ledger-by-bs-and-pl-ledger-id/:bSPLLedgerId",
+  roleBasedMiddleware("School"),
+  getAllByBSPLLedgerId
 );
 
 router.put(
@@ -100,6 +114,9 @@ import {
   getAllLedgerBySchoolId,
   updateLedgerById,
   deleteLedgerById,
+  getAllLedgerByName,
+  updatePaymentModeById,
+  getAllByPaymentMode,
 } from "../controllers/Setting/Ledger/Ledger/index.js";
 
 router.post("/create-ledger", roleBasedMiddleware("School"), createLedger);
@@ -110,10 +127,28 @@ router.get(
   getAllLedgerBySchoolId
 );
 
+router.get(
+  "/get-all-ledger-by-name",
+  roleBasedMiddleware("School"),
+  getAllLedgerByName
+);
+
+router.get(
+  "/get-all-ledger-by-name-payment-mode/:paymentMode",
+  roleBasedMiddleware("School"),
+  getAllByPaymentMode
+);
+
 router.put(
   "/update-ledger-by-id/:id",
   roleBasedMiddleware("School"),
   updateLedgerById
+);
+
+router.put(
+  "/update-ledger-payment-mode-by-id/:id",
+  roleBasedMiddleware("School"),
+  updatePaymentModeById
 );
 
 router.delete(

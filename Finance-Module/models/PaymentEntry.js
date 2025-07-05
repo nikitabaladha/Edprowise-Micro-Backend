@@ -16,7 +16,7 @@ const PaymentEntrySchema = new mongoose.Schema(
     entryDate: { type: Date, required: true },
     invoiceDate: { type: Date, required: true },
     invoiceNumber: { type: String, required: true },
-    poNumber: { type: String, required: true },
+    poNumber: { type: String },
     dueDate: { type: Date, required: true },
     narration: { type: String, required: true },
     paymentMode: {

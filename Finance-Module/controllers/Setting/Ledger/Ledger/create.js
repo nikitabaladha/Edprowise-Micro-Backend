@@ -36,7 +36,7 @@ async function create(req, res) {
       groupLedgerId,
       bSPLLedgerId,
       ledgerName,
-      openingBalance,
+      openingBalance: openingBalance ?? 0,
     });
 
     await newLedger.save();

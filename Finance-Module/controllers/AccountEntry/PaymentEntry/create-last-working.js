@@ -117,8 +117,16 @@ async function create(req, res) {
       0
     );
 
+    // const TDSTCSRateWithAmountBeforeGST =
+    //   ((parseFloat(TDSTCSRate) || 0) * totalAmountBeforeGST) / 100;
+
+    // const totalAmountAfterGST =
+    //   subTotalAmountAfterGST +
+    //   TDSTCSRateWithAmountBeforeGST +
+    //   (parseFloat(adjustmentValue) || 0);
+
     const totalAmountAfterGST =
-      subTotalAmountAfterGST -
+      subTotalAmountAfterGST +
       (parseFloat(TDSTCSRateWithAmountBeforeGST) || 0) +
       (parseFloat(adjustmentValue) || 0);
 

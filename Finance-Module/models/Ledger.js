@@ -27,7 +27,12 @@ const LedgerSchema = new mongoose.Schema(
     },
     openingBalance: {
       type: Number,
-      required: true,
+      default: 0,
+    },
+    paymentMode: {
+      type: String,
+      enum: ["Not Defined", "Cash", "Online", "Cheque"],
+      default: "Not Defined",
     },
   },
   {

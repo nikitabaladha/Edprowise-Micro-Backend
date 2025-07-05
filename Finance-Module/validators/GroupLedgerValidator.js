@@ -11,6 +11,11 @@ const GroupLedgerValidator = Joi.object({
     "string.empty": "Head Of Account Id cannot be empty.",
     "any.required": "Head Of Account Id is required.",
   }),
+  bSPLLedgerId: Joi.string().required().messages({
+    "string.base": "BS & P&L Ledger	Id must be a string.",
+    "string.empty": "BS & P&L Ledger Id cannot be empty.",
+    "any.required": "BS & P&L Ledger Id is required.",
+  }),
 });
 
 export default {

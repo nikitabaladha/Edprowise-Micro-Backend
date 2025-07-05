@@ -11,6 +11,11 @@ const GroupLedgerSchema = new mongoose.Schema(
       ref: "HeadOfAccount",
       required: true,
     },
+    bSPLLedgerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BSPLLedger",
+      required: true,
+    },
     groupLedgerName: {
       type: String,
       required: true,
