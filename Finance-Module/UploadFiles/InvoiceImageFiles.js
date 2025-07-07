@@ -19,10 +19,12 @@ const chequeImageDir = "./Images/FinanceModule/ChequeImage";
 const FinanceFileUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
+      const isPdf = file.mimetype === "application/pdf";
+
       if (file.fieldname === "invoiceImage") {
-        cb(null, invoiceImageDir);
+        cb(null, isPdf ? invoiceFileDir : invoiceImageDir);
       } else if (file.fieldname === "chequeImage") {
-        cb(null, chequeImageDir);
+        cb(null, isPdf ? chequeFileDir : chequeImageDir);
       } else {
         cb(new Error("Invalid file fieldname"));
       }

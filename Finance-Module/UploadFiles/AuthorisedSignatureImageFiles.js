@@ -16,12 +16,18 @@ const authorisedSignatureImageDir =
 const FinanceFileUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
+      const isPdf = file.mimetype === "application/pdf";
+
       if (file.fieldname === "authorisedSignatureImage") {
-        cb(null, authorisedSignatureImageDir);
+        cb(
+          null,
+          isPdf ? authorisedSignatureFileDir : authorisedSignatureImageDir
+        );
       } else {
         cb(new Error("Invalid file fieldname"));
       }
     },
+
     filename: (req, file, cb) => {
       try {
         const sanitizedFilename = file.originalname
