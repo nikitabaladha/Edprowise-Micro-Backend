@@ -4,6 +4,8 @@ async function getAllBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
+    const { academicYear } = req.params;
+
     if (!schoolId) {
       return res.status(401).json({
         hasError: true,
@@ -11,7 +13,9 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    const ledgers = await BSPLLedger.find({ schoolId }).sort({ createdAt: -1 });
+    const ledgers = await BSPLLedger.find({ schoolId, academicYear }).sort({
+      createdAt: -1,
+    });
 
     return res.status(200).json({
       hasError: false,

@@ -1,3 +1,5 @@
+import FinanceModuleYearRoutes from "./FinanceModuleYear.js";
+
 import ledgerRoutes from "./Ledger.js";
 import vendorRoutes from "./Vendor.js";
 import TDSTCSRateChartRoutes from "./TDSTCSRateChart.js";
@@ -10,4 +12,5 @@ export default (app) => {
   app.use("/api", TDSTCSRateChartRoutes);
   app.use("/api", PaymentEntryRoutes);
   app.use("/api", AuthorisedSignatureRoutes);
+  app.use("/api", FinanceModuleYearRoutes);
 };

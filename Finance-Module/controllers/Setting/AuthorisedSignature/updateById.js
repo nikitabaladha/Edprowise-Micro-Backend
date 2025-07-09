@@ -3,7 +3,8 @@ import AuthorisedSignature from "../../../models/AuthorisedSignature.js";
 async function updateById(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { id } = req.params;
+
+    const { id, academicYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -12,7 +13,11 @@ async function updateById(req, res) {
       });
     }
 
-    const existing = await AuthorisedSignature.findOne({ _id: id, schoolId });
+    const existing = await AuthorisedSignature.findOne({
+      _id: id,
+      schoolId,
+      academicYear,
+    });
 
     if (!existing) {
       return res.status(404).json({

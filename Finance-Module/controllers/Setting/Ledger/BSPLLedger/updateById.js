@@ -3,7 +3,7 @@ import BSPLLedgerValidator from "../../../../validators/BSPLLedgerValidator.js";
 
 async function updateById(req, res) {
   try {
-    const { id } = req.params;
+    const { id, academicYear } = req.params;
 
     const schoolId = req.user?.schoolId;
 
@@ -14,7 +14,7 @@ async function updateById(req, res) {
       });
     }
 
-    const { error } = BSPLLedgerValidator.BSPLLedgerValidator.validate(
+    const { error } = BSPLLedgerValidator.BSPLLedgerValidatorUpdate.validate(
       req.body
     );
     if (error?.details?.length) {
@@ -24,7 +24,11 @@ async function updateById(req, res) {
 
     const { bSPLLedgerName, headOfAccountId } = req.body;
 
-    const existingBSPLLedger = await BSPLLedger.findOne({ _id: id, schoolId });
+    const existingBSPLLedger = await BSPLLedger.findOne({
+      _id: id,
+      schoolId,
+      academicYear,
+    });
     if (!existingBSPLLedger) {
       return res.status(404).json({
         hasError: true,

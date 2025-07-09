@@ -3,7 +3,8 @@ import TDSTCSRateChart from "../../../models/TDSTCSRateChart.js";
 async function getAllByTDSOrTCS(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const TDSorTCS = req.query.TDSorTCS;
+
+    const { TDSorTCS, academicYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -19,7 +20,11 @@ async function getAllByTDSOrTCS(req, res) {
       });
     }
 
-    const charts = await TDSTCSRateChart.find({ schoolId, TDSorTCS }).sort({
+    const charts = await TDSTCSRateChart.find({
+      schoolId,
+      TDSorTCS,
+      academicYear,
+    }).sort({
       createdAt: -1,
     });
 

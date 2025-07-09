@@ -34,6 +34,10 @@ const LedgerSchema = new mongoose.Schema(
       enum: ["Not Defined", "Cash", "Online", "Cheque"],
       default: "Not Defined",
     },
+    academicYear: {
+      type: String,
+      required: true,
+    },
   },
   {
     timestamps: true,
@@ -43,10 +47,11 @@ const LedgerSchema = new mongoose.Schema(
 LedgerSchema.index(
   {
     schoolId: 1,
-    ledgerName: 1,
     headOfAccountId: 1,
     groupLedgerId: 1,
     bSPLLedgerId: 1,
+    ledgerName: 1,
+    academicYear: 1,
   },
   { unique: true }
 );

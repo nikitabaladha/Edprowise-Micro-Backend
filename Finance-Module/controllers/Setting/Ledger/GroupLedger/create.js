@@ -24,13 +24,15 @@ async function create(req, res) {
       });
     }
 
-    const { groupLedgerName, headOfAccountId, bSPLLedgerId } = req.body;
+    const { groupLedgerName, headOfAccountId, bSPLLedgerId, academicYear } =
+      req.body;
 
     const newGroupLedger = new GroupLedger({
       schoolId,
       headOfAccountId,
       bSPLLedgerId,
       groupLedgerName,
+      academicYear,
     });
 
     await newGroupLedger.save();

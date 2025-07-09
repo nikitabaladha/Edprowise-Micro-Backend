@@ -10,10 +10,19 @@ const HeadOfAccountSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    academicYear: {
+      type: String,
+      required: true,
+    },
   },
   {
     timestamps: true,
   }
+);
+
+HeadOfAccountSchema.index(
+  { schoolId: 1, headOfAccountName: 1, academicYear: 1 },
+  { unique: true }
 );
 
 export default mongoose.model("HeadOfAccount", HeadOfAccountSchema);

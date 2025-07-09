@@ -28,6 +28,7 @@ async function create(req, res) {
       groupLedgerId,
       bSPLLedgerId,
       openingBalance,
+      academicYear,
     } = req.body;
 
     const newLedger = new Ledger({
@@ -37,6 +38,7 @@ async function create(req, res) {
       bSPLLedgerId,
       ledgerName,
       openingBalance: openingBalance ?? 0,
+      academicYear,
     });
 
     await newLedger.save();

@@ -13,25 +13,25 @@ import {
 router.post("/create-Vendor", roleBasedMiddleware("School"), createVendor);
 
 router.get(
-  "/get-all-vendor",
+  "/get-all-vendor/:academicYear",
   roleBasedMiddleware("School"),
   getAllVendorBySchoolId
 );
 
 router.get(
-  "/get-one-by-vendor-code/:vendorCode",
+  "/get-one-by-vendor-code/:vendorCode/:academicYear",
   roleBasedMiddleware("School"),
   getOneByVendorCode
 );
 
 router.put(
-  "/update-vendor-by-id/:id",
+  "/update-vendor-by-id/:id/:academicYear",
   roleBasedMiddleware("School"),
   updateVendorById
 );
 
 router.delete(
-  "/delete-vendor-by-id/:id",
+  "/delete-vendor-by-id/:id/:academicYear",
   roleBasedMiddleware("School"),
   deleteVendorById
 );

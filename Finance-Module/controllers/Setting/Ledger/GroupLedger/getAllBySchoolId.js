@@ -11,7 +11,9 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    const ledgers = await GroupLedger.find({ schoolId }).sort({
+    const { academicYear } = req.params;
+
+    const ledgers = await GroupLedger.find({ schoolId, academicYear }).sort({
       createdAt: -1,
     });
 

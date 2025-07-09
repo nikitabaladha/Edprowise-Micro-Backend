@@ -25,7 +25,7 @@ async function create(req, res) {
       });
     }
 
-    const { bSPLLedgerName, headOfAccountId } = req.body;
+    const { bSPLLedgerName, headOfAccountId, academicYear } = req.body;
 
     const headExists = await HeadOfAccount.findOne({
       _id: headOfAccountId,
@@ -42,6 +42,7 @@ async function create(req, res) {
       schoolId,
       headOfAccountId,
       bSPLLedgerName,
+      academicYear,
     });
 
     await newBSPLLedger.save();

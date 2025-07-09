@@ -20,6 +20,10 @@ const GroupLedgerSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    academicYear: {
+      type: String,
+      required: true,
+    },
   },
   {
     timestamps: true,
@@ -27,7 +31,13 @@ const GroupLedgerSchema = new mongoose.Schema(
 );
 
 GroupLedgerSchema.index(
-  { schoolId: 1, headOfAccountId: 1, groupLedgerName: 1 },
+  {
+    schoolId: 1,
+    headOfAccountId: 1,
+    bSPLLedgerId: 1,
+    groupLedgerName: 1,
+    academicYear: 1,
+  },
   { unique: true }
 );
 

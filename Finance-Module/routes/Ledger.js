@@ -16,19 +16,19 @@ router.post(
 );
 
 router.get(
-  "/get-all-head-of-account",
+  "/get-all-head-of-account/:academicYear",
   roleBasedMiddleware("School"),
   getAllHeadOfAccount
 );
 
 router.put(
-  "/update-head-of-account-by-id/:id",
+  "/update-head-of-account-by-id/:id/:academicYear",
   roleBasedMiddleware("School"),
   updateHeadOfAccount
 );
 
 router.delete(
-  "/delete-head-of-account-by-id/:id",
+  "/delete-head-of-account-by-id/:id/:academicYear",
   roleBasedMiddleware("School"),
   deleteHeadOfAccount
 );
@@ -48,25 +48,25 @@ router.post(
 );
 
 router.get(
-  "/get-all-bs-pl-ledger",
+  "/get-all-bs-pl-ledger/:academicYear",
   roleBasedMiddleware("School"),
   getAllBSPLLedgerBySchoolId
 );
 
 router.get(
-  "/get-all-bs-pl-ledger-by-head-of-account-id/:headOfAccountId",
+  "/get-all-bs-pl-ledger-by-head-of-account-id/:headOfAccountId/:academicYear",
   roleBasedMiddleware("School"),
   getAllByHeadOfAccountId
 );
 
 router.put(
-  "/update-bs-pl-ledger-by-id/:id",
+  "/update-bs-pl-ledger-by-id/:id/:academicYear",
   roleBasedMiddleware("School"),
   updateBSPLLedgerById
 );
 
 router.delete(
-  "/delete-bs-pl-ledger-by-id/:id",
+  "/delete-bs-pl-ledger-by-id/:id/:academicYear",
   roleBasedMiddleware("School"),
   deleteBSPLLedgerById
 );
@@ -86,25 +86,25 @@ router.post(
 );
 
 router.get(
-  "/get-all-group-ledger",
+  "/get-all-group-ledger/:academicYear",
   roleBasedMiddleware("School"),
   getAllGroupLedgerBySchoolId
 );
 
 router.get(
-  "/get-all-group-ledger-by-bs-and-pl-ledger-id/:bSPLLedgerId",
+  "/get-all-group-ledger-by-bs-and-pl-ledger-id/:bSPLLedgerId/:academicYear",
   roleBasedMiddleware("School"),
   getAllByBSPLLedgerId
 );
 
 router.put(
-  "/update-group-ledger-by-id/:id",
+  "/update-group-ledger-by-id/:id/:academicYear",
   roleBasedMiddleware("School"),
   updateGroupLedgerById
 );
 
 router.delete(
-  "/delete-group-ledger-by-id/:id",
+  "/delete-group-ledger-by-id/:id/:academicYear",
   roleBasedMiddleware("School"),
   deleteGroupLedgerById
 );
@@ -122,37 +122,43 @@ import {
 router.post("/create-ledger", roleBasedMiddleware("School"), createLedger);
 
 router.get(
-  "/get-all-ledger",
+  "/get-all-ledger/:academicYear",
   roleBasedMiddleware("School"),
   getAllLedgerBySchoolId
 );
 
 router.get(
-  "/get-all-ledger-by-name",
+  "/get-all-ledger-by-name/:academicYear",
   roleBasedMiddleware("School"),
   getAllLedgerByName
 );
 
+// router.get(
+//   "/get-all-ledger-by-name",
+//   roleBasedMiddleware("School"),
+//   getAllLedgerByName
+// );
+
 router.get(
-  "/get-all-ledger-by-name-payment-mode/:paymentMode",
+  "/get-all-ledger-by-name-payment-mode/:paymentMode/:academicYear",
   roleBasedMiddleware("School"),
   getAllByPaymentMode
 );
 
 router.put(
-  "/update-ledger-by-id/:id",
+  "/update-ledger-by-id/:id/:academicYear",
   roleBasedMiddleware("School"),
   updateLedgerById
 );
 
 router.put(
-  "/update-ledger-payment-mode-by-id/:id",
+  "/update-ledger-payment-mode-by-id/:id/:academicYear",
   roleBasedMiddleware("School"),
   updatePaymentModeById
 );
 
 router.delete(
-  "/delete-ledger-by-id/:id",
+  "/delete-ledger-by-id/:id/:academicYear",
   roleBasedMiddleware("School"),
   deleteLedgerById
 );

@@ -3,7 +3,7 @@ import VendorValidator from "../../../validators/VendorValidator.js";
 
 async function updateById(req, res) {
   try {
-    const { id } = req.params;
+    const { id, academicYear } = req.params;
 
     const schoolId = req.user?.schoolId;
 
@@ -15,7 +15,7 @@ async function updateById(req, res) {
       });
     }
 
-    const { error } = VendorValidator.VendorValidator.validate(req.body);
+    const { error } = VendorValidator.VendorValidatorUpdate.validate(req.body);
     if (error?.details?.length) {
       const errorMessages = error.details.map((err) => err.message).join(", ");
       return res.status(400).json({ hasError: true, message: errorMessages });
@@ -36,7 +36,11 @@ async function updateById(req, res) {
       accountType,
     } = req.body;
 
-    const existingVendor = await Vendor.findOne({ _id: id, schoolId });
+    const existingVendor = await Vendor.findOne({
+      _id: id,
+      schoolId,
+      academicYear,
+    });
     if (!existingVendor) {
       return res.status(404).json({
         hasError: true,

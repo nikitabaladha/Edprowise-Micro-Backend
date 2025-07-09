@@ -3,7 +3,8 @@ import Ledger from "../../../../models/Ledger.js";
 async function getAllByPaymentMode(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const paymentMode = req.params.paymentMode;
+
+    const { paymentMode, academicYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -23,6 +24,7 @@ async function getAllByPaymentMode(req, res) {
 
     const ledgers = await Ledger.find({
       schoolId,
+      academicYear,
       paymentMode,
     }).sort({ createdAt: -1 });
 

@@ -5,9 +5,12 @@ const AuthorisedSignatureSchema = new mongoose.Schema(
     schoolId: {
       type: String,
       required: true,
-      unique: true,
     },
     authorisedSignatureImage: {
+      type: String,
+      required: true,
+    },
+    academicYear: {
       type: String,
       required: true,
     },
@@ -15,6 +18,11 @@ const AuthorisedSignatureSchema = new mongoose.Schema(
   {
     timestamps: true,
   }
+);
+
+AuthorisedSignatureSchema.index(
+  { schoolId: 1, academicYear: 1 },
+  { unique: true }
 );
 
 export default mongoose.model("AuthorisedSignature", AuthorisedSignatureSchema);

@@ -3,9 +3,9 @@ import LedgerValidator from "../../../../validators/LedgerValidator.js";
 
 async function updateById(req, res) {
   try {
-    const { id } = req.params;
-
     const schoolId = req.user?.schoolId;
+
+    const { id, academicYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -15,7 +15,7 @@ async function updateById(req, res) {
       });
     }
 
-    const { error } = LedgerValidator.LedgerValidator.validate(req.body);
+    const { error } = LedgerValidator.LedgerValidatorUpdate.validate(req.body);
     if (error?.details?.length) {
       const errorMessages = error.details.map((err) => err.message).join(", ");
       return res.status(400).json({ hasError: true, message: errorMessages });
@@ -29,7 +29,11 @@ async function updateById(req, res) {
       openingBalance,
     } = req.body;
 
-    const existingLedger = await Ledger.findOne({ _id: id, schoolId });
+    const existingLedger = await Ledger.findOne({
+      _id: id,
+      schoolId,
+      academicYear,
+    });
     if (!existingLedger) {
       return res.status(404).json({
         hasError: true,

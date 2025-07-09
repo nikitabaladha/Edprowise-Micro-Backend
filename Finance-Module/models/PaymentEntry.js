@@ -92,10 +92,18 @@ const PaymentEntrySchema = new mongoose.Schema(
     chequeImage: {
       type: String,
     },
+    ledgerIdWithPaymentMode: {
+      type: String,
+      required: true,
+    },
     status: {
       type: String,
       required: true,
       enum: ["Posted", "Draft", "Reversed"],
+    },
+    academicYear: {
+      type: String,
+      required: true,
     },
   },
   {

@@ -3,7 +3,7 @@ import GroupLedgerValidator from "../../../../validators/GroupLedgerValidator.js
 
 async function updateById(req, res) {
   try {
-    const { id } = req.params;
+    const { id, academicYear } = req.params;
 
     const schoolId = req.user?.schoolId;
 
@@ -14,7 +14,7 @@ async function updateById(req, res) {
       });
     }
 
-    const { error } = GroupLedgerValidator.GroupLedgerValidator.validate(
+    const { error } = GroupLedgerValidator.GroupLedgerValidatorUpdate.validate(
       req.body
     );
     if (error?.details?.length) {
@@ -27,6 +27,7 @@ async function updateById(req, res) {
     const existingGroupLedger = await GroupLedger.findOne({
       _id: id,
       schoolId,
+      academicYear,
     });
     if (!existingGroupLedger) {
       return res.status(404).json({

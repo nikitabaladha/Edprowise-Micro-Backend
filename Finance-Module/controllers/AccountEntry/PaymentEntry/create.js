@@ -10,6 +10,9 @@ async function generatePaymentVoucherNumber(schoolId) {
   return `PVN-${formattedNumber}`;
 }
 
+// Insted of - use /
+// PVN/25-26/1
+
 async function generateTransactionNumber() {
   const now = moment();
   const dateTimeStr = now.format("DDMMYYYYHHmmss");
@@ -68,6 +71,8 @@ async function create(req, res) {
       adjustmentValue,
       status,
       TDSTCSRateWithAmountBeforeGST,
+      ledgerIdWithPaymentMode,
+      academicYear,
     } = req.body;
 
     const { invoiceImage, chequeImage } = req.files || {};
@@ -151,7 +156,9 @@ async function create(req, res) {
       totalAmountAfterGST,
       invoiceImage: invoiceImageFullPath,
       chequeImage: chequeImageFullPath,
+      ledgerIdWithPaymentMode,
       status,
+      academicYear,
     });
 
     await newPaymentEntry.save();

@@ -19,13 +19,13 @@ router.post(
 );
 
 router.get(
-  "/get-authorised-signature-by-school-id",
+  "/get-authorised-signature-by-school-id/:academicYear",
   roleBasedMiddleware("School"),
   getOneAuthorisedSignatureBySchoolId
 );
 
 router.put(
-  "/update-authorised-signature/:id",
+  "/update-authorised-signature/:id/:academicYear",
   upload,
   roleBasedMiddleware("School"),
   updateAuthorisedSignatureById

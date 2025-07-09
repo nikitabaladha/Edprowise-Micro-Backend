@@ -3,6 +3,9 @@ import Vendor from "../../../models/Vendor.js";
 import Ledger from "../../../models/Ledger.js";
 import TDSTCSRateChart from "../../../models/TDSTCSRateChart.js";
 
+// i have store ledgerIdWithPaymentMode on the basis of that id i want to fetch ledgerName
+// and want ledgerNameWithPaymentMode to in response data
+
 async function getAllBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
@@ -51,6 +54,12 @@ async function getAllBySchoolId(req, res) {
         ? await TDSTCSRateChart.findById(entry.TDSTCSRateChartId).lean()
         : null;
 
+      const ledgerWithPaymentMode = entry.ledgerIdWithPaymentMode
+        ? await Ledger.findById(entry.ledgerIdWithPaymentMode)
+            .select("ledgerName")
+            .lean()
+        : null;
+
       const entryData = {
         // PaymentEntry fields
         _id: entry._id,
@@ -77,6 +86,8 @@ async function getAllBySchoolId(req, res) {
         totalAmountAfterGST: entry.totalAmountAfterGST,
         invoiceImage: entry.invoiceImage,
         chequeImage: entry.chequeImage || null,
+        ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
+        ledgerNameWithPaymentMode: ledgerWithPaymentMode?.ledgerName || null,
         status: entry.status || null,
         paymentVoucherNumber: entry.paymentVoucherNumber || null,
         createdAt: entry.createdAt,

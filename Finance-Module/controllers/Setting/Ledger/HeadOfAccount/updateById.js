@@ -3,9 +3,22 @@ import HeadOfAccountValidator from "../../../../validators/HeadOfAccountValidato
 
 async function update(req, res) {
   try {
-    const { id } = req.params;
+    const schoolId = req.user?.schoolId;
 
-    const existingHead = await HeadOfAccount.findById(id);
+    if (!schoolId) {
+      return res.status(401).json({
+        hasError: true,
+        message: "Access denied: Unauthorized request.",
+      });
+    }
+
+    const { id, academicYear } = req.params;
+
+    const existingHead = await HeadOfAccount.findOne({
+      _id: id,
+      schoolId,
+      academicYear,
+    });
     if (!existingHead) {
       return res.status(404).json({
         hasError: true,
@@ -16,9 +29,11 @@ async function update(req, res) {
     const { headOfAccountName } = req.body;
 
     if (headOfAccountName) {
-      const { error } = HeadOfAccountValidator.HeadOfAccountValidator.validate({
-        headOfAccountName,
-      });
+      const { error } =
+        HeadOfAccountValidator.HeadOfAccountValidatorUpdate.validate({
+          headOfAccountName,
+          academicYear,
+        });
 
       if (error) {
         const errorMessages = error.details
@@ -27,18 +42,6 @@ async function update(req, res) {
         return res.status(400).json({
           hasError: true,
           message: errorMessages,
-        });
-      }
-
-      const duplicate = await HeadOfAccount.findOne({
-        headOfAccountName: headOfAccountName,
-        _id: { $ne: id },
-      });
-
-      if (duplicate) {
-        return res.status(400).json({
-          hasError: true,
-          message: "A Head Of Account with this Name already exists.",
         });
       }
 
@@ -53,6 +56,16 @@ async function update(req, res) {
       data: existingHead,
     });
   } catch (error) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)
+        .map((key) => `${key}: ${error.keyValue[key]}`)
+        .join(", ");
+      return res.status(400).json({
+        hasError: true,
+        message: `Duplicate entry for ${field}. Head Of Accounnt already exists.`,
+      });
+    }
+
     console.error("Error updating Head Of Account:", error);
     return res.status(500).json({
       hasError: true,

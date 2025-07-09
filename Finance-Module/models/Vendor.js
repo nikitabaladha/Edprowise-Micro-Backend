@@ -14,22 +14,22 @@ const VendorSchema = new mongoose.Schema(
     email: {
       type: String,
       required: true,
-      unique: true,
+      // unique: true,
     },
     contactNumber: {
       type: String,
       required: true,
-      unique: true,
+      // unique: true,
     },
     panNumber: {
       type: String,
       required: true,
-      unique: true,
+      // unique: true,
     },
     gstNumber: {
       type: String,
       required: true,
-      unique: true,
+      // unique: true,
     },
     address: {
       type: String,
@@ -59,12 +59,19 @@ const VendorSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    academicYear: {
+      type: String,
+      required: true,
+    },
   },
   {
     timestamps: true,
   }
 );
 
-VendorSchema.index({ schoolId: 1, vendorCode: 1 }, { unique: true });
+VendorSchema.index(
+  { schoolId: 1, vendorCode: 1, academicYear: 1 },
+  { unique: true }
+);
 
 export default mongoose.model("Vendor", VendorSchema);

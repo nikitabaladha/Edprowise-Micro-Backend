@@ -11,6 +11,15 @@ async function create(req, res) {
       });
     }
 
+    const { academicYear } = req.body;
+
+    if (!academicYear) {
+      return res.status(400).json({
+        hasError: true,
+        message: "Academic Year is required.",
+      });
+    }
+
     const { authorisedSignatureImage } = req.files || {};
 
     if (!authorisedSignatureImage?.[0]) {
@@ -30,6 +39,7 @@ async function create(req, res) {
     const newAuthorisedSignature = new AuthorisedSignature({
       schoolId,
       authorisedSignatureImage: authorisedSignatureImageFullPath,
+      academicYear,
     });
 
     await newAuthorisedSignature.save();

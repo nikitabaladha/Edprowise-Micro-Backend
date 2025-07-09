@@ -15,6 +15,10 @@ const BSPLLedgerSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    academicYear: {
+      type: String,
+      required: true,
+    },
   },
   {
     timestamps: true,
@@ -22,7 +26,7 @@ const BSPLLedgerSchema = new mongoose.Schema(
 );
 
 BSPLLedgerSchema.index(
-  { schoolId: 1, headOfAccountId: 1, bSPLLedgerName: 1 },
+  { schoolId: 1, headOfAccountId: 1, bSPLLedgerName: 1, academicYear: 1 },
   { unique: true }
 );
 

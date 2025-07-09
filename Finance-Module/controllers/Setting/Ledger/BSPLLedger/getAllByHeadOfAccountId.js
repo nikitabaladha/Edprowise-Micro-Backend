@@ -3,7 +3,8 @@ import BSPLLedger from "../../../../models/BSPLLedger.js";
 async function getAllByHeadOfAccountId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const headOfAccountId = req.params.headOfAccountId;
+
+    const { headOfAccountId, academicYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -19,7 +20,11 @@ async function getAllByHeadOfAccountId(req, res) {
       });
     }
 
-    const ledgers = await BSPLLedger.find({ schoolId, headOfAccountId }).sort({
+    const ledgers = await BSPLLedger.find({
+      schoolId,
+      headOfAccountId,
+      academicYear,
+    }).sort({
       createdAt: -1,
     });
 

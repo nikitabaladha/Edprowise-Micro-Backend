@@ -24,19 +24,13 @@ async function create(req, res) {
       });
     }
 
-    const { headOfAccountName } = req.body;
+    const { headOfAccountName, academicYear } = req.body;
 
-    const existingHeadOfAccountName = await HeadOfAccount.findOne({
+    const newHeadOfAccount = new HeadOfAccount({
+      schoolId,
       headOfAccountName,
+      academicYear,
     });
-    if (existingHeadOfAccountName) {
-      return res.status(400).json({
-        hasError: true,
-        message: "A Head Of Account with this Name already exists.",
-      });
-    }
-
-    const newHeadOfAccount = new HeadOfAccount({ schoolId, headOfAccountName });
 
     await newHeadOfAccount.save();
 
@@ -46,6 +40,16 @@ async function create(req, res) {
       data: newHeadOfAccount,
     });
   } catch (error) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)
+        .map((key) => `${key}: ${error.keyValue[key]}`)
+        .join(", ");
+      return res.status(400).json({
+        hasError: true,
+        message: `Duplicate entry for ${field}. Head Of Accounnt already exists.`,
+      });
+    }
+
     console.error("Error Creating Head Of Account:", error);
     return res.status(500).json({
       hasError: true,

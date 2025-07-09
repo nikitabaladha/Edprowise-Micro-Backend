@@ -4,6 +4,8 @@ async function getAllBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
+    const { academicYear } = req.params;
+
     if (!schoolId) {
       return res.status(401).json({
         hasError: true,
@@ -11,7 +13,7 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    const charts = await TDSTCSRateChart.find({ schoolId }).sort({
+    const charts = await TDSTCSRateChart.find({ schoolId, academicYear }).sort({
       createdAt: -1,
     });
 

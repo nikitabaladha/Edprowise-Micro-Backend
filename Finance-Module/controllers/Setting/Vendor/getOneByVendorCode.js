@@ -3,7 +3,8 @@ import Vendor from "../../../models/Vendor.js";
 async function getOneByVendorCode(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const vendorCode = req.params.vendorCode;
+
+    const { vendorCode, academicYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -19,7 +20,7 @@ async function getOneByVendorCode(req, res) {
       });
     }
 
-    const vendor = await Vendor.findOne({ schoolId, vendorCode });
+    const vendor = await Vendor.findOne({ schoolId, vendorCode, academicYear });
 
     if (!vendor) {
       return res.status(404).json({

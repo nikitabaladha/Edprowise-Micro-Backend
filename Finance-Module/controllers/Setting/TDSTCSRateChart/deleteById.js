@@ -3,7 +3,8 @@ import TDSTCSRateChart from "../../../models/TDSTCSRateChart.js";
 async function deleteById(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { id } = req.params;
+
+    const { id, academicYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -15,6 +16,7 @@ async function deleteById(req, res) {
     const existingTDSTCSRateChart = await TDSTCSRateChart.findOne({
       _id: id,
       schoolId,
+      academicYear,
     });
 
     if (!existingTDSTCSRateChart) {

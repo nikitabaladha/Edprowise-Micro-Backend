@@ -3,7 +3,7 @@ import TDSTCSRateChartValidator from "../../../validators/TDSTCSRateChartValidat
 
 async function updateById(req, res) {
   try {
-    const { id } = req.params;
+    const { id, academicYear } = req.params;
 
     const schoolId = req.user?.schoolId;
 
@@ -15,7 +15,9 @@ async function updateById(req, res) {
     }
 
     const { error } =
-      TDSTCSRateChartValidator.TDSTCSRateChartValidator.validate(req.body);
+      TDSTCSRateChartValidator.TDSTCSRateChartValidatorUpdate.validate(
+        req.body
+      );
     if (error) {
       const errorMessages = error.details.map((err) => err.message).join(", ");
       return res.status(400).json({
@@ -29,6 +31,7 @@ async function updateById(req, res) {
     const existingTDSTCSRateChart = await TDSTCSRateChart.findOne({
       _id: id,
       schoolId,
+      academicYear,
     });
     if (!existingTDSTCSRateChart) {
       return res.status(404).json({

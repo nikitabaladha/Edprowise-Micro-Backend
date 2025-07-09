@@ -44,6 +44,7 @@ async function create(req, res) {
       ifscCode,
       accountNumber,
       accountType,
+      academicYear,
     } = req.body;
 
     const newVendor = new Vendor({
@@ -61,6 +62,7 @@ async function create(req, res) {
       ifscCode,
       accountNumber,
       accountType,
+      academicYear,
     });
 
     await newVendor.save();
