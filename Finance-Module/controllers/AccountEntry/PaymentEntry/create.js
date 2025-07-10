@@ -3,15 +3,11 @@ import moment from "moment";
 import PaymentEntry from "../../../models/PaymentEntry.js";
 import PaymentEntryValidator from "../../../validators/PaymentEntryValidator.js";
 
-async function generatePaymentVoucherNumber(schoolId) {
-  const count = await PaymentEntry.countDocuments({ schoolId });
+async function generatePaymentVoucherNumber(schoolId, academicYear) {
+  const count = await PaymentEntry.countDocuments({ schoolId, academicYear });
   const nextNumber = count + 1;
-  const formattedNumber = String(nextNumber).padStart(3, "0");
-  return `PVN-${formattedNumber}`;
+  return `PVN/${academicYear}/${nextNumber}`;
 }
-
-// Insted of - use /
-// PVN/25-26/1
 
 async function generateTransactionNumber() {
   const now = moment();
@@ -51,8 +47,6 @@ async function create(req, res) {
       });
     }
 
-    const paymentVoucherNumber = await generatePaymentVoucherNumber(schoolId);
-
     const {
       vendorCode,
       vendorId,
@@ -74,6 +68,11 @@ async function create(req, res) {
       ledgerIdWithPaymentMode,
       academicYear,
     } = req.body;
+
+    const paymentVoucherNumber = await generatePaymentVoucherNumber(
+      schoolId,
+      academicYear
+    );
 
     const { invoiceImage, chequeImage } = req.files || {};
 

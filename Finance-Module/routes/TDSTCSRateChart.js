@@ -24,7 +24,7 @@ router.get(
 );
 
 router.get(
-  "/get-all-rate-chart-by-tds-or-tcs/:academicYear",
+  "/get-all-rate-chart-by-tds-or-tcs/:TDSorTCS/:academicYear",
   roleBasedMiddleware("School"),
   getAllByTDSOrTCS
 );

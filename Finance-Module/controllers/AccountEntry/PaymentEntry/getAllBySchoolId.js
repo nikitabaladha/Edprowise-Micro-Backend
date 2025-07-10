@@ -2,13 +2,13 @@ import PaymentEntry from "../../../models/PaymentEntry.js";
 import Vendor from "../../../models/Vendor.js";
 import Ledger from "../../../models/Ledger.js";
 import TDSTCSRateChart from "../../../models/TDSTCSRateChart.js";
-
-// i have store ledgerIdWithPaymentMode on the basis of that id i want to fetch ledgerName
-// and want ledgerNameWithPaymentMode to in response data
+import AuthorisedSignature from "../../../models/AuthorisedSignature.js";
 
 async function getAllBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
+
+    const { academicYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -17,8 +17,14 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    // Get all payment entries for the school
-    const paymentEntries = await PaymentEntry.find({ schoolId })
+    const authorisedSignature = await AuthorisedSignature.findOne({
+      schoolId,
+      academicYear,
+    })
+      .select("authorisedSignatureImage")
+      .lean();
+
+    const paymentEntries = await PaymentEntry.find({ schoolId, academicYear })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -113,6 +119,9 @@ async function getAllBySchoolId(req, res) {
         // TDS/TCS Rate Chart details
         natureOfTransaction: tdsTcsRateChart?.natureOfTransaction || null,
         rate: tdsTcsRateChart?.rate || null,
+
+        authorisedSignatureImage:
+          authorisedSignature?.authorisedSignatureImage || null,
       };
 
       formattedData.push(entryData);

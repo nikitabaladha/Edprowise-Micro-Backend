@@ -99,7 +99,7 @@ const PaymentEntrySchema = new mongoose.Schema(
     status: {
       type: String,
       required: true,
-      enum: ["Posted", "Draft", "Reversed"],
+      enum: ["Posted", "Draft", "Reversed", "Cancelled"],
     },
     academicYear: {
       type: String,

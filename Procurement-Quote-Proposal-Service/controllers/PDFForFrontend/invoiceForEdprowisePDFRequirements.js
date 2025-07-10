@@ -224,21 +224,21 @@ async function invoiceForEdprowisePDFRequirements(req, res) {
     const edprowiseProfile = edprowiseProfileData.data;
     const orderDetails = orderDetailsData.data;
 
-    const signaturePath = path.join(
-      __dirname,
-      "Images",
-      "SellerSignature",
-      path.basename(sellerProfile.signature)
-    );
+    // const signaturePath = path.join(
+    //   __dirname,
+    //   "Images",
+    //   "SellerSignature",
+    //   path.basename(sellerProfile.signature)
+    // );
 
     let signatureDataURI = "";
-    if (!signatureDataURI) {
-      const signatureBuffer = fs.readFileSync(signaturePath);
-      const signatureType = path.extname(signaturePath).replace(".", "");
-      signatureDataURI = `data:image/${signatureType};base64,${signatureBuffer.toString(
-        "base64"
-      )}`;
-    }
+    // if (!signatureDataURI) {
+    //   const signatureBuffer = fs.readFileSync(signaturePath);
+    //   const signatureType = path.extname(signaturePath).replace(".", "");
+    //   signatureDataURI = `data:image/${signatureType};base64,${signatureBuffer.toString(
+    //     "base64"
+    //   )}`;
+    // }
 
     const dynamicData = {
       prepareQuoteData: prepareQuotesWithStatus,
@@ -274,7 +274,7 @@ async function invoiceForEdprowisePDFRequirements(req, res) {
         deliveryCharges: submitQuote?.deliveryCharges || null,
         // Seller
         sellerCompanyName: sellerProfile.companyName,
-        signature: signatureDataURI,
+        // signature: signatureDataURI,
         sellerAddress: `${sellerProfile.address || ""}${
           sellerProfile.landmark ? `, ${sellerProfile.landmark}` : ""
         }`,

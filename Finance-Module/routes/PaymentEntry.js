@@ -8,6 +8,7 @@ import upload from "../UploadFiles/InvoiceImageFiles.js";
 import {
   createPaymentEntry,
   getAllPaymentEntryBySchoolId,
+  cancelPaymentEntryById,
 } from "../controllers/AccountEntry/PaymentEntry/index.js";
 
 router.post(
@@ -18,10 +19,17 @@ router.post(
 );
 
 router.get(
-  "/get-all-payment-entry",
+  "/get-all-payment-entry/:academicYear",
   upload,
   roleBasedMiddleware("School"),
   getAllPaymentEntryBySchoolId
+);
+
+router.put(
+  "/cancel-payment-entry/:id/:academicYear",
+  upload,
+  roleBasedMiddleware("School"),
+  cancelPaymentEntryById
 );
 
 export default router;

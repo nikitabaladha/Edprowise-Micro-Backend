@@ -1,4 +1,9 @@
 import createPaymentEntry from "./create.js";
 import getAllPaymentEntryBySchoolId from "./getAllBySchoolId.js";
+import cancelPaymentEntryById from "./cancelById.js";
 
-export { createPaymentEntry, getAllPaymentEntryBySchoolId };
+export {
+  createPaymentEntry,
+  getAllPaymentEntryBySchoolId,
+  cancelPaymentEntryById,
+};
