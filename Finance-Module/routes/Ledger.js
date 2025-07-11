@@ -133,14 +133,8 @@ router.get(
   getAllLedgerByName
 );
 
-// router.get(
-//   "/get-all-ledger-by-name",
-//   roleBasedMiddleware("School"),
-//   getAllLedgerByName
-// );
-
 router.get(
-  "/get-all-ledger-by-name-payment-mode/:paymentMode/:academicYear",
+  "/get-all-ledger-by-payment-mode/:paymentMode/:academicYear",
   roleBasedMiddleware("School"),
   getAllByPaymentMode
 );

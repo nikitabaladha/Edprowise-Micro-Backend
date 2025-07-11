@@ -24,6 +24,16 @@ const academicYearUpdate = Joi.string().allow("").optional().messages({
   "string.empty": "Academic Year cannot be empty.",
 });
 
+const invoiceImage = Joi.string().allow("").optional().messages({
+  "string.base": "invoiceImage must be a string",
+  "string.empty": "invoiceImage cannot be empty",
+});
+
+const chequeImage = Joi.string().allow("").optional().messages({
+  "string.base": "chequeImage must be a string",
+  "string.empty": "chequeImage cannot be empty",
+});
+
 const vendorCode = Joi.string().required().messages({
   "any.required": "Vendor code is required",
   "string.base": "Vendor code must be a string",
@@ -239,6 +249,8 @@ const PaymentEntryValidatorUpdate = Joi.object({
   ledgerIdWithPaymentMode,
   status,
   academicYear: academicYearUpdate,
+  invoiceImage,
+  chequeImage,
 });
 
 export default {

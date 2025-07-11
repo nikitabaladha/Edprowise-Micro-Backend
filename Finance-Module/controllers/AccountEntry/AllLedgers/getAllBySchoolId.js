@@ -1,8 +1,6 @@
 import PaymentEntry from "../../../models/PaymentEntry.js";
-import Vendor from "../../../models/Vendor.js";
 import Ledger from "../../../models/Ledger.js";
-import TDSTCSRateChart from "../../../models/TDSTCSRateChart.js";
-import AuthorisedSignature from "../../../models/AuthorisedSignature.js";
+import GroupLedger from "../../../models/GroupLedger.js";
 import mongoose from "mongoose";
 
 async function getAllBySchoolId(req, res) {
@@ -17,13 +15,6 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    const authorisedSignature = await AuthorisedSignature.findOne({
-      schoolId,
-      academicYear,
-    })
-      .select("authorisedSignatureImage")
-      .lean();
-
     const paymentEntries = await PaymentEntry.find({ schoolId, academicYear })
       .sort({ createdAt: -1 })
       .lean();
@@ -31,14 +22,6 @@ async function getAllBySchoolId(req, res) {
     const formattedData = [];
 
     for (const entry of paymentEntries) {
-      // Fetch Vendor
-      const vendor = entry.vendorCode
-        ? await Vendor.findOne({
-            vendorCode: entry.vendorCode,
-            schoolId,
-          }).lean()
-        : null;
-
       const itemsWithLedgerNames = [];
 
       for (const item of entry.itemDetails) {
@@ -48,93 +31,110 @@ async function getAllBySchoolId(req, res) {
             _id: item.ledgerId,
             schoolId,
           })
-            .select("ledgerName")
+            .select("ledgerName groupLedgerId")
+            .lean();
+        }
+
+        let groupLedger = null;
+        if (ledger?.groupLedgerId) {
+          groupLedger = await GroupLedger.findOne({
+            _id: ledger.groupLedgerId,
+            schoolId,
+          })
+            .select("groupLedgerName")
             .lean();
         }
 
         itemsWithLedgerNames.push({
           itemName: item.itemName,
           ledgerId: item.ledgerId || null,
-          ledgerName: ledger?.ledgerName || null,
           amountBeforeGST: item.amountBeforeGST,
           GSTAmount: item.GSTAmount,
           amountAfterGST: item.amountAfterGST,
+          ledgerName: ledger?.ledgerName || null,
+          groupLedgerId: ledger?.groupLedgerId || null,
+          groupLedgerName: groupLedger?.groupLedgerName || null,
         });
       }
 
-      // Fetch TDS/TCS Rate Chart
-      const tdsTcsRateChart =
-        entry.TDSTCSRateChartId &&
-        mongoose.Types.ObjectId.isValid(entry.TDSTCSRateChartId)
-          ? await TDSTCSRateChart.findById(entry.TDSTCSRateChartId).lean()
-          : null;
-
-      // Fetch Ledger with Payment Mode
       const ledgerWithPaymentMode =
         entry.ledgerIdWithPaymentMode &&
         mongoose.Types.ObjectId.isValid(entry.ledgerIdWithPaymentMode)
           ? await Ledger.findById(entry.ledgerIdWithPaymentMode)
-              .select("ledgerName")
+              .select("ledgerName groupLedgerId")
               .lean()
           : null;
 
+      let groupLedgerWithPaymentMode = null;
+      if (ledgerWithPaymentMode?.groupLedgerId) {
+        groupLedgerWithPaymentMode = await GroupLedger.findOne({
+          _id: ledgerWithPaymentMode.groupLedgerId,
+          schoolId,
+        })
+          .select("groupLedgerName")
+          .lean();
+      }
+
+      let TDSorTCSGroupLedgerName = null;
+      let TDSorTCSLedgerName = null;
+
+      if (entry.TDSorTCS) {
+        // 1. Find GroupLedger by name
+        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+          schoolId,
+          groupLedgerName: entry.TDSorTCS,
+        })
+          .select("_id groupLedgerName")
+          .lean();
+
+        if (tdsOrTcsGroupLedger) {
+          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+
+          // 2. Find Ledger under that GroupLedger
+          const tdsOrTcsLedger = await Ledger.findOne({
+            schoolId,
+            groupLedgerId: tdsOrTcsGroupLedger._id,
+          })
+            .select("ledgerName")
+            .lean();
+
+          if (tdsOrTcsLedger) {
+            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+          }
+        }
+      }
+
       const entryData = {
         // PaymentEntry fields
+        accountingEntry: "Payment",
         _id: entry._id,
         schoolId: entry.schoolId,
-        vendorCode: entry.vendorCode,
-        vendorId: entry.vendorId,
         entryDate: entry.entryDate,
         invoiceDate: entry.invoiceDate,
-        invoiceNumber: entry.invoiceNumber,
-        poNumber: entry.poNumber,
-        dueDate: entry.dueDate,
         narration: entry.narration,
-        paymentMode: entry.paymentMode,
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
         subTotalAmountAfterGST: entry.subTotalAmountAfterGST,
-        TDSorTCS: entry.TDSorTCS,
-        TDSTCSRateChartId: entry.TDSTCSRateChartId,
-        TDSTCSRate: entry.TDSTCSRate,
         TDSTCSRateWithAmountBeforeGST: entry.TDSTCSRateWithAmountBeforeGST,
-        adjustmentValue: entry.adjustmentValue,
-        totalAmountBeforeGST: entry.totalAmountBeforeGST,
-        totalGSTAmount: entry.totalGSTAmount,
         totalAmountAfterGST: entry.totalAmountAfterGST,
-        invoiceImage: entry.invoiceImage,
-        chequeImage: entry.chequeImage || null,
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
         ledgerNameWithPaymentMode: ledgerWithPaymentMode?.ledgerName || null,
-        status: entry.status || null,
+        groupLedgerIdWithPaymentMode:
+          ledgerWithPaymentMode?.groupLedgerId || null,
+        groupLedgerNameWithPaymentMode:
+          groupLedgerWithPaymentMode?.groupLedgerName || null,
         paymentVoucherNumber: entry.paymentVoucherNumber || null,
+        TDSorTCS: entry.TDSorTCS,
+
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
 
-        // Vendor fields
-        nameOfVendor: vendor?.nameOfVendor || null,
-        email: vendor?.email || null,
-        contactNumber: vendor?.contactNumber || null,
-        gstNumber: vendor?.gstNumber || null,
-        panNumber: vendor?.panNumber || null,
-        address: vendor?.address || null,
-        state: vendor?.state || null,
-        nameOfAccountHolder: vendor?.nameOfAccountHolder || null,
-        nameOfBank: vendor?.nameOfBank || null,
-        ifscCode: vendor?.ifscCode || null,
-        accountNumber: vendor?.accountNumber || null,
-        accountType: vendor?.accountType || null,
+        // ✅ NEW:
+        TDSorTCSGroupLedgerName,
+        TDSorTCSLedgerName,
 
         // Item details
         itemDetails: itemsWithLedgerNames,
-
-        // TDS/TCS Rate Chart fields
-        natureOfTransaction: tdsTcsRateChart?.natureOfTransaction || null,
-        rate: tdsTcsRateChart?.rate || null,
-
-        // Authorised Signature
-        authorisedSignatureImage:
-          authorisedSignature?.authorisedSignatureImage || null,
       };
 
       formattedData.push(entryData);

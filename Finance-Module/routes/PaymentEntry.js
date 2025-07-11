@@ -9,6 +9,10 @@ import {
   createPaymentEntry,
   getAllPaymentEntryBySchoolId,
   cancelPaymentEntryById,
+  updatePaymentEntryById,
+  dreaftPaymentEntry,
+  updateDraftPaymentEntryById,
+  getAllLedgerByNameWithTDSorTCS,
 } from "../controllers/AccountEntry/PaymentEntry/index.js";
 
 router.post(
@@ -18,18 +22,43 @@ router.post(
   createPaymentEntry
 );
 
+router.post(
+  "/draft-payment-entry",
+  upload,
+  roleBasedMiddleware("School"),
+  dreaftPaymentEntry
+);
+
 router.get(
   "/get-all-payment-entry/:academicYear",
-  upload,
   roleBasedMiddleware("School"),
   getAllPaymentEntryBySchoolId
 );
 
 router.put(
-  "/cancel-payment-entry/:id/:academicYear",
+  "/update-payment-entry/:id/:academicYear",
   upload,
   roleBasedMiddleware("School"),
+  updatePaymentEntryById
+);
+
+router.put(
+  "/update-draft-payment-entry/:id/:academicYear",
+  upload,
+  roleBasedMiddleware("School"),
+  updateDraftPaymentEntryById
+);
+
+router.put(
+  "/cancel-payment-entry/:id/:academicYear",
+  roleBasedMiddleware("School"),
   cancelPaymentEntryById
+);
+
+router.get(
+  "/get-payment-entry-with-ledger-by-tds-tcs/:id/:academicYear",
+  roleBasedMiddleware("School"),
+  getAllLedgerByNameWithTDSorTCS
 );
 
 export default router;

@@ -1,19 +1,16 @@
 import moment from "moment";
-
 import PaymentEntry from "../../../models/PaymentEntry.js";
-import PaymentEntryValidator from "../../../validators/PaymentEntryValidator.js";
 
-async function generatePaymentVoucherNumber(schoolId) {
-  const count = await PaymentEntry.countDocuments({ schoolId });
+async function generatePaymentVoucherNumber(schoolId, academicYear) {
+  const count = await PaymentEntry.countDocuments({ schoolId, academicYear });
   const nextNumber = count + 1;
-  const formattedNumber = String(nextNumber).padStart(3, "0");
-  return `PVN-${formattedNumber}`;
+  return `PVN/${academicYear}/${nextNumber}`;
 }
 
 async function generateTransactionNumber() {
   const now = moment();
   const dateTimeStr = now.format("DDMMYYYYHHmmss");
-  let baseTransactionNumber = `TRA-${dateTimeStr}`;
+  const baseTransactionNumber = `TRA-${dateTimeStr}`;
   let transactionNumber = baseTransactionNumber;
   let counter = 1;
 
@@ -26,7 +23,7 @@ async function generateTransactionNumber() {
   return transactionNumber;
 }
 
-async function create(req, res) {
+async function draft(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
@@ -36,19 +33,6 @@ async function create(req, res) {
         message: "Access denied: You do not have permission.",
       });
     }
-
-    const { error } = PaymentEntryValidator.PaymentEntryValidator.validate(
-      req.body
-    );
-    if (error) {
-      const errorMessages = error.details.map((err) => err.message).join(", ");
-      return res.status(400).json({
-        hasError: true,
-        message: errorMessages,
-      });
-    }
-
-    const paymentVoucherNumber = await generatePaymentVoucherNumber(schoolId);
 
     const {
       vendorCode,
@@ -68,24 +52,33 @@ async function create(req, res) {
       adjustmentValue,
       status,
       TDSTCSRateWithAmountBeforeGST,
+      ledgerIdWithPaymentMode,
+      academicYear,
     } = req.body;
 
-    const { invoiceImage, chequeImage } = req.files || {};
-
-    if (!invoiceImage?.[0]) {
+    if (!academicYear || academicYear.trim() === "") {
       return res.status(400).json({
         hasError: true,
-        message: "Invoice is required.",
+        message: "Academic year is required.",
       });
     }
 
-    const invoiceImagePath = invoiceImage[0].mimetype.startsWith("image/")
+    const paymentVoucherNumber = await generatePaymentVoucherNumber(
+      schoolId,
+      academicYear
+    );
+
+    const { invoiceImage, chequeImage } = req.files || {};
+
+    const invoiceImagePath = invoiceImage?.[0]?.mimetype?.startsWith("image/")
       ? "/Images/FinanceModule/InvoiceImage"
       : "/Documents/FinanceModule/InvoiceImage";
 
-    const invoiceImageFullPath = `${invoiceImagePath}/${invoiceImage[0].filename}`;
+    const invoiceImageFullPath = invoiceImage?.[0]
+      ? `${invoiceImagePath}/${invoiceImage[0].filename}`
+      : null;
 
-    const chequeImagePath = chequeImage?.[0]?.mimetype.startsWith("image/")
+    const chequeImagePath = chequeImage?.[0]?.mimetype?.startsWith("image/")
       ? "/Images/FinanceModule/ChequeImage"
       : "/Documents/FinanceModule/ChequeImage";
 
@@ -93,40 +86,34 @@ async function create(req, res) {
       ? `${chequeImagePath}/${chequeImage[0].filename}`
       : null;
 
-    const updatedItemDetails = itemDetails.map((item) => ({
-      ...item,
-      amountBeforeGST: parseFloat(item.amountBeforeGST) || 0,
-      GSTAmount: parseFloat(item.GSTAmount) || 0,
-      amountAfterGST:
-        (parseFloat(item.amountBeforeGST) || 0) +
-        (parseFloat(item.GSTAmount) || 0),
-    }));
+    const updatedItemDetails = itemDetails.map((item) => {
+      const amountBeforeGST = parseFloat(item.amountBeforeGST) || 0;
+      const GSTAmount = parseFloat(item.GSTAmount) || 0;
+      return {
+        ...item,
+        amountBeforeGST,
+        GSTAmount,
+        amountAfterGST: amountBeforeGST + GSTAmount,
+      };
+    });
 
     const totalAmountBeforeGST = updatedItemDetails.reduce(
-      (sum, item) => sum + (parseFloat(item.amountBeforeGST) || 0),
+      (sum, item) => sum + item.amountBeforeGST,
       0
     );
 
     const totalGSTAmount = updatedItemDetails.reduce(
-      (sum, item) => sum + (parseFloat(item.GSTAmount) || 0),
+      (sum, item) => sum + item.GSTAmount,
       0
     );
 
     const subTotalAmountAfterGST = updatedItemDetails.reduce(
-      (sum, item) => sum + (parseFloat(item.amountAfterGST) || 0),
+      (sum, item) => sum + item.amountAfterGST,
       0
     );
 
-    // const TDSTCSRateWithAmountBeforeGST =
-    //   ((parseFloat(TDSTCSRate) || 0) * totalAmountBeforeGST) / 100;
-
-    // const totalAmountAfterGST =
-    //   subTotalAmountAfterGST +
-    //   TDSTCSRateWithAmountBeforeGST +
-    //   (parseFloat(adjustmentValue) || 0);
-
     const totalAmountAfterGST =
-      subTotalAmountAfterGST +
+      subTotalAmountAfterGST -
       (parseFloat(TDSTCSRateWithAmountBeforeGST) || 0) +
       (parseFloat(adjustmentValue) || 0);
 
@@ -135,6 +122,7 @@ async function create(req, res) {
 
     const newPaymentEntry = new PaymentEntry({
       schoolId,
+      academicYear,
       paymentVoucherNumber,
       vendorCode,
       vendorId,
@@ -152,13 +140,15 @@ async function create(req, res) {
       TDSorTCS,
       TDSTCSRateChartId,
       TDSTCSRate,
-      TDSTCSRateWithAmountBeforeGST,
+      TDSTCSRateWithAmountBeforeGST:
+        parseFloat(TDSTCSRateWithAmountBeforeGST) || 0,
       adjustmentValue: parseFloat(adjustmentValue) || 0,
       totalAmountBeforeGST,
       totalGSTAmount,
       totalAmountAfterGST,
       invoiceImage: invoiceImageFullPath,
       chequeImage: chequeImageFullPath,
+      ledgerIdWithPaymentMode,
       status,
     });
 
@@ -166,7 +156,7 @@ async function create(req, res) {
 
     return res.status(201).json({
       hasError: false,
-      message: "Payment Entry created successfully!",
+      message: "Payment Entry drafted successfully!",
       data: newPaymentEntry,
     });
   } catch (error) {
@@ -188,4 +178,4 @@ async function create(req, res) {
   }
 }
 
-export default create;
+export default draft;

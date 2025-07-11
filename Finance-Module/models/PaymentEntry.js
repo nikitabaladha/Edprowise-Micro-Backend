@@ -6,23 +6,25 @@ const PaymentEntrySchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    paymentVoucherNumber: { type: String, required: true },
-    vendorCode: { type: String, required: true },
-    vendorId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Vendor",
-      required: true,
-    },
-    entryDate: { type: Date, required: true },
-    invoiceDate: { type: Date, required: true },
-    invoiceNumber: { type: String, required: true },
-    poNumber: { type: String },
-    dueDate: { type: Date, required: true },
-    narration: { type: String, required: true },
-    paymentMode: {
+    academicYear: {
       type: String,
       required: true,
-      enum: ["Cash", "Online", "Cheque"],
+    },
+    paymentVoucherNumber: { type: String, required: true },
+    vendorCode: { type: String },
+    vendorId: {
+      type: String,
+      ref: "Vendor",
+    },
+    entryDate: { type: Date },
+    invoiceDate: { type: Date },
+    invoiceNumber: { type: String },
+    poNumber: { type: String },
+    dueDate: { type: Date },
+    narration: { type: String },
+    paymentMode: {
+      type: String,
+      enum: ["Cash", "Online", "Cheque", ""],
     },
     chequeNumber: {
       type: String,
@@ -34,76 +36,57 @@ const PaymentEntrySchema = new mongoose.Schema(
       {
         itemName: {
           type: String,
-          required: true,
         },
         ledgerId: {
           type: String,
-          required: true,
         },
         amountBeforeGST: {
           type: Number,
-          required: true,
         },
         GSTAmount: {
           type: Number,
-          required: true,
         },
         amountAfterGST: {
           type: Number,
-          required: true,
         },
       },
     ],
     subTotalAmountAfterGST: {
       type: Number,
-      required: true,
     },
     TDSorTCS: {
       type: String,
-      required: true,
+
       enum: ["TDS", "TCS"],
     },
-    TDSTCSRateChartId: { type: String, required: true },
-    TDSTCSRate: { type: Number, required: true },
+    TDSTCSRateChartId: { type: String },
+    TDSTCSRate: { type: Number },
     TDSTCSRateWithAmountBeforeGST: {
       type: Number,
-      required: true,
     },
     adjustmentValue: {
       type: Number,
-      required: true,
     },
     totalAmountBeforeGST: {
       type: Number,
-      required: true,
     },
     totalGSTAmount: {
       type: Number,
-      required: true,
     },
     totalAmountAfterGST: {
       type: Number,
-      required: true,
     },
     invoiceImage: {
       type: String,
-      required: true,
     },
-    chequeImage: {
-      type: String,
-    },
+    chequeImage: {},
     ledgerIdWithPaymentMode: {
       type: String,
-      required: true,
     },
     status: {
       type: String,
       required: true,
       enum: ["Posted", "Draft", "Reversed", "Cancelled"],
-    },
-    academicYear: {
-      type: String,
-      required: true,
     },
   },
   {

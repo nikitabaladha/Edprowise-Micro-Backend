@@ -6,19 +6,17 @@ const ReceiptSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    receiptDate: { type: Date, required: true },
-    entryDate: { type: Date, required: true },
-    narration: { type: String, required: true },
+    receiptDate: { type: Date },
+    entryDate: { type: Date },
+    narration: { type: String },
     receiptImage: {
       type: String,
-      required: true,
     },
     chequeImage: {
       type: String,
     },
     paymentMode: {
       type: String,
-      required: true,
       enum: ["Cash", "Online", "Cheque"],
     },
     chequeNumber: {
@@ -27,53 +25,43 @@ const ReceiptSchema = new mongoose.Schema(
     transactionNumber: {
       type: String,
     },
-    receiptVoucherNumber: { type: String, required: true },
+    receiptVoucherNumber: { type: String },
     itemDetails: [
       {
         itemName: {
           type: String,
-          required: true,
         },
         ledgerId: {
           type: String,
-          required: true,
         },
         amount: {
           type: Number,
-          required: true,
         },
       },
     ],
     subTotalAmount: {
       type: Number,
-      required: true,
     },
     TDSorTCS: {
       type: String,
-      required: true,
       enum: ["TDS", "TCS"],
     },
-    TDSTCSRateChartId: { type: String, required: true },
-    TDSTCSRate: { type: Number, required: true },
+    TDSTCSRateChartId: { type: String },
+    TDSTCSRate: { type: Number },
     TDSTCSRateWithAmount: {
       type: Number,
-      required: true,
     },
     adjustmentValue: {
       type: Number,
-      required: true,
     },
     totalAmount: {
       type: Number,
-      required: true,
     },
     ledgerIdWithPaymentMode: {
       type: String,
-      required: true,
     },
     status: {
       type: String,
-      required: true,
       enum: ["Posted", "Draft", "Reversed", "Cancelled"],
     },
     academicYear: {
