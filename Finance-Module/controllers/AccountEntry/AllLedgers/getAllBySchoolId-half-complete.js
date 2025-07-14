@@ -19,9 +19,9 @@ async function getAllBySchoolId(req, res) {
       .sort({ createdAt: -1 })
       .lean();
 
-    // const receiptEntries = await Receipt.find({ schoolId, academicYear })
-    //   .sort({ createdAt: -1 })
-    //   .lean();
+    const receiptEntries = await Receipt.find({ schoolId, academicYear })
+      .sort({ createdAt: -1 })
+      .lean();
 
     const formattedData = [];
 
