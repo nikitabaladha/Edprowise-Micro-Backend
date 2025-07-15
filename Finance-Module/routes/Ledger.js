@@ -7,6 +7,7 @@ import {
   getAllHeadOfAccount,
   updateHeadOfAccount,
   deleteHeadOfAccount,
+  findHeadOfAccountByName,
 } from "../controllers/Setting/Ledger/HeadOfAccount/index.js";
 
 router.post(
@@ -33,12 +34,19 @@ router.delete(
   deleteHeadOfAccount
 );
 
+router.post(
+  "/find-head-of-account-by-name",
+  roleBasedMiddleware("School"),
+  findHeadOfAccountByName
+);
+
 import {
   createBSPLLedger,
   getAllBSPLLedgerBySchoolId,
   updateBSPLLedgerById,
   deleteBSPLLedgerById,
   getAllByHeadOfAccountId,
+  findBSPLLedgerByName,
 } from "../controllers/Setting/Ledger/BSPLLedger/index.js";
 
 router.post(
@@ -71,12 +79,19 @@ router.delete(
   deleteBSPLLedgerById
 );
 
+router.post(
+  "/find-bs-pl-ledger-by-name",
+  roleBasedMiddleware("School"),
+  findBSPLLedgerByName
+);
+
 import {
   createGroupLedger,
   getAllGroupLedgerBySchoolId,
   updateGroupLedgerById,
   deleteGroupLedgerById,
   getAllByBSPLLedgerId,
+  findGroupLedgerByName,
 } from "../controllers/Setting/Ledger/GroupLedger/index.js";
 
 router.post(
@@ -109,6 +124,12 @@ router.delete(
   deleteGroupLedgerById
 );
 
+router.post(
+  "/find-group-ledger-by-name",
+  roleBasedMiddleware("School"),
+  findGroupLedgerByName
+);
+
 import {
   createLedger,
   getAllLedgerBySchoolId,
@@ -117,6 +138,7 @@ import {
   getAllLedgerByName,
   updatePaymentModeById,
   getAllByPaymentMode,
+  findLedgerByName,
 } from "../controllers/Setting/Ledger/Ledger/index.js";
 
 router.post("/create-ledger", roleBasedMiddleware("School"), createLedger);
@@ -155,6 +177,12 @@ router.delete(
   "/delete-ledger-by-id/:id/:academicYear",
   roleBasedMiddleware("School"),
   deleteLedgerById
+);
+
+router.post(
+  "/find-ledger-by-name",
+  roleBasedMiddleware("School"),
+  findLedgerByName
 );
 
 export default router;

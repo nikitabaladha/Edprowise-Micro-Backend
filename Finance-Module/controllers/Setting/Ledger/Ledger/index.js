@@ -5,6 +5,7 @@ import updatePaymentModeById from "./updatePaymentModeById.js";
 import deleteLedgerById from "./deleteById.js";
 import getAllLedgerByName from "./getAllByName.js";
 import getAllByPaymentMode from "./getAllByPaymentMode.js";
+import findLedgerByName from "./findLedgerByName.js";
 
 export {
   createLedger,
@@ -14,4 +15,5 @@ export {
   deleteLedgerById,
   getAllLedgerByName,
   getAllByPaymentMode,
+  findLedgerByName,
 };
