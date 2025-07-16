@@ -3,12 +3,21 @@ const router = express.Router();
 
 import roleBasedMiddleware from "../middleware/index.js";
 
-import { getAllBySchoolId } from "../controllers/AccountEntry/AllLedgers/index.js";
+import {
+  getAllBySchoolId,
+  getAllPaymentEntryBySchoolId,
+} from "../controllers/AccountEntry/AllLedgers/index.js";
 
 router.get(
   "/get-all-entry/:academicYear",
   roleBasedMiddleware("School"),
   getAllBySchoolId
+);
+
+router.get(
+  "/get-only-payment-entry/:academicYear",
+  roleBasedMiddleware("School"),
+  getAllPaymentEntryBySchoolId
 );
 
 export default router;
