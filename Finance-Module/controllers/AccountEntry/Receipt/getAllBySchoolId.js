@@ -2,11 +2,11 @@ import Receipt from "../../../models/Receipt.js";
 import Ledger from "../../../models/Ledger.js";
 import TDSTCSRateChart from "../../../models/TDSTCSRateChart.js";
 import AuthorisedSignature from "../../../models/AuthorisedSignature.js";
+import mongoose from "mongoose";
 
 async function getAllBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-
     const { academicYear } = req.params;
 
     if (!schoolId) {
@@ -23,40 +23,49 @@ async function getAllBySchoolId(req, res) {
       .select("authorisedSignatureImage")
       .lean();
 
-    const paymentEntries = await Receipt.find({ schoolId, academicYear })
+    const receipts = await Receipt.find({ schoolId, academicYear })
       .sort({ createdAt: -1 })
       .lean();
 
     const formattedData = [];
 
-    for (const entry of paymentEntries) {
+    for (const entry of receipts) {
       const itemsWithLedgerNames = [];
 
       for (const item of entry.itemDetails) {
-        const ledger = await Ledger.findOne({
-          _id: item.ledgerId,
-          schoolId,
-        })
-          .select("ledgerName")
-          .lean();
+        let ledger = null;
+        if (item.ledgerId && mongoose.Types.ObjectId.isValid(item.ledgerId)) {
+          ledger = await Ledger.findOne({
+            _id: item.ledgerId,
+            schoolId,
+          })
+            .select("ledgerName")
+            .lean();
+        }
 
         itemsWithLedgerNames.push({
           itemName: item.itemName,
-          ledgerId: item.ledgerId,
+          ledgerId: item.ledgerId || null,
           ledgerName: ledger?.ledgerName || null,
           amount: item.amount,
         });
       }
 
-      const tdsTcsRateChart = entry.TDSTCSRateChartId
-        ? await TDSTCSRateChart.findById(entry.TDSTCSRateChartId).lean()
-        : null;
+      // Fetch TDS/TCS Rate Chart
+      const tdsTcsRateChart =
+        entry.TDSTCSRateChartId &&
+        mongoose.Types.ObjectId.isValid(entry.TDSTCSRateChartId)
+          ? await TDSTCSRateChart.findById(entry.TDSTCSRateChartId).lean()
+          : null;
 
-      const ledgerWithPaymentMode = entry.ledgerIdWithPaymentMode
-        ? await Ledger.findById(entry.ledgerIdWithPaymentMode)
-            .select("ledgerName")
-            .lean()
-        : null;
+      // Fetch Ledger with Payment Mode
+      const ledgerWithPaymentMode =
+        entry.ledgerIdWithPaymentMode &&
+        mongoose.Types.ObjectId.isValid(entry.ledgerIdWithPaymentMode)
+          ? await Ledger.findById(entry.ledgerIdWithPaymentMode)
+              .select("ledgerName")
+              .lean()
+          : null;
 
       const entryData = {
         // Receipt fields
@@ -75,8 +84,8 @@ async function getAllBySchoolId(req, res) {
         TDSTCSRateWithAmount: entry.TDSTCSRateWithAmount,
         adjustmentValue: entry.adjustmentValue,
         totalAmount: entry.totalAmount,
-        receiptImage: entry.invoiceImage,
-        chequeImage: entry.chequeImage || null,
+        receiptImage: entry.receiptImage,
+        chequeImageForReceipt: entry.chequeImageForReceipt || null,
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
         ledgerNameWithPaymentMode: ledgerWithPaymentMode?.ledgerName || null,
         status: entry.status || null,
@@ -84,13 +93,14 @@ async function getAllBySchoolId(req, res) {
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
 
-        // Item details array
+        // Item details
         itemDetails: itemsWithLedgerNames,
 
-        // TDS/TCS Rate Chart details
+        // TDS/TCS Rate Chart fields
         natureOfTransaction: tdsTcsRateChart?.natureOfTransaction || null,
         rate: tdsTcsRateChart?.rate || null,
 
+        // Authorised Signature
         authorisedSignatureImage:
           authorisedSignature?.authorisedSignatureImage || null,
       };
@@ -100,7 +110,7 @@ async function getAllBySchoolId(req, res) {
 
     return res.status(200).json({
       hasError: false,
-      message: "Receipts fetched successfully with vendor and ledger info.",
+      message: "Receipts fetched successfully with ledger info.",
       data: formattedData,
     });
   } catch (error) {

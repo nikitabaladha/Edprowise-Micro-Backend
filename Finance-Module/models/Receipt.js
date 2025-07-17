@@ -6,18 +6,18 @@ const ReceiptSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    receiptDate: { type: Date },
+    academicYear: {
+      type: String,
+      required: true,
+    },
+    receiptVoucherNumber: { type: String, required: true },
+
     entryDate: { type: Date },
+    receiptDate: { type: Date },
     narration: { type: String },
-    receiptImage: {
-      type: String,
-    },
-    chequeImage: {
-      type: String,
-    },
     paymentMode: {
       type: String,
-      enum: ["Cash", "Online", "Cheque"],
+      enum: ["Cash", "Online", "Cheque", ""],
     },
     chequeNumber: {
       type: String,
@@ -25,7 +25,6 @@ const ReceiptSchema = new mongoose.Schema(
     transactionNumber: {
       type: String,
     },
-    receiptVoucherNumber: { type: String },
     itemDetails: [
       {
         itemName: {
@@ -44,6 +43,7 @@ const ReceiptSchema = new mongoose.Schema(
     },
     TDSorTCS: {
       type: String,
+
       enum: ["TDS", "TCS"],
     },
     TDSTCSRateChartId: { type: String },
@@ -57,16 +57,17 @@ const ReceiptSchema = new mongoose.Schema(
     totalAmount: {
       type: Number,
     },
+    receiptImage: {
+      type: String,
+    },
+    chequeImageForReceipt: { type: String },
     ledgerIdWithPaymentMode: {
       type: String,
     },
     status: {
       type: String,
-      enum: ["Posted", "Draft", "Reversed", "Cancelled"],
-    },
-    academicYear: {
-      type: String,
       required: true,
+      enum: ["Posted", "Draft", "Reversed", "Cancelled"],
     },
   },
   {

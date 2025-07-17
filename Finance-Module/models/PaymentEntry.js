@@ -79,7 +79,7 @@ const PaymentEntrySchema = new mongoose.Schema(
     invoiceImage: {
       type: String,
     },
-    chequeImage: {},
+    chequeImage: { type: String },
     ledgerIdWithPaymentMode: {
       type: String,
     },

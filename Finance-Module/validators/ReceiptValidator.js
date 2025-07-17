@@ -24,6 +24,16 @@ const academicYearUpdate = Joi.string().allow("").optional().messages({
   "string.empty": "Academic Year cannot be empty.",
 });
 
+const receiptImage = Joi.string().allow("").optional().messages({
+  "string.base": "Receipt Image must be a string",
+  "string.empty": "Receipt Image cannot be empty",
+});
+
+const chequeImageForReceipt = Joi.string().allow("").optional().messages({
+  "string.base": "chequeImage must be a string",
+  "string.empty": "chequeImage cannot be empty",
+});
+
 const entryDate = Joi.date()
   .required()
   .custom(validateFutureOrTodayDate)
@@ -31,6 +41,11 @@ const entryDate = Joi.date()
     "any.required": "Entry date is required",
     "date.base": "Entry date must be a valid date",
   });
+
+const receiptDate = Joi.date().required().messages({
+  "any.required": "Receipt date is required",
+  "date.base": "Receipt date must be a valid date",
+});
 
 const narration = Joi.string().required().messages({
   "any.required": "Narration is required",
@@ -104,7 +119,7 @@ const TDSTCSRate = Joi.number().required().messages({
 
 const TDSTCSRateWithAmount = Joi.number().required().messages({
   "any.required": "TDS/TCS rate with amount is required.",
-  "number.base": "TDS/TCS rate must be a number.",
+  "number.base": "TDS/TCS rate with amount must be a number.",
 });
 
 const adjustmentValue = Joi.number().required().messages({
@@ -135,6 +150,7 @@ const status = Joi.string()
 
 const ReceiptValidator = Joi.object({
   entryDate,
+  receiptDate,
   narration,
   paymentMode,
   chequeNumber,
@@ -154,6 +170,7 @@ const ReceiptValidator = Joi.object({
 
 const ReceiptValidatorUpdate = Joi.object({
   entryDate,
+  receiptDate,
   narration,
   paymentMode,
   chequeNumber,
@@ -169,6 +186,8 @@ const ReceiptValidatorUpdate = Joi.object({
   ledgerIdWithPaymentMode,
   status,
   academicYear: academicYearUpdate,
+  receiptImage,
+  chequeImageForReceipt,
 });
 
 export default {

@@ -1,7 +1,6 @@
 import moment from "moment";
 
 import Receipt from "../../../models/Receipt.js";
-import ReceiptValidator from "../../../validators/ReceiptValidator.js";
 
 async function generateReceiptVoucherNumber(schoolId, academicYear) {
   const count = await Receipt.countDocuments({ schoolId, academicYear });
@@ -25,7 +24,7 @@ async function generateTransactionNumber() {
   return transactionNumber;
 }
 
-async function create(req, res) {
+async function draft(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
@@ -33,15 +32,6 @@ async function create(req, res) {
       return res.status(401).json({
         hasError: true,
         message: "Access denied: You do not have permission.",
-      });
-    }
-
-    const { error } = ReceiptValidator.ReceiptValidator.validate(req.body);
-    if (error) {
-      const errorMessages = error.details.map((err) => err.message).join(", ");
-      return res.status(400).json({
-        hasError: true,
-        message: errorMessages,
       });
     }
 
@@ -62,39 +52,43 @@ async function create(req, res) {
       academicYear,
     } = req.body;
 
+    if (!academicYear || academicYear.trim() === "") {
+      return res.status(400).json({
+        hasError: true,
+        message: "Academic year is required.",
+      });
+    }
+
     const receiptVoucherNumber = await generateReceiptVoucherNumber(
       schoolId,
       academicYear
     );
 
-    const { receiptImage, chequeImageForReceipt } = req.files || {};
+    const { receiptImage, chequeImage } = req.files || {};
 
-    if (!receiptImage?.[0]) {
-      return res.status(400).json({
-        hasError: true,
-        message: "Receipt Image is required.",
-      });
-    }
-
-    const receiptImagePath = receiptImage[0].mimetype.startsWith("image/")
+    const receiptImagePath = receiptImage?.[0]?.mimetype?.startsWith("image/")
       ? "/Images/FinanceModule/ReceiptImage"
       : "/Documents/FinanceModule/ReceiptImage";
 
-    const receiptImageFullPath = `${receiptImagePath}/${receiptImage[0].filename}`;
-
-    const chequeImageForReceiptPath =
-      chequeImageForReceipt?.[0]?.mimetype.startsWith("image/")
-        ? "/Images/FinanceModule/chequeImageForReceipt"
-        : "/Documents/FinanceModule/chequeImageForReceipt";
-
-    const chequeImageForReceiptFullPath = chequeImageForReceipt?.[0]
-      ? `${chequeImageForReceiptPath}/${chequeImageForReceipt[0].filename}`
+    const receiptImageFullPath = receiptImage?.[0]
+      ? `${receiptImagePath}/${receiptImage[0].filename}`
       : null;
 
-    const updatedItemDetails = itemDetails.map((item) => ({
-      ...item,
-      amount: parseFloat(item.amount) || 0,
-    }));
+    const chequeImagePath = chequeImage?.[0]?.mimetype?.startsWith("image/")
+      ? "/Images/FinanceModule/ChequeImage"
+      : "/Documents/FinanceModule/ChequeImage";
+
+    const chequeImageFullPath = chequeImage?.[0]
+      ? `${chequeImagePath}/${chequeImage[0].filename}`
+      : null;
+
+    const updatedItemDetails = itemDetails.map((item) => {
+      const amount = parseFloat(item.amount) || 0;
+      return {
+        ...item,
+        amount,
+      };
+    });
 
     const subTotalAmount = updatedItemDetails.reduce(
       (sum, item) => sum + (parseFloat(item.amount) || 0),
@@ -111,6 +105,7 @@ async function create(req, res) {
 
     const newReceipt = new Receipt({
       schoolId,
+      academicYear,
       receiptVoucherNumber,
       entryDate,
       receiptDate,
@@ -123,21 +118,20 @@ async function create(req, res) {
       TDSorTCS,
       TDSTCSRateChartId,
       TDSTCSRate,
-      TDSTCSRateWithAmount,
+      TDSTCSRateWithAmount: parseFloat(TDSTCSRateWithAmount) || 0,
       adjustmentValue: parseFloat(adjustmentValue) || 0,
       totalAmount,
       receiptImage: receiptImageFullPath,
-      chequeImageForReceipt: chequeImageForReceiptFullPath,
+      chequeImage: chequeImageFullPath,
       ledgerIdWithPaymentMode,
       status,
-      academicYear,
     });
 
     await newReceipt.save();
 
     return res.status(201).json({
       hasError: false,
-      message: "Receipt created successfully!",
+      message: "Receipt drafted successfully!",
       data: newReceipt,
     });
   } catch (error) {
@@ -151,7 +145,7 @@ async function create(req, res) {
       });
     }
 
-    console.error("Error creating Receipt:", error);
+    console.error("Error drafting Receipt:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",
@@ -159,4 +153,4 @@ async function create(req, res) {
   }
 }
 
-export default create;
+export default draft;

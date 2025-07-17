@@ -34,6 +34,7 @@ const LedgerSchema = new mongoose.Schema(
       enum: ["Not Defined", "Cash", "Online", "Cheque"],
       default: "Not Defined",
     },
+    ledgerCode: { type: String },
     academicYear: {
       type: String,
       required: true,

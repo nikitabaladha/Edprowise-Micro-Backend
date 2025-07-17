@@ -1,6 +1,5 @@
 import moment from "moment";
 import Receipt from "../../../models/Receipt.js";
-import ReceiptValidator from "../../../validators/ReceiptValidator.js";
 
 async function generateTransactionNumber() {
   const now = moment();
@@ -27,17 +26,6 @@ async function updateById(req, res) {
       return res.status(401).json({
         hasError: true,
         message: "Access denied: Unauthorized request.",
-      });
-    }
-
-    const { error } = ReceiptValidator.ReceiptValidatorUpdate.validate(
-      req.body
-    );
-    if (error) {
-      const errorMessages = error.details.map((err) => err.message).join(", ");
-      return res.status(400).json({
-        hasError: true,
-        message: errorMessages,
       });
     }
 
@@ -131,7 +119,7 @@ async function updateById(req, res) {
 
     return res.status(200).json({
       hasError: false,
-      message: "Receipt updated successfully!",
+      message: "Receipt  draft updated successfully!",
       data: existingReceipt,
     });
   } catch (error) {
@@ -145,7 +133,7 @@ async function updateById(req, res) {
       });
     }
 
-    console.error("Error updating Receipt Entry:", error);
+    console.error("Error updating Receipt Draft:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",
