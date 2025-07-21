@@ -7,6 +7,7 @@ import PaymentEntryRoutes from "./PaymentEntry.js";
 import ReceiptRoutes from "./Receipt.js";
 import AuthorisedSignatureRoutes from "./AuthorisedSignature.js";
 import AllLedgerRoutes from "./AllLedgers.js";
+import ContraRoutes from "./Contra.js";
 
 export default (app) => {
   app.use("/api", ledgerRoutes);
@@ -17,4 +18,5 @@ export default (app) => {
   app.use("/api", AuthorisedSignatureRoutes);
   app.use("/api", FinanceModuleYearRoutes);
   app.use("/api", AllLedgerRoutes);
+  app.use("/api", ContraRoutes);
 };

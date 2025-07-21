@@ -47,7 +47,7 @@ async function create(req, res) {
       Assets: 1000,
       Liabilities: 2000,
       Income: 3000,
-      Expenditure: 4000,
+      Expenses: 4000,
     };
 
     const baseCode = typeToBaseCode[headOfAccount.headOfAccountName];

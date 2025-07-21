@@ -23,6 +23,7 @@ async function getAllBySchoolId(req, res) {
       _id: ledger._id,
       schoolId: ledger.schoolId,
       ledgerName: ledger.ledgerName,
+      ledgerCode: ledger.ledgerCode,
       openingBalance: ledger.openingBalance,
       headOfAccountId: ledger.headOfAccountId?._id ?? null,
       headOfAccountName: ledger.headOfAccountId?.headOfAccountName ?? null,

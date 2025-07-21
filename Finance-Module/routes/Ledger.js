@@ -139,6 +139,8 @@ import {
   updatePaymentModeById,
   getAllByPaymentMode,
   findLedgerByName,
+  getAllLedgerByBankName,
+  getAllLedgerByCashName,
 } from "../controllers/Setting/Ledger/Ledger/index.js";
 
 router.post("/create-ledger", roleBasedMiddleware("School"), createLedger);
@@ -153,6 +155,18 @@ router.get(
   "/get-all-ledger-by-name/:academicYear",
   roleBasedMiddleware("School"),
   getAllLedgerByName
+);
+
+router.get(
+  "/get-all-ledger-by-bank-name/:academicYear",
+  roleBasedMiddleware("School"),
+  getAllLedgerByBankName
+);
+
+router.get(
+  "/get-ledger-by-cash-name/:academicYear",
+  roleBasedMiddleware("School"),
+  getAllLedgerByCashName
 );
 
 router.get(
