@@ -8,6 +8,7 @@ import ReceiptRoutes from "./Receipt.js";
 import AuthorisedSignatureRoutes from "./AuthorisedSignature.js";
 import AllLedgerRoutes from "./AllLedgers.js";
 import ContraRoutes from "./Contra.js";
+import JournalRoutes from "./Journal.js";
 
 export default (app) => {
   app.use("/api", ledgerRoutes);
@@ -19,4 +20,5 @@ export default (app) => {
   app.use("/api", FinanceModuleYearRoutes);
   app.use("/api", AllLedgerRoutes);
   app.use("/api", ContraRoutes);
+  app.use("/api", JournalRoutes);
 };

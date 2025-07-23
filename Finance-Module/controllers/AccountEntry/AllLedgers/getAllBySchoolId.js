@@ -1,6 +1,7 @@
 import PaymentEntry from "../../../models/PaymentEntry.js";
 import Receipt from "../../../models/Receipt.js";
 import Contra from "../../../models/Contra.js";
+import Journal from "../../../models/Journal.js";
 import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
 import mongoose from "mongoose";
@@ -26,6 +27,10 @@ async function getAllBySchoolId(req, res) {
       .lean();
 
     const contraEntries = await Contra.find({ schoolId, academicYear })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const JournalEntries = await Journal.find({ schoolId, academicYear })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -270,8 +275,6 @@ async function getAllBySchoolId(req, res) {
     }
 
     // Find Contra Entries
-
-    // Find Contra Entries
     for (const entry of contraEntries) {
       const itemsWithLedgerNames = [];
 
@@ -406,6 +409,98 @@ async function getAllBySchoolId(req, res) {
         updatedAt: entry.updatedAt,
         TDSorTCSGroupLedgerName,
         TDSorTCSLedgerName,
+        itemDetails: itemsWithLedgerNames,
+      };
+
+      formattedData.push(entryData);
+    }
+
+    // Find Journal Entries
+
+    for (const entry of JournalEntries) {
+      const itemsWithLedgerNames = [];
+
+      for (const item of entry.itemDetails) {
+        let ledger = null;
+        if (item.ledgerId && mongoose.Types.ObjectId.isValid(item.ledgerId)) {
+          ledger = await Ledger.findOne({
+            _id: item.ledgerId,
+            schoolId,
+          })
+            .select("ledgerName groupLedgerId")
+            .lean();
+        }
+
+        let groupLedger = null;
+        if (ledger?.groupLedgerId) {
+          groupLedger = await GroupLedger.findOne({
+            _id: ledger.groupLedgerId,
+            schoolId,
+          })
+            .select("groupLedgerName")
+            .lean();
+        }
+
+        itemsWithLedgerNames.push({
+          description: item.description,
+          ledgerId: item.ledgerId || null,
+          debitAmount: item.debitAmount,
+          creditAmount: item.creditAmount,
+          ledgerName: ledger?.ledgerName || null,
+          groupLedgerId: ledger?.groupLedgerId || null,
+          groupLedgerName: groupLedger?.groupLedgerName || null,
+        });
+      }
+
+      let TDSorTCSGroupLedgerName = null;
+      let TDSorTCSLedgerName = null;
+
+      if (entry.TDSorTCS) {
+        // 1. Find GroupLedger by name
+        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+          schoolId,
+          groupLedgerName: entry.TDSorTCS,
+        })
+          .select("_id groupLedgerName")
+          .lean();
+
+        if (tdsOrTcsGroupLedger) {
+          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+
+          // 2. Find Ledger under that GroupLedger
+          const tdsOrTcsLedger = await Ledger.findOne({
+            schoolId,
+            groupLedgerId: tdsOrTcsGroupLedger._id,
+          })
+            .select("ledgerName")
+            .lean();
+
+          if (tdsOrTcsLedger) {
+            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+          }
+        }
+      }
+
+      const entryData = {
+        accountingEntry: "Journal",
+        _id: entry._id,
+        schoolId: entry.schoolId,
+        entryDate: entry.entryDate,
+        narration: entry.narration,
+        subTotalOfDebit: entry.subTotalOfDebit,
+        TDSTCSRateWithDebitAmount: entry.TDSTCSRateWithDebitAmount,
+        TDSTCSRateWithCreditAmount: entry.TDSTCSRateWithCreditAmount,
+        totalAmountOfDebit: entry.totalAmountOfDebit,
+        totalAmountOfCredit: entry.totalAmountOfCredit,
+        journalVoucherNumber: entry.journalVoucherNumber || null,
+        TDSorTCS: entry.TDSorTCS,
+        createdAt: entry.createdAt,
+        updatedAt: entry.updatedAt,
+
+        TDSorTCSGroupLedgerName,
+        TDSorTCSLedgerName,
+
+        // Item details
         itemDetails: itemsWithLedgerNames,
       };
 
