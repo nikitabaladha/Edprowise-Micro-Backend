@@ -7,6 +7,7 @@ import {
   getAllBySchoolId,
   getAllPaymentEntryBySchoolId,
   getAllReceiptBySchoolId,
+  getAllContraBySchoolId,
 } from "../controllers/AccountEntry/AllLedgers/index.js";
 
 router.get(
@@ -25,6 +26,12 @@ router.get(
   "/get-only-receipt/:academicYear",
   roleBasedMiddleware("School"),
   getAllReceiptBySchoolId
+);
+
+router.get(
+  "/get-only-contra/:academicYear",
+  roleBasedMiddleware("School"),
+  getAllContraBySchoolId
 );
 
 export default router;

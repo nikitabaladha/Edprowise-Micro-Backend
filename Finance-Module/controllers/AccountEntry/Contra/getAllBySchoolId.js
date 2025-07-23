@@ -53,6 +53,7 @@ async function getAllBySchoolId(req, res) {
       const itemsWithLedgerNames = entry.itemDetails.map((item) => ({
         ledgerId: item.ledgerId || null,
         ledgerName: ledgerMap[item.ledgerId?.toString()] || null,
+        ledgerIdOfCashAccount: item.ledgerIdOfCashAccount || null,
         ledgerNameOfCashAccount:
           ledgerMap[item.ledgerIdOfCashAccount?.toString()] || null,
         debitAmount: item.debitAmount || 0,
