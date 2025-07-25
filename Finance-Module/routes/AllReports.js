@@ -8,6 +8,7 @@ import {
   getAllBankBookBySchoolId,
   getAllIncomeBookBySchoolId,
   getAllExpensesBookBySchoolId,
+  getAllJournalWIthoutBankCashBySchoolId,
 } from "../controllers/Reports/index.js";
 
 router.get(
@@ -32,6 +33,12 @@ router.get(
   "/get-all-expenses-book-entry/:academicYear",
   roleBasedMiddleware("School"),
   getAllExpensesBookBySchoolId
+);
+
+router.get(
+  "/get-all-journal-without-bank-cash-entry/:academicYear",
+  roleBasedMiddleware("School"),
+  getAllJournalWIthoutBankCashBySchoolId
 );
 
 export default router;
