@@ -18,19 +18,35 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    const paymentEntries = await PaymentEntry.find({ schoolId, academicYear })
+    const paymentEntries = await PaymentEntry.find({
+      schoolId,
+      academicYear,
+      status: "Posted",
+    })
       .sort({ createdAt: -1 })
       .lean();
 
-    const receiptEntries = await Receipt.find({ schoolId, academicYear })
+    const receiptEntries = await Receipt.find({
+      schoolId,
+      academicYear,
+      status: "Posted",
+    })
       .sort({ createdAt: -1 })
       .lean();
 
-    const contraEntries = await Contra.find({ schoolId, academicYear })
+    const contraEntries = await Contra.find({
+      schoolId,
+      academicYear,
+      status: "Posted",
+    })
       .sort({ createdAt: -1 })
       .lean();
 
-    const JournalEntries = await Journal.find({ schoolId, academicYear })
+    const JournalEntries = await Journal.find({
+      schoolId,
+      academicYear,
+      status: "Posted",
+    })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -275,6 +291,7 @@ async function getAllBySchoolId(req, res) {
     }
 
     // Find Contra Entries
+
     for (const entry of contraEntries) {
       const itemsWithLedgerNames = [];
 
@@ -486,6 +503,7 @@ async function getAllBySchoolId(req, res) {
         _id: entry._id,
         schoolId: entry.schoolId,
         entryDate: entry.entryDate,
+        documentDate: entry.documentDate,
         narration: entry.narration,
         subTotalOfDebit: entry.subTotalOfDebit,
         TDSTCSRateWithDebitAmount: entry.TDSTCSRateWithDebitAmount,

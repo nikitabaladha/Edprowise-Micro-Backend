@@ -12,6 +12,7 @@ const JournalSchema = new mongoose.Schema(
     },
     journalVoucherNumber: { type: String, required: true },
     entryDate: { type: Date },
+    documentDate: { type: Date },
     itemDetails: [
       {
         ledgerId: {
@@ -51,6 +52,9 @@ const JournalSchema = new mongoose.Schema(
     },
     totalAmountOfCredit: {
       type: Number,
+    },
+    documentImage: {
+      type: String,
     },
     narration: { type: String },
     status: {

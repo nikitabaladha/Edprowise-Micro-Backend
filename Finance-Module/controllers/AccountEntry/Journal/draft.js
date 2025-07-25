@@ -19,6 +19,7 @@ export async function draft(req, res) {
 
     const {
       entryDate,
+      documentDate,
       narration,
       itemDetails,
       TDSorTCS,
@@ -32,6 +33,16 @@ export async function draft(req, res) {
       schoolId,
       academicYear
     );
+
+    const { documentImage } = req.files || {};
+
+    const documentImagePath = documentImage?.[0]?.mimetype.startsWith("image/")
+      ? "/Images/FinanceModule/DocumentImageForJournal"
+      : "/Documents/FinanceModule/DocumentImageForJournal";
+
+    const documentImageFullPath = documentImage?.[0]
+      ? `${documentImagePath}/${documentImage[0].filename}`
+      : null;
 
     const updatedItemDetails = itemDetails.map((item) => ({
       ...item,
@@ -59,6 +70,7 @@ export async function draft(req, res) {
       schoolId,
       journalVoucherNumber: JournalVoucherNumber,
       entryDate,
+      documentDate,
       narration,
       itemDetails: updatedItemDetails,
       subTotalOfCredit: subTotalOfCredit,
@@ -68,6 +80,7 @@ export async function draft(req, res) {
       TDSTCSRateWithCreditAmount,
       totalAmountOfDebit,
       totalAmountOfCredit,
+      documentImage: documentImageFullPath,
       status,
       academicYear,
     });

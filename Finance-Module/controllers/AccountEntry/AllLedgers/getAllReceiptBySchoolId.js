@@ -15,7 +15,11 @@ async function getAllReceiptBySchoolId(req, res) {
       });
     }
 
-    const receiptEntries = await Receipt.find({ schoolId, academicYear })
+    const receiptEntries = await Receipt.find({
+      schoolId,
+      academicYear,
+      status: "Posted",
+    })
       .sort({ createdAt: -1 })
       .lean();
 

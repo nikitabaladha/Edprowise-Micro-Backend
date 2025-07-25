@@ -9,7 +9,7 @@ async function generateTransactionNumber() {
   let transactionNumber = baseTransactionNumber;
   let counter = 1;
 
-  while (await PaymentEntry.exists({ transactionNumber })) {
+  while (await Receipt.exists({ transactionNumber })) {
     const suffix = String(counter).padStart(2, "0");
     transactionNumber = `${baseTransactionNumber}${suffix}`;
     counter++;

@@ -32,6 +32,16 @@ const entryDate = Joi.date()
     "date.base": "Entry date must be a valid date",
   });
 
+const documentDate = Joi.date().required().messages({
+  "any.required": "Document date is required",
+  "date.base": "Document date must be a valid date",
+});
+
+const documentImage = Joi.string().allow("").optional().messages({
+  "string.base": "Document Image must be a string",
+  "string.empty": "Document Image cannot be empty",
+});
+
 const itemDetails = Joi.array()
   .items(
     Joi.object({
@@ -115,6 +125,7 @@ const status = Joi.string()
 
 const JournalValidator = Joi.object({
   entryDate,
+  documentDate,
   narration,
   itemDetails,
   subTotalOfDebit,
@@ -130,6 +141,7 @@ const JournalValidator = Joi.object({
 
 const JournalValidatorUpdate = Joi.object({
   entryDate,
+  documentDate,
   narration,
   itemDetails,
   subTotalOfDebit,
@@ -139,6 +151,7 @@ const JournalValidatorUpdate = Joi.object({
   TDSTCSRateWithCreditAmount,
   totalAmountOfCredit,
   totalAmountOfDebit,
+  documentImage,
   status,
   academicYear: academicYearUpdate,
 });

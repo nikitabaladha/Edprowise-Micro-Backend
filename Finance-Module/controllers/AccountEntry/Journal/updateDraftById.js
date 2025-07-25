@@ -14,6 +14,7 @@ export async function updateById(req, res) {
 
     const {
       entryDate,
+      documentDate,
       narration,
       itemDetails,
       TDSorTCS,
@@ -33,6 +34,17 @@ export async function updateById(req, res) {
         hasError: true,
         message: "Journal not found.",
       });
+    }
+
+    // Handle uploaded files (if provided)
+    const { documentImage } = req.files || {};
+
+    if (documentImage?.[0]) {
+      const documentImagePath = documentImage[0].mimetype.startsWith("image/")
+        ? "/Images/FinanceModule/DocumentImageForJournal"
+        : "/Documents/FinanceModule/DocumentImageForJournal";
+
+      existingJournal.documentImage = `${documentImagePath}/${documentImage[0].filename}`;
     }
 
     const updatedItemDetails = itemDetails.map((item) => ({
@@ -59,6 +71,7 @@ export async function updateById(req, res) {
 
     // Update fields
     existingJournal.entryDate = entryDate || existingJournal.entryDate;
+    existingJournal.documentDate = documentDate || existingJournal.documentDate;
     existingJournal.itemDetails = updatedItemDetails;
     existingJournal.subTotalOfDebit = subTotalOfDebit;
     existingJournal.subTotalOfCredit = subTotalOfCredit;

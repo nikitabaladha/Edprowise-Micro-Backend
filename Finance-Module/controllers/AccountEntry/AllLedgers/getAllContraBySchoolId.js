@@ -15,7 +15,11 @@ async function getAllContraBySchoolId(req, res) {
       });
     }
 
-    const contraEntries = await Contra.find({ schoolId, academicYear })
+    const contraEntries = await Contra.find({
+      schoolId,
+      academicYear,
+      status: "Posted",
+    })
       .sort({ createdAt: -1 })
       .lean();
 

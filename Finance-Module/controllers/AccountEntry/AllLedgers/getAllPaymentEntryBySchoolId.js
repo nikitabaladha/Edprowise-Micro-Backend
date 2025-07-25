@@ -15,7 +15,11 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    const paymentEntries = await PaymentEntry.find({ schoolId, academicYear })
+    const paymentEntries = await PaymentEntry.find({
+      schoolId,
+      academicYear,
+      status: "Posted",
+    })
       .sort({ createdAt: -1 })
       .lean();
 

@@ -56,6 +56,7 @@ async function getAllBySchoolId(req, res) {
         _id: entry._id,
         schoolId: entry.schoolId,
         entryDate: entry.entryDate,
+        documentDate: entry.documentDate,
         narration: entry.narration,
         subTotalOfDebit: entry.subTotalOfDebit,
         subTotalOfCredit: entry.subTotalOfCredit,
@@ -66,6 +67,8 @@ async function getAllBySchoolId(req, res) {
         totalAmountOfDebit: entry.totalAmountOfDebit,
         status: entry.status || null,
         journalVoucherNumber: entry.journalVoucherNumber || null,
+        documentImage: entry.documentImage || null,
+
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
 

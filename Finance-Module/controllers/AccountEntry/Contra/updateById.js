@@ -99,7 +99,7 @@ export async function updateById(req, res) {
         return res.status(400).json({
           hasError: true,
           message:
-            "ledgerIdOfCashAccount is required for Cash Deposited or Cash Withdrawn entries.",
+            "LedgerId Of CashAccount is required for Cash Deposited or Cash Withdrawn entries.",
         });
       }
 
