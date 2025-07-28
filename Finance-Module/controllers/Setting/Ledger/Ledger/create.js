@@ -67,13 +67,18 @@ async function create(req, res) {
 
     const ledgerCode = baseCode + counter.lastLedgerCode;
 
+    const isAssetOrLiability = ["Assets", "Liabilities"].includes(
+      headOfAccount.headOfAccountName
+    );
+    const finalOpeningBalance = isAssetOrLiability ? openingBalance || 0 : 0;
+
     const newLedger = new Ledger({
       schoolId,
       headOfAccountId,
       groupLedgerId,
       bSPLLedgerId,
       ledgerName,
-      openingBalance: openingBalance ?? 0,
+      openingBalance: finalOpeningBalance,
       academicYear,
       ledgerCode: ledgerCode.toString(),
     });
