@@ -28,7 +28,6 @@ const VendorSchema = new mongoose.Schema(
     },
     gstNumber: {
       type: String,
-      required: true,
       // unique: true,
     },
     address: {
@@ -63,6 +62,13 @@ const VendorSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    openingBalance: {
+      type: Number,
+      default: 0,
+    },
+    paymentTerms: { type: Number },
+    documentImage: { type: String },
+    ledgerId: { type: String },
   },
   {
     timestamps: true,

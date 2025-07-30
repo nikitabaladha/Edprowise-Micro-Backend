@@ -19,6 +19,7 @@ const TDSTCSRateChartSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    guidance: { type: String },
     academicYear: {
       type: String,
       required: true,

@@ -10,6 +10,8 @@ import AllLedgerRoutes from "./AllLedgers.js";
 import ContraRoutes from "./Contra.js";
 import JournalRoutes from "./Journal.js";
 
+import FinancialInformationRoutes from "./FinancialInformation.js";
+
 import ReportsRoutes from "./AllReports.js";
 
 export default (app) => {
@@ -24,4 +26,5 @@ export default (app) => {
   app.use("/api", ContraRoutes);
   app.use("/api", JournalRoutes);
   app.use("/api", ReportsRoutes);
+  app.use("/api", FinancialInformationRoutes);
 };

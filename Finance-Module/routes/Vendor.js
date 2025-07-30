@@ -2,6 +2,8 @@ import express from "express";
 const router = express.Router();
 import roleBasedMiddleware from "../middleware/index.js";
 
+import upload from "../UploadFiles/DocumentImageFilesForVendor.js";
+
 import {
   createVendor,
   getAllVendorBySchoolId,
@@ -10,7 +12,12 @@ import {
   getOneByVendorCode,
 } from "../controllers/Setting/Vendor/index.js";
 
-router.post("/create-Vendor", roleBasedMiddleware("School"), createVendor);
+router.post(
+  "/create-Vendor",
+  upload,
+  roleBasedMiddleware("School"),
+  createVendor
+);
 
 router.get(
   "/get-all-vendor/:academicYear",
@@ -26,6 +33,7 @@ router.get(
 
 router.put(
   "/update-vendor-by-id/:id/:academicYear",
+  upload,
   roleBasedMiddleware("School"),
   updateVendorById
 );

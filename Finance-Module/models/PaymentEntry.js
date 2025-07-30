@@ -64,9 +64,7 @@ const PaymentEntrySchema = new mongoose.Schema(
     TDSTCSRateWithAmountBeforeGST: {
       type: Number,
     },
-    adjustmentValue: {
-      type: Number,
-    },
+
     totalAmountBeforeGST: {
       type: Number,
     },

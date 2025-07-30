@@ -51,7 +51,6 @@ async function updateById(req, res) {
       TDSorTCS,
       TDSTCSRateChartId,
       TDSTCSRate,
-      adjustmentValue,
       TDSTCSRateWithAmount,
       ledgerIdWithPaymentMode,
       status,
@@ -99,10 +98,8 @@ async function updateById(req, res) {
     );
 
     const parsedTDSTCSRateWithAmount = parseFloat(TDSTCSRateWithAmount) || 0;
-    const parsedAdjustmentValue = parseFloat(adjustmentValue) || 0;
 
-    const totalAmount =
-      subTotalAmount - parsedTDSTCSRateWithAmount + parsedAdjustmentValue;
+    const totalAmount = subTotalAmount - parsedTDSTCSRateWithAmount;
 
     // Update fields
     existingReceipt.entryDate = entryDate || existingReceipt.entryDate;
@@ -116,7 +113,6 @@ async function updateById(req, res) {
       TDSTCSRateChartId || existingReceipt.TDSTCSRateChartId;
     existingReceipt.TDSTCSRate = TDSTCSRate || existingReceipt.TDSTCSRate;
     existingReceipt.TDSTCSRateWithAmount = parsedTDSTCSRateWithAmount;
-    existingReceipt.adjustmentValue = parsedAdjustmentValue;
     existingReceipt.subTotalAmount = subTotalAmount;
     existingReceipt.totalAmount = totalAmount;
     existingReceipt.ledgerIdWithPaymentMode =

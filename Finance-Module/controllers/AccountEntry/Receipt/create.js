@@ -55,7 +55,6 @@ async function create(req, res) {
       TDSorTCS,
       TDSTCSRateChartId,
       TDSTCSRate,
-      adjustmentValue,
       status,
       TDSTCSRateWithAmount,
       ledgerIdWithPaymentMode,
@@ -102,9 +101,7 @@ async function create(req, res) {
     );
 
     const totalAmount =
-      subTotalAmount -
-      (parseFloat(TDSTCSRateWithAmount) || 0) +
-      (parseFloat(adjustmentValue) || 0);
+      subTotalAmount - (parseFloat(TDSTCSRateWithAmount) || 0);
 
     const transactionNumber =
       paymentMode === "Online" ? await generateTransactionNumber() : null;
@@ -124,7 +121,6 @@ async function create(req, res) {
       TDSTCSRateChartId,
       TDSTCSRate,
       TDSTCSRateWithAmount,
-      adjustmentValue: parseFloat(adjustmentValue) || 0,
       totalAmount,
       receiptImage: receiptImageFullPath,
       chequeImageForReceipt: chequeImageForReceiptFullPath,

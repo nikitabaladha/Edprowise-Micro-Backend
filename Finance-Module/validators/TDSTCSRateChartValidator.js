@@ -30,10 +30,15 @@ const rate = Joi.number().min(0).required().messages({
   "any.required": `"Rate" is required`,
 });
 
+const guidance = Joi.string().allow("").optional().messages({
+  "string.base": "Guidance must be a string",
+});
+
 const TDSTCSRateChartValidator = Joi.object({
   TDSorTCS,
   rate,
   natureOfTransaction,
+  guidance,
   academicYear: academicYearCreate,
 });
 
@@ -41,6 +46,7 @@ const TDSTCSRateChartValidatorUpdate = Joi.object({
   TDSorTCS,
   rate,
   natureOfTransaction,
+  guidance,
   academicYear: academicYearUpdate,
 });
 

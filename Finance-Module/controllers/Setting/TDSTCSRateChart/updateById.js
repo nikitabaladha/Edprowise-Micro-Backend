@@ -26,7 +26,7 @@ async function updateById(req, res) {
       });
     }
 
-    const { TDSorTCS, rate, natureOfTransaction } = req.body;
+    const { TDSorTCS, rate, natureOfTransaction, guidance } = req.body;
 
     const existingTDSTCSRateChart = await TDSTCSRateChart.findOne({
       _id: id,
@@ -47,6 +47,9 @@ async function updateById(req, res) {
 
     existingTDSTCSRateChart.natureOfTransaction =
       natureOfTransaction || existingTDSTCSRateChart.natureOfTransaction;
+
+    existingTDSTCSRateChart.guidance =
+      guidance || existingTDSTCSRateChart.guidance;
 
     await existingTDSTCSRateChart.save();
 

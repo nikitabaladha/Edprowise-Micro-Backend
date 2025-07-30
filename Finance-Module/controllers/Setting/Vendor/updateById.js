@@ -1,5 +1,6 @@
 import Vendor from "../../../models/Vendor.js";
 import VendorValidator from "../../../validators/VendorValidator.js";
+import Ledger from "../../../models/Ledger.js";
 
 async function updateById(req, res) {
   try {
@@ -34,6 +35,8 @@ async function updateById(req, res) {
       ifscCode,
       accountNumber,
       accountType,
+      openingBalance,
+      paymentTerms,
     } = req.body;
 
     const existingVendor = await Vendor.findOne({
@@ -48,7 +51,22 @@ async function updateById(req, res) {
       });
     }
 
+    const { documentImage } = req.files || {};
+
+    if (documentImage?.[0]) {
+      const documentImagePath = documentImage[0].mimetype.startsWith("image/")
+        ? "/Images/FinanceModule/DocumentImageForVendor"
+        : "/Documents/FinanceModule/DocumentImageForVendor";
+      existingVendor.documentImage = `${documentImagePath}/${documentImage[0].filename}`;
+    }
+
+    const isNameChanged =
+      nameOfVendor && nameOfVendor !== existingVendor.nameOfVendor;
+
     existingVendor.nameOfVendor = nameOfVendor || existingVendor.nameOfVendor;
+    // see if new nameOfVendor then you must need to change the LedgerName also
+    // so what to do for that?
+
     existingVendor.email = email || existingVendor.email;
     existingVendor.contactNumber =
       contactNumber || existingVendor.contactNumber;
@@ -63,8 +81,17 @@ async function updateById(req, res) {
     existingVendor.accountNumber =
       accountNumber || existingVendor.accountNumber;
     existingVendor.accountType = accountType || existingVendor.accountType;
+    existingVendor.openingBalance =
+      openingBalance || existingVendor.openingBalance;
+    existingVendor.paymentTerms = paymentTerms || existingVendor.paymentTerms;
 
     await existingVendor.save();
+
+    if (isNameChanged && existingVendor.ledgerId) {
+      await Ledger.findByIdAndUpdate(existingVendor.ledgerId, {
+        ledgerName: existingVendor.nameOfVendor,
+      });
+    }
 
     return res.status(200).json({
       hasError: false,

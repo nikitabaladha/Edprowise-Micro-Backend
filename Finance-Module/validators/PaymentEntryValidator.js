@@ -1,17 +1,17 @@
 import Joi from "joi";
 
-const validateFutureOrTodayDate = (value, helpers) => {
-  const inputDate = new Date(value);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  inputDate.setHours(0, 0, 0, 0);
+// const validateFutureOrTodayDate = (value, helpers) => {
+//   const inputDate = new Date(value);
+//   const today = new Date();
+//   today.setHours(0, 0, 0, 0);
+//   inputDate.setHours(0, 0, 0, 0);
 
-  if (inputDate < today) {
-    return helpers.message("Entry date cannot be in the past");
-  }
+//   if (inputDate < today) {
+//     return helpers.message("Entry date cannot be in the past");
+//   }
 
-  return value;
-};
+//   return value;
+// };
 
 const academicYearCreate = Joi.string().required().messages({
   "string.base": "Academic Year must be a string.",
@@ -34,15 +34,31 @@ const chequeImage = Joi.string().allow("").optional().messages({
   "string.empty": "chequeImage cannot be empty",
 });
 
-const vendorCode = Joi.string().required().messages({
+// const vendorCode = Joi.string().required().messages({
+//   "any.required": "Vendor code is required",
+//   "string.base": "Vendor code must be a string",
+//   "string.empty": "Vendor code cannot be empty",
+// });
+
+const vendorCode = Joi.string().allow(null, "").messages({
   "any.required": "Vendor code is required",
   "string.base": "Vendor code must be a string",
   "string.empty": "Vendor code cannot be empty",
 });
 
+// const vendorId = Joi.string()
+//   .required()
+//   .regex(/^[0-9a-fA-F]{24}$/)
+//   .messages({
+//     "any.required": "Vendor ID is required",
+//     "string.base": "Vendor ID must be a string",
+//     "string.empty": "Vendor ID cannot be empty",
+//     "string.pattern.base": "Vendor ID must be a valid MongoDB ObjectId",
+//   });
+
 const vendorId = Joi.string()
-  .required()
   .regex(/^[0-9a-fA-F]{24}$/)
+  .allow(null, "")
   .messages({
     "any.required": "Vendor ID is required",
     "string.base": "Vendor ID must be a string",
@@ -50,13 +66,10 @@ const vendorId = Joi.string()
     "string.pattern.base": "Vendor ID must be a valid MongoDB ObjectId",
   });
 
-const entryDate = Joi.date()
-  .required()
-  .custom(validateFutureOrTodayDate)
-  .messages({
-    "any.required": "Entry date is required",
-    "date.base": "Entry date must be a valid date",
-  });
+const entryDate = Joi.date().required().messages({
+  "any.required": "Entry date is required",
+  "date.base": "Entry date must be a valid date",
+});
 
 const invoiceDate = Joi.date().required().messages({
   "any.required": "Invoice date is required",
@@ -73,7 +86,7 @@ const poNumber = Joi.string().allow(null, "").optional().messages({
   "string.base": "PO number must be a string",
 });
 
-const dueDate = Joi.date().required().messages({
+const dueDate = Joi.date().allow(null, "").optional().messages({
   "any.required": "Due date is required",
   "date.base": "Due date must be a valid date",
 });
@@ -140,14 +153,27 @@ const subTotalAmountAfterGST = Joi.number().required().messages({
   "number.base": "SubTotal Amount after GST must be a number.",
 });
 
-const TDSorTCS = Joi.string().valid("TDS", "TCS").required().messages({
-  "any.required": "TDS or TCS type is required.",
-  "any.only": "TDSorTCS must be either 'TDS' or 'TCS'.",
-  "string.base": "TDSorTCS must be a string.",
-});
+// const TDSorTCS = Joi.string().valid("TDS", "TCS").required().messages({
+//   "any.required": "TDS or TCS type is required.",
+//   "any.only": "TDSorTCS must be either 'TDS' or 'TCS'.",
+//   "string.base": "TDSorTCS must be a string.",
+// });
 
-const TDSTCSRateChartId = Joi.string().required().messages({
-  "any.required": "TDS/TCS rate chart ID is required.",
+const TDSorTCS = Joi.string()
+  .valid("TDS", "TCS")
+  .allow("")
+  .optional()
+  .messages({
+    "any.only": "TDSorTCS must be either 'TDS' or 'TCS'.",
+    "string.base": "TDSorTCS must be a string.",
+  });
+
+// const TDSTCSRateChartId = Joi.string().required().messages({
+//   "any.required": "TDS/TCS rate chart ID is required.",
+//   "string.base": "TDS/TCS rate chart ID must be a string.",
+// });
+
+const TDSTCSRateChartId = Joi.string().allow("").optional().messages({
   "string.base": "TDS/TCS rate chart ID must be a string.",
 });
 
@@ -159,11 +185,6 @@ const TDSTCSRate = Joi.number().required().messages({
 const TDSTCSRateWithAmountBeforeGST = Joi.number().required().messages({
   "any.required": "TDS/TCS rate with amount before GST is required.",
   "number.base": "This value must be a number.",
-});
-
-const adjustmentValue = Joi.number().required().messages({
-  "any.required": "Adjustment value is required.",
-  "number.base": "Adjustment value must be a number.",
 });
 
 const totalAmountBeforeGST = Joi.number().required().messages({
@@ -215,7 +236,6 @@ const PaymentEntryValidator = Joi.object({
   TDSTCSRateChartId,
   TDSTCSRate,
   TDSTCSRateWithAmountBeforeGST,
-  adjustmentValue,
   totalAmountBeforeGST,
   totalGSTAmount,
   totalAmountAfterGST,
@@ -242,7 +262,6 @@ const PaymentEntryValidatorUpdate = Joi.object({
   TDSTCSRateChartId,
   TDSTCSRate,
   TDSTCSRateWithAmountBeforeGST,
-  adjustmentValue,
   totalAmountBeforeGST,
   totalGSTAmount,
   totalAmountAfterGST,

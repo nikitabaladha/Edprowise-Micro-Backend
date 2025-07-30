@@ -45,11 +45,9 @@ const panNumber = Joi.string()
 
 const gstNumber = Joi.string()
   .pattern(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/)
-  .required()
+  .allow("")
   .messages({
     "string.pattern.base": "GST number must be in a valid 15-character format.",
-    "string.empty": "GST number is required.",
-    "any.required": "GST number is required.",
   });
 
 const address = Joi.string().required().messages({
@@ -96,6 +94,18 @@ const accountType = Joi.string().required().messages({
   "any.required": "Account type is required.",
 });
 
+const documentImage = Joi.string().allow("").optional().messages({
+  "string.base": "Attachment Image must be a string",
+  "string.empty": "Attachment Image cannot be empty",
+});
+
+const openingBalance = Joi.number().optional().messages({
+  "number.base": "Opening Balance must be a number.",
+});
+const paymentTerms = Joi.number().optional().messages({
+  "number.base": "Payment Terms must be a number.",
+});
+
 const VendorValidator = Joi.object({
   nameOfVendor,
   email,
@@ -109,6 +119,8 @@ const VendorValidator = Joi.object({
   ifscCode,
   accountNumber,
   accountType,
+  openingBalance,
+  paymentTerms,
   academicYear: academicYearCreate,
 });
 
@@ -125,6 +137,9 @@ const VendorValidatorUpdate = Joi.object({
   ifscCode,
   accountNumber,
   accountType,
+  openingBalance,
+  documentImage,
+  paymentTerms,
   academicYear: academicYearUpdate,
 });
 

@@ -45,7 +45,6 @@ async function draft(req, res) {
       TDSorTCS,
       TDSTCSRateChartId,
       TDSTCSRate,
-      adjustmentValue,
       status,
       TDSTCSRateWithAmount,
       ledgerIdWithPaymentMode,
@@ -96,9 +95,7 @@ async function draft(req, res) {
     );
 
     const totalAmount =
-      subTotalAmount -
-      (parseFloat(TDSTCSRateWithAmount) || 0) +
-      (parseFloat(adjustmentValue) || 0);
+      subTotalAmount - (parseFloat(TDSTCSRateWithAmount) || 0);
 
     const transactionNumber =
       paymentMode === "Online" ? await generateTransactionNumber() : null;
@@ -119,7 +116,6 @@ async function draft(req, res) {
       TDSTCSRateChartId,
       TDSTCSRate,
       TDSTCSRateWithAmount: parseFloat(TDSTCSRateWithAmount) || 0,
-      adjustmentValue: parseFloat(adjustmentValue) || 0,
       totalAmount,
       receiptImage: receiptImageFullPath,
       chequeImage: chequeImageFullPath,

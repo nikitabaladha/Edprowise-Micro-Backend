@@ -22,12 +22,14 @@ async function create(req, res) {
       });
     }
 
-    const { TDSorTCS, rate, natureOfTransaction, academicYear } = req.body;
+    const { TDSorTCS, rate, natureOfTransaction, guidance, academicYear } =
+      req.body;
 
     const newTDSTCSRateChart = new TDSTCSRateChart({
       schoolId,
       TDSorTCS,
       rate,
+      guidance,
       natureOfTransaction,
       academicYear,
     });

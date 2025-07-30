@@ -1,17 +1,17 @@
 import Joi from "joi";
 
-const validateFutureOrTodayDate = (value, helpers) => {
-  const inputDate = new Date(value);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  inputDate.setHours(0, 0, 0, 0);
+// const validateFutureOrTodayDate = (value, helpers) => {
+//   const inputDate = new Date(value);
+//   const today = new Date();
+//   today.setHours(0, 0, 0, 0);
+//   inputDate.setHours(0, 0, 0, 0);
 
-  if (inputDate < today) {
-    return helpers.message("Entry date cannot be in the past");
-  }
+//   if (inputDate < today) {
+//     return helpers.message("Entry date cannot be in the past");
+//   }
 
-  return value;
-};
+//   return value;
+// };
 
 const academicYearCreate = Joi.string().required().messages({
   "string.base": "Academic Year must be a string.",
@@ -24,13 +24,10 @@ const academicYearUpdate = Joi.string().allow("").optional().messages({
   "string.empty": "Academic Year cannot be empty.",
 });
 
-const entryDate = Joi.date()
-  .required()
-  .custom(validateFutureOrTodayDate)
-  .messages({
-    "any.required": "Entry date is required",
-    "date.base": "Entry date must be a valid date",
-  });
+const entryDate = Joi.date().required().messages({
+  "any.required": "Entry date is required",
+  "date.base": "Entry date must be a valid date",
+});
 
 const dateOfCashDepositedWithdrawlDate = Joi.date().required().messages({
   "any.required": "Date of Cash Deposited/Withdrawl/BankTransfer is required",

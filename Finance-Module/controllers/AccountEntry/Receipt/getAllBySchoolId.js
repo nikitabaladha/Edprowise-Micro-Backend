@@ -82,7 +82,6 @@ async function getAllBySchoolId(req, res) {
         TDSTCSRateChartId: entry.TDSTCSRateChartId,
         TDSTCSRate: entry.TDSTCSRate,
         TDSTCSRateWithAmount: entry.TDSTCSRateWithAmount,
-        adjustmentValue: entry.adjustmentValue,
         totalAmount: entry.totalAmount,
         receiptImage: entry.receiptImage,
         chequeImageForReceipt: entry.chequeImageForReceipt || null,

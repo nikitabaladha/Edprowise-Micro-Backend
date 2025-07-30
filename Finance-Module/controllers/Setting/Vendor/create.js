@@ -1,5 +1,10 @@
 import Vendor from "../../../models/Vendor.js";
 import VendorValidator from "../../../validators/VendorValidator.js";
+import HeadOfAccount from "../../../models/HeadOfAccount.js";
+import BSPLLedger from "../../../models/BSPLLedger.js";
+import GroupLedger from "../../../models/GroupLedger.js";
+import Ledger from "../../../models/Ledger.js";
+import CounterForFinaceLedger from "../../../models/CounterForFinaceLedger.js";
 
 async function generateVendorCode(schoolId) {
   const count = await Vendor.countDocuments({ schoolId });
@@ -45,7 +50,19 @@ async function create(req, res) {
       accountNumber,
       accountType,
       academicYear,
+      openingBalance,
+      paymentTerms,
     } = req.body;
+
+    const { documentImage } = req.files || {};
+
+    const documentImagePath = documentImage?.[0]?.mimetype.startsWith("image/")
+      ? "/Images/FinanceModule/DocumentImageForVendor"
+      : "/Documents/FinanceModule/DocumentImageForVendor";
+
+    const documentImageFullPath = documentImage?.[0]
+      ? `${documentImagePath}/${documentImage[0].filename}`
+      : null;
 
     const newVendor = new Vendor({
       schoolId,
@@ -63,14 +80,135 @@ async function create(req, res) {
       accountNumber,
       accountType,
       academicYear,
+      openingBalance,
+      paymentTerms,
+      documentImage: documentImageFullPath,
     });
 
     await newVendor.save();
 
+    // Create accounting hierarchy for the vendor
+    // 1. Create Head of Account "Liabilities" if not exists
+    let headOfAccount = await HeadOfAccount.findOneAndUpdate(
+      {
+        schoolId,
+        headOfAccountName: "Liabilities",
+        academicYear,
+      },
+      {
+        schoolId,
+        headOfAccountName: "Liabilities",
+        academicYear,
+      },
+      {
+        new: true,
+        upsert: true,
+      }
+    );
+
+    // 2. Create B/S P&L Ledger "Current Liabilities" if not exists
+    let bsplLedger = await BSPLLedger.findOneAndUpdate(
+      {
+        schoolId,
+        headOfAccountId: headOfAccount._id,
+        bSPLLedgerName: "Current Liabilities",
+        academicYear,
+      },
+      {
+        schoolId,
+        headOfAccountId: headOfAccount._id,
+        bSPLLedgerName: "Current Liabilities",
+        academicYear,
+      },
+      {
+        new: true,
+        upsert: true,
+      }
+    );
+
+    // 3. Create Group Ledger "Payable" if not exists
+    let groupLedger = await GroupLedger.findOneAndUpdate(
+      {
+        schoolId,
+        headOfAccountId: headOfAccount._id,
+        bSPLLedgerId: bsplLedger._id,
+        groupLedgerName: "Payable",
+        academicYear,
+      },
+      {
+        schoolId,
+        headOfAccountId: headOfAccount._id,
+        bSPLLedgerId: bsplLedger._id,
+        groupLedgerName: "Payable",
+        academicYear,
+      },
+      {
+        new: true,
+        upsert: true,
+      }
+    );
+
+    // Generate ledger code for the vendor ledger
+    const typeToBaseCode = {
+      Assets: 1000,
+      Liabilities: 2000,
+      Income: 3000,
+      Expenses: 4000,
+    };
+
+    const baseCode = typeToBaseCode[headOfAccount.headOfAccountName] || 2000; // Default to 2000 if not found
+
+    // Atomically find and increment the counter for Liabilities
+    const counter = await CounterForFinaceLedger.findOneAndUpdate(
+      { schoolId, headOfAccountType: headOfAccount.headOfAccountName },
+      { $inc: { lastLedgerCode: 1 } },
+      { new: true, upsert: true }
+    );
+
+    const ledgerCode = baseCode + counter.lastLedgerCode;
+
+    // 4. Create Ledger with vendor's name and generated ledger code
+    let ledger = await Ledger.findOneAndUpdate(
+      {
+        schoolId,
+        headOfAccountId: headOfAccount._id,
+        bSPLLedgerId: bsplLedger._id,
+        groupLedgerId: groupLedger._id,
+        ledgerName: nameOfVendor,
+        academicYear,
+      },
+      {
+        schoolId,
+        headOfAccountId: headOfAccount._id,
+        bSPLLedgerId: bsplLedger._id,
+        groupLedgerId: groupLedger._id,
+        ledgerName: nameOfVendor,
+        openingBalance: 0,
+        paymentMode: "Not Defined",
+        ledgerCode: ledgerCode.toString(),
+        academicYear,
+      },
+      {
+        new: true,
+        upsert: true,
+      }
+    );
+
+    newVendor.ledgerId = ledger._id;
+    await newVendor.save();
+
     return res.status(201).json({
       hasError: false,
-      message: "Vendor created successfully!",
-      data: newVendor,
+      message: "Vendor created successfully with accounting entries!",
+      data: {
+        vendor: newVendor,
+        accountingEntries: {
+          headOfAccount,
+          bsplLedger,
+          groupLedger,
+          ledger,
+        },
+      },
     });
   } catch (error) {
     if (error.code === 11000) {
