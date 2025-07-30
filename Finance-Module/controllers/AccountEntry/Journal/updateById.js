@@ -29,9 +29,9 @@ export async function updateById(req, res) {
       documentDate,
       narration,
       itemDetails,
-      TDSorTCS,
-      TDSTCSRateWithDebitAmount,
-      TDSTCSRateWithCreditAmount,
+      // TDSorTCS,
+      // TDSTCSRateWithDebitAmount,
+      // TDSTCSRateWithCreditAmount,
       status,
     } = req.body;
 
@@ -75,11 +75,15 @@ export async function updateById(req, res) {
       0
     );
 
-    const totalAmountOfDebit =
-      subTotalOfDebit + Number(TDSTCSRateWithDebitAmount) || 0;
+    // const totalAmountOfDebit =
+    //   subTotalOfDebit + Number(TDSTCSRateWithDebitAmount) || 0;
 
-    const totalAmountOfCredit =
-      subTotalOfCredit + Number(TDSTCSRateWithCreditAmount) || 0;
+    // const totalAmountOfCredit =
+    //   subTotalOfCredit + Number(TDSTCSRateWithCreditAmount) || 0;
+
+    const totalAmountOfDebit = subTotalOfDebit || 0;
+
+    const totalAmountOfCredit = subTotalOfCredit || 0;
 
     if (totalAmountOfDebit !== totalAmountOfCredit) {
       return res.status(400).json({
@@ -94,11 +98,11 @@ export async function updateById(req, res) {
     existingJournal.itemDetails = updatedItemDetails;
     existingJournal.subTotalOfDebit = subTotalOfDebit;
     existingJournal.subTotalOfCredit = subTotalOfCredit;
-    existingJournal.TDSorTCS = TDSorTCS || existingJournal.TDSorTCS;
-    existingJournal.TDSTCSRateWithDebitAmount =
-      Number(TDSTCSRateWithDebitAmount) || 0;
-    existingJournal.TDSTCSRateWithCreditAmount =
-      Number(TDSTCSRateWithCreditAmount) || 0;
+    // existingJournal.TDSorTCS = TDSorTCS || existingJournal.TDSorTCS;
+    // existingJournal.TDSTCSRateWithDebitAmount =
+    //   Number(TDSTCSRateWithDebitAmount) || 0;
+    // existingJournal.TDSTCSRateWithCreditAmount =
+    //   Number(TDSTCSRateWithCreditAmount) || 0;
     existingJournal.totalAmountOfDebit = totalAmountOfDebit;
     existingJournal.totalAmountOfCredit = totalAmountOfCredit;
     existingJournal.narration = narration || existingJournal.narration;

@@ -22,9 +22,9 @@ export async function draft(req, res) {
       documentDate,
       narration,
       itemDetails,
-      TDSorTCS,
-      TDSTCSRateWithDebitAmount,
-      TDSTCSRateWithCreditAmount,
+      // TDSorTCS,
+      // TDSTCSRateWithDebitAmount,
+      // TDSTCSRateWithCreditAmount,
       status,
       academicYear,
     } = req.body;
@@ -60,11 +60,15 @@ export async function draft(req, res) {
       0
     );
 
-    const totalAmountOfDebit =
-      subTotalOfDebit + (parseFloat(TDSTCSRateWithDebitAmount) || 0);
+    // const totalAmountOfDebit =
+    //   subTotalOfDebit + (parseFloat(TDSTCSRateWithDebitAmount) || 0);
 
-    const totalAmountOfCredit =
-      subTotalOfCredit + (parseFloat(TDSTCSRateWithCreditAmount) || 0);
+    // const totalAmountOfCredit =
+    //   subTotalOfCredit + (parseFloat(TDSTCSRateWithCreditAmount) || 0);
+
+    const totalAmountOfDebit = subTotalOfDebit || 0;
+
+    const totalAmountOfCredit = subTotalOfCredit || 0;
 
     const newJournal = new Journal({
       schoolId,
@@ -75,9 +79,9 @@ export async function draft(req, res) {
       itemDetails: updatedItemDetails,
       subTotalOfCredit: subTotalOfCredit,
       subTotalOfDebit: subTotalOfDebit,
-      TDSorTCS,
-      TDSTCSRateWithDebitAmount,
-      TDSTCSRateWithCreditAmount,
+      // TDSorTCS,
+      // TDSTCSRateWithDebitAmount,
+      // TDSTCSRateWithCreditAmount,
       totalAmountOfDebit,
       totalAmountOfCredit,
       documentImage: documentImageFullPath,

@@ -1,16 +1,17 @@
 import moment from "moment";
-import PaymentEntry from "../../../models/PaymentEntry.js";
 
-async function generatePaymentVoucherNumber(schoolId, academicYear) {
-  const count = await PaymentEntry.countDocuments({ schoolId, academicYear });
+import Receipt from "../../../models/Receipt.js";
+
+async function generateReceiptVoucherNumber(schoolId, academicYear) {
+  const count = await Receipt.countDocuments({ schoolId, academicYear });
   const nextNumber = count + 1;
-  return `PVN/${academicYear}/${nextNumber}`;
+  return `RVN/${academicYear}/${nextNumber}`;
 }
 
 async function generateTransactionNumber() {
   const now = moment();
   const dateTimeStr = now.format("DDMMYYYYHHmmss");
-  const baseTransactionNumber = `TRA-${dateTimeStr}`;
+  let baseTransactionNumber = `TRA-${dateTimeStr}`;
   let transactionNumber = baseTransactionNumber;
   let counter = 1;
 
@@ -35,13 +36,8 @@ async function draft(req, res) {
     }
 
     const {
-      vendorCode,
-      vendorId,
       entryDate,
-      invoiceDate,
-      invoiceNumber,
-      poNumber,
-      dueDate,
+      receiptDate,
       narration,
       paymentMode,
       chequeNumber,
@@ -50,7 +46,7 @@ async function draft(req, res) {
       TDSTCSRateChartId,
       TDSTCSRate,
       status,
-      TDSTCSRateWithAmountBeforeGST,
+      TDSTCSRateWithAmount,
       ledgerIdWithPaymentMode,
       academicYear,
     } = req.body;
@@ -62,19 +58,19 @@ async function draft(req, res) {
       });
     }
 
-    const paymentVoucherNumber = await generatePaymentVoucherNumber(
+    const receiptVoucherNumber = await generateReceiptVoucherNumber(
       schoolId,
       academicYear
     );
 
-    const { invoiceImage, chequeImage } = req.files || {};
+    const { receiptImage, chequeImage } = req.files || {};
 
-    const invoiceImagePath = invoiceImage?.[0]?.mimetype?.startsWith("image/")
-      ? "/Images/FinanceModule/InvoiceImage"
-      : "/Documents/FinanceModule/InvoiceImage";
+    const receiptImagePath = receiptImage?.[0]?.mimetype?.startsWith("image/")
+      ? "/Images/FinanceModule/ReceiptImage"
+      : "/Documents/FinanceModule/ReceiptImage";
 
-    const invoiceImageFullPath = invoiceImage?.[0]
-      ? `${invoiceImagePath}/${invoiceImage[0].filename}`
+    const receiptImageFullPath = receiptImage?.[0]
+      ? `${receiptImagePath}/${receiptImage[0].filename}`
       : null;
 
     const chequeImagePath = chequeImage?.[0]?.mimetype?.startsWith("image/")
@@ -86,74 +82,53 @@ async function draft(req, res) {
       : null;
 
     const updatedItemDetails = itemDetails.map((item) => {
-      const amountBeforeGST = parseFloat(item.amountBeforeGST) || 0;
-      const GSTAmount = parseFloat(item.GSTAmount) || 0;
+      const amount = parseFloat(item.amount) || 0;
       return {
         ...item,
-        amountBeforeGST,
-        GSTAmount,
-        amountAfterGST: amountBeforeGST + GSTAmount,
+        amount,
       };
     });
 
-    const totalAmountBeforeGST = updatedItemDetails.reduce(
-      (sum, item) => sum + item.amountBeforeGST,
+    const subTotalAmount = updatedItemDetails.reduce(
+      (sum, item) => sum + (parseFloat(item.amount) || 0),
       0
     );
 
-    const totalGSTAmount = updatedItemDetails.reduce(
-      (sum, item) => sum + item.GSTAmount,
-      0
-    );
-
-    const subTotalAmountAfterGST = updatedItemDetails.reduce(
-      (sum, item) => sum + item.amountAfterGST,
-      0
-    );
-
-    const totalAmountAfterGST =
-      subTotalAmountAfterGST - (parseFloat(TDSTCSRateWithAmountBeforeGST) || 0);
+    const totalAmount =
+      subTotalAmount - (parseFloat(TDSTCSRateWithAmount) || 0);
 
     const transactionNumber =
       paymentMode === "Online" ? await generateTransactionNumber() : null;
 
-    const newPaymentEntry = new PaymentEntry({
+    const newReceipt = new Receipt({
       schoolId,
       academicYear,
-      paymentVoucherNumber,
-      vendorCode,
-      vendorId,
+      receiptVoucherNumber,
       entryDate,
-      invoiceDate,
-      invoiceNumber,
-      poNumber,
-      dueDate,
+      receiptDate,
       narration,
       paymentMode,
       chequeNumber,
       transactionNumber,
       itemDetails: updatedItemDetails,
-      subTotalAmountAfterGST,
+      subTotalAmount,
       TDSorTCS,
       TDSTCSRateChartId,
       TDSTCSRate,
-      TDSTCSRateWithAmountBeforeGST:
-        parseFloat(TDSTCSRateWithAmountBeforeGST) || 0,
-      totalAmountBeforeGST,
-      totalGSTAmount,
-      totalAmountAfterGST,
-      invoiceImage: invoiceImageFullPath,
+      TDSTCSRateWithAmount: parseFloat(TDSTCSRateWithAmount) || 0,
+      totalAmount,
+      receiptImage: receiptImageFullPath,
       chequeImage: chequeImageFullPath,
       ledgerIdWithPaymentMode,
       status,
     });
 
-    await newPaymentEntry.save();
+    await newReceipt.save();
 
     return res.status(201).json({
       hasError: false,
-      message: "Payment Entry drafted successfully!",
-      data: newPaymentEntry,
+      message: "Receipt drafted successfully!",
+      data: newReceipt,
     });
   } catch (error) {
     if (error.code === 11000) {
@@ -162,11 +137,11 @@ async function draft(req, res) {
         .join(", ");
       return res.status(400).json({
         hasError: true,
-        message: `Duplicate entry for ${field}. Payment Entry already exists.`,
+        message: `Duplicate entry for ${field}. Receipt already exists.`,
       });
     }
 
-    console.error("Error creating Payment Entry:", error);
+    console.error("Error drafting Receipt:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",

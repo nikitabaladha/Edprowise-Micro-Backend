@@ -91,6 +91,13 @@ const TDSTCSRateAmount = Joi.number().required().messages({
   "number.base": "TDS/TCS rate amount must be a number.",
 });
 
+// const TDSTCSRateAmount = Joi.number().allow("").optional().messages({
+//   "any.required": "TDS/TCS rate amount is required.",
+//   "number.base": "TDS/TCS rate amount must be a number.",
+// });
+
+// .allow("").optional().
+
 const totalAmountOfDebit = Joi.number().required().messages({
   "any.required": "Total Debit Amount is required.",
   "number.base": "Total Debit Amount must be a number.",

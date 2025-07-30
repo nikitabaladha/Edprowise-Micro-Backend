@@ -49,12 +49,12 @@ export async function updateById(req, res) {
 
     const { chequeImageForContra } = req.files || {};
     if (["Cash Withdrawn", "Bank Transfer"].includes(contraEntryName)) {
-      if (!chequeImageForContra?.[0] && !existingContra.chequeImageForContra) {
-        return res.status(400).json({
-          hasError: true,
-          message: "Cheque image is required for this Contra entry type.",
-        });
-      }
+      // if (!chequeImageForContra?.[0] && !existingContra.chequeImageForContra) {
+      //   return res.status(400).json({
+      //     hasError: true,
+      //     message: "Cheque image is required for this Contra entry type.",
+      //   });
+      // }
     }
 
     if (chequeImageForContra?.[0]) {
@@ -103,12 +103,12 @@ export async function updateById(req, res) {
         });
       }
 
-      if (!TDSorTCS || !["TDS", "TCS"].includes(TDSorTCS)) {
-        return res.status(400).json({
-          hasError: true,
-          message: "TDS or TCS is required and must be valid.",
-        });
-      }
+      // if (!TDSorTCS || !["TDS", "TCS"].includes(TDSorTCS)) {
+      //   return res.status(400).json({
+      //     hasError: true,
+      //     message: "TDS or TCS is required and must be valid.",
+      //   });
+      // }
     }
 
     // Update fields

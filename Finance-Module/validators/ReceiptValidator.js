@@ -98,23 +98,24 @@ const subTotalAmount = Joi.number().required().messages({
   "number.base": "SubTotal Amount must be a number.",
 });
 
-const TDSorTCS = Joi.string().valid("TDS", "TCS").required().messages({
-  "any.required": "TDS or TCS type is required.",
-  "any.only": "TDSorTCS must be either 'TDS' or 'TCS'.",
-  "string.base": "TDSorTCS must be a string.",
-});
+const TDSorTCS = Joi.string()
+  .valid("TDS", "TCS")
+  .allow("")
+  .optional()
+  .messages({
+    "any.only": "TDSorTCS must be either 'TDS' or 'TCS'.",
+    "string.base": "TDSorTCS must be a string.",
+  });
 
-const TDSTCSRateChartId = Joi.string().required().messages({
-  "any.required": "TDS/TCS rate chart ID is required.",
+const TDSTCSRateChartId = Joi.string().allow("").optional().messages({
   "string.base": "TDS/TCS rate chart ID must be a string.",
 });
 
-const TDSTCSRate = Joi.number().required().messages({
-  "any.required": "TDS/TCS rate is required.",
+const TDSTCSRate = Joi.number().allow("").optional().messages({
   "number.base": "TDS/TCS rate must be a number.",
 });
 
-const TDSTCSRateWithAmount = Joi.number().required().messages({
+const TDSTCSRateWithAmount = Joi.number().allow("").optional().messages({
   "any.required": "TDS/TCS rate with amount is required.",
   "number.base": "TDS/TCS rate with amount must be a number.",
 });

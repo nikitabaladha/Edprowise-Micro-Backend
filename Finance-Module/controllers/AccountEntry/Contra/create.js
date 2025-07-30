@@ -48,12 +48,12 @@ export async function create(req, res) {
     const { chequeImageForContra } = req.files || {};
 
     if (["Cash Withdrawn", "Bank Transfer"].includes(contraEntryName)) {
-      if (!chequeImageForContra?.[0]) {
-        return res.status(400).json({
-          hasError: true,
-          message: "Cheque image is required for this Contra entry type.",
-        });
-      }
+      // if (!chequeImageForContra?.[0]) {
+      //   return res.status(400).json({
+      //     hasError: true,
+      //     message: "Cheque image is required for this Contra entry type.",
+      //   });
+      // }
     }
 
     let chequeImageForContraFullPath = "";
@@ -103,12 +103,12 @@ export async function create(req, res) {
         });
       }
 
-      if (!TDSorTCS || !["TDS", "TCS"].includes(TDSorTCS)) {
-        return res.status(400).json({
-          hasError: true,
-          message: "TDS or TCS Required and must be valid.",
-        });
-      }
+      // if (!TDSorTCS || !["TDS", "TCS"].includes(TDSorTCS)) {
+      //   return res.status(400).json({
+      //     hasError: true,
+      //     message: "TDS or TCS Required and must be valid.",
+      //   });
+      // }
     }
 
     const newContra = new Contra({

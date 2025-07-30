@@ -32,9 +32,9 @@ export async function create(req, res) {
       documentDate,
       narration,
       itemDetails,
-      TDSorTCS,
-      TDSTCSRateWithDebitAmount,
-      TDSTCSRateWithCreditAmount,
+      // TDSorTCS,
+      // TDSTCSRateWithDebitAmount,
+      // TDSTCSRateWithCreditAmount,
       status,
       academicYear,
     } = req.body;
@@ -70,11 +70,15 @@ export async function create(req, res) {
       0
     );
 
-    const totalAmountOfDebit =
-      subTotalOfDebit + (parseFloat(TDSTCSRateWithDebitAmount) || 0);
+    // const totalAmountOfDebit =
+    //   subTotalOfDebit + (parseFloat(TDSTCSRateWithDebitAmount) || 0);
 
-    const totalAmountOfCredit =
-      subTotalOfCredit + (parseFloat(TDSTCSRateWithCreditAmount) || 0);
+    // const totalAmountOfCredit =
+    //   subTotalOfCredit + (parseFloat(TDSTCSRateWithCreditAmount) || 0);
+
+    const totalAmountOfDebit = subTotalOfDebit;
+
+    const totalAmountOfCredit = subTotalOfCredit;
 
     if (totalAmountOfDebit !== totalAmountOfCredit) {
       return res.status(400).json({
@@ -92,9 +96,9 @@ export async function create(req, res) {
       itemDetails: updatedItemDetails,
       subTotalOfCredit: subTotalOfCredit,
       subTotalOfDebit: subTotalOfDebit,
-      TDSorTCS,
-      TDSTCSRateWithDebitAmount,
-      TDSTCSRateWithCreditAmount,
+      // TDSorTCS,
+      // TDSTCSRateWithDebitAmount,
+      // TDSTCSRateWithCreditAmount,
       totalAmountOfDebit,
       totalAmountOfCredit,
       documentImage: documentImageFullPath,

@@ -37,16 +37,16 @@ const JournalSchema = new mongoose.Schema(
     subTotalOfCredit: {
       type: Number,
     },
-    TDSorTCS: {
-      type: String,
-      enum: ["TDS", "TCS", ""],
-    },
-    TDSTCSRateWithDebitAmount: {
-      type: Number,
-    },
-    TDSTCSRateWithCreditAmount: {
-      type: Number,
-    },
+    // TDSorTCS: {
+    //   type: String,
+    //   enum: ["TDS", "TCS", ""],
+    // },
+    // TDSTCSRateWithDebitAmount: {
+    //   type: Number,
+    // },
+    // TDSTCSRateWithCreditAmount: {
+    //   type: Number,
+    // },
     totalAmountOfDebit: {
       type: Number,
     },

@@ -77,21 +77,21 @@ const subTotalOfCredit = Joi.number().required().messages({
   "number.base": "SubTotal Amount Of Credit must be a number.",
 });
 
-const TDSorTCS = Joi.string().valid("TDS", "TCS").required().messages({
-  "any.required": "TDS or TCS type is required.",
-  "any.only": "TDSorTCS must be either 'TDS' or 'TCS'.",
-  "string.base": "TDSorTCS must be a string.",
-});
+// const TDSorTCS = Joi.string().valid("TDS", "TCS").required().messages({
+//   "any.required": "TDS or TCS type is required.",
+//   "any.only": "TDSorTCS must be either 'TDS' or 'TCS'.",
+//   "string.base": "TDSorTCS must be a string.",
+// });
 
-const TDSTCSRateWithDebitAmount = Joi.number().required().messages({
-  "any.required": "TDS/TCS rate amount is required.",
-  "number.base": "TDS/TCS rate amount must be a number.",
-});
+// const TDSTCSRateWithDebitAmount = Joi.number().required().messages({
+//   "any.required": "TDS/TCS rate amount is required.",
+//   "number.base": "TDS/TCS rate amount must be a number.",
+// });
 
-const TDSTCSRateWithCreditAmount = Joi.number().required().messages({
-  "any.required": "TDS/TCS rate amount is required.",
-  "number.base": "TDS/TCS rate amount must be a number.",
-});
+// const TDSTCSRateWithCreditAmount = Joi.number().required().messages({
+//   "any.required": "TDS/TCS rate amount is required.",
+//   "number.base": "TDS/TCS rate amount must be a number.",
+// });
 
 const totalAmountOfDebit = Joi.number().required().messages({
   "any.required": "Total Debit Amount is required.",
@@ -127,9 +127,9 @@ const JournalValidator = Joi.object({
   itemDetails,
   subTotalOfDebit,
   subTotalOfCredit,
-  TDSorTCS,
-  TDSTCSRateWithDebitAmount,
-  TDSTCSRateWithCreditAmount,
+  // TDSorTCS,
+  // TDSTCSRateWithDebitAmount,
+  // TDSTCSRateWithCreditAmount,
   totalAmountOfCredit,
   totalAmountOfDebit,
   status,
@@ -143,9 +143,9 @@ const JournalValidatorUpdate = Joi.object({
   itemDetails,
   subTotalOfDebit,
   subTotalOfCredit,
-  TDSorTCS,
-  TDSTCSRateWithDebitAmount,
-  TDSTCSRateWithCreditAmount,
+  // TDSorTCS,
+  // TDSTCSRateWithDebitAmount,
+  // TDSTCSRateWithCreditAmount,
   totalAmountOfCredit,
   totalAmountOfDebit,
   documentImage,

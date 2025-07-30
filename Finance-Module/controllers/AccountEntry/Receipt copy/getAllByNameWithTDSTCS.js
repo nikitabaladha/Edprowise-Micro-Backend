@@ -1,4 +1,4 @@
-import PaymentEntry from "../../../models/PaymentEntry.js";
+import Receipt from "../../../models/Receipt.js";
 import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
 
@@ -14,23 +14,23 @@ async function getById(req, res) {
       });
     }
 
-    const paymentEntry = await PaymentEntry.findOne({
+    const receipt = await Receipt.findOne({
       _id: id,
       schoolId,
       academicYear,
     });
 
-    if (!paymentEntry) {
+    if (!receipt) {
       return res.status(404).json({
         hasError: true,
-        message: "PaymentEntry not found.",
+        message: "Receipt not found.",
       });
     }
 
-    if (!["TDS", "TCS"].includes(paymentEntry.TDSorTCS)) {
+    if (!["TDS", "TCS"].includes(receipt.TDSorTCS)) {
       return res.status(200).json({
         hasError: false,
-        message: "No TDS or TCS linked to this PaymentEntry.",
+        message: "No TDS or TCS linked to this Receipt.",
         data: [],
       });
     }
@@ -38,13 +38,13 @@ async function getById(req, res) {
     const groupLedger = await GroupLedger.findOne({
       schoolId,
       academicYear,
-      groupLedgerName: paymentEntry.TDSorTCS,
+      groupLedgerName: receipt.TDSorTCS,
     });
 
     if (!groupLedger) {
       return res.status(404).json({
         hasError: true,
-        message: `No GroupLedger found for ${paymentEntry.TDSorTCS}.`,
+        message: `No GroupLedger found for ${receipt.TDSorTCS}.`,
       });
     }
 

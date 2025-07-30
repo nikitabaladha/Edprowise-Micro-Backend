@@ -1,4 +1,4 @@
-import PaymentEntry from "../../../models/PaymentEntry.js";
+import Receipt from "../../../models/Receipt.js";
 
 async function cancelById(req, res) {
   try {
@@ -13,28 +13,28 @@ async function cancelById(req, res) {
       });
     }
 
-    const existingPaymentEntry = await PaymentEntry.findOne({
+    const existingReceipt = await Receipt.findOne({
       _id: id,
       schoolId,
       academicYear,
     });
 
-    if (!existingPaymentEntry) {
+    if (!existingReceipt) {
       return res.status(404).json({
         hasError: true,
-        message: "PaymentEntry not found.",
+        message: "Receipt not found.",
       });
     }
 
-    existingPaymentEntry.status = "Cancelled";
-    await existingPaymentEntry.save();
+    existingReceipt.status = "Cancelled";
+    await existingReceipt.save();
 
     return res.status(200).json({
       hasError: false,
-      message: "PaymentEntry Cancelled successfully.",
+      message: "Receipt Cancelled successfully.",
     });
   } catch (error) {
-    console.error("Error cancelling PaymentEntry:", error);
+    console.error("Error cancelling Receipt:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",
