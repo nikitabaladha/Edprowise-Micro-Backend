@@ -46,6 +46,7 @@ async function updateById(req, res) {
       TDSTCSRate,
       TDSTCSRateWithAmountBeforeGST,
       ledgerIdWithPaymentMode,
+      totalAmountAfterGST,
       status,
     } = req.body;
 
@@ -106,8 +107,8 @@ async function updateById(req, res) {
     const parsedTDSTCSRateWithAmountBeforeGST =
       parseFloat(TDSTCSRateWithAmountBeforeGST) || 0;
 
-    const totalAmountAfterGST =
-      subTotalAmountAfterGST - parsedTDSTCSRateWithAmountBeforeGST;
+    // const totalAmountAfterGST =
+    //   subTotalAmountAfterGST - parsedTDSTCSRateWithAmountBeforeGST;
 
     // Update fields
     existingPaymentEntry.vendorCode =
@@ -138,7 +139,8 @@ async function updateById(req, res) {
     existingPaymentEntry.subTotalAmountAfterGST = subTotalAmountAfterGST;
     existingPaymentEntry.totalAmountBeforeGST = totalAmountBeforeGST;
     existingPaymentEntry.totalGSTAmount = totalGSTAmount;
-    existingPaymentEntry.totalAmountAfterGST = totalAmountAfterGST;
+    existingPaymentEntry.totalAmountAfterGST =
+      totalAmountAfterGST || existingPaymentEntry.totalAmountAfterGST;
     existingPaymentEntry.ledgerIdWithPaymentMode =
       ledgerIdWithPaymentMode || existingPaymentEntry.ledgerIdWithPaymentMode;
     existingPaymentEntry.status = status || existingPaymentEntry.status;

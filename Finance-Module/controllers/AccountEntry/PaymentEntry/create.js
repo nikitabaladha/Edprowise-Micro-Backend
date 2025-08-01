@@ -63,6 +63,7 @@ async function create(req, res) {
       TDSTCSRateChartId,
       TDSTCSRate,
       status,
+      totalAmountAfterGST,
       TDSTCSRateWithAmountBeforeGST,
       ledgerIdWithPaymentMode,
       academicYear,
@@ -120,8 +121,8 @@ async function create(req, res) {
       0
     );
 
-    const totalAmountAfterGST =
-      subTotalAmountAfterGST - (parseFloat(TDSTCSRateWithAmountBeforeGST) || 0);
+    // const totalAmountAfterGST =
+    //   subTotalAmountAfterGST - (parseFloat(TDSTCSRateWithAmountBeforeGST) || 0);
 
     const transactionNumber =
       paymentMode === "Online" ? await generateTransactionNumber() : null;

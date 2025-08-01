@@ -154,7 +154,6 @@ const ReceiptValidator = Joi.object({
   TDSTCSRateChartId,
   TDSTCSRate,
   TDSTCSRateWithAmount,
-
   totalAmount,
   ledgerIdWithPaymentMode,
   status,

@@ -59,6 +59,7 @@ async function create(req, res) {
       TDSTCSRateWithAmount,
       ledgerIdWithPaymentMode,
       academicYear,
+      totalAmount,
     } = req.body;
 
     const receiptVoucherNumber = await generateReceiptVoucherNumber(
@@ -99,9 +100,6 @@ async function create(req, res) {
       (sum, item) => sum + (parseFloat(item.amount) || 0),
       0
     );
-
-    const totalAmount =
-      subTotalAmount - (parseFloat(TDSTCSRateWithAmount) || 0);
 
     const transactionNumber =
       paymentMode === "Online" ? await generateTransactionNumber() : null;

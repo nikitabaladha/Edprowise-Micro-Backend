@@ -157,7 +157,7 @@ async function getAllBySchoolId(req, res) {
         groupLedgerNameWithPaymentMode:
           groupLedgerWithPaymentMode?.groupLedgerName || null,
         paymentVoucherNumber: entry.paymentVoucherNumber || null,
-        TDSorTCS: entry.TDSorTCS,
+        TDSorTCS: entry.TDSorTCS || null,
 
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
@@ -275,7 +275,7 @@ async function getAllBySchoolId(req, res) {
         groupLedgerNameWithPaymentMode:
           groupLedgerWithPaymentMode?.groupLedgerName || null,
         receiptVoucherNumber: entry.receiptVoucherNumber || null,
-        TDSorTCS: entry.TDSorTCS,
+        TDSorTCS: entry.TDSorTCS || null,
 
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
@@ -420,7 +420,7 @@ async function getAllBySchoolId(req, res) {
         totalAmountOfDebit: entry.totalAmountOfDebit || 0,
         TDSTCSRateAmount: entry.TDSTCSRateAmount || 0,
         contraVoucherNumber: entry.contraVoucherNumber || null,
-        TDSorTCS: entry.TDSorTCS,
+        TDSorTCS: entry.TDSorTCS || null,
         status: entry.status,
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
@@ -469,34 +469,34 @@ async function getAllBySchoolId(req, res) {
         });
       }
 
-      let TDSorTCSGroupLedgerName = null;
-      let TDSorTCSLedgerName = null;
+      // let TDSorTCSGroupLedgerName = null;
+      // let TDSorTCSLedgerName = null;
 
-      if (entry.TDSorTCS) {
-        // 1. Find GroupLedger by name
-        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
-          schoolId,
-          groupLedgerName: entry.TDSorTCS,
-        })
-          .select("_id groupLedgerName")
-          .lean();
+      // if (entry.TDSorTCS) {
+      //   // 1. Find GroupLedger by name
+      //   const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+      //     schoolId,
+      //     groupLedgerName: entry.TDSorTCS,
+      //   })
+      //     .select("_id groupLedgerName")
+      //     .lean();
 
-        if (tdsOrTcsGroupLedger) {
-          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+      // if (tdsOrTcsGroupLedger) {
+      //   TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
 
-          // 2. Find Ledger under that GroupLedger
-          const tdsOrTcsLedger = await Ledger.findOne({
-            schoolId,
-            groupLedgerId: tdsOrTcsGroupLedger._id,
-          })
-            .select("ledgerName")
-            .lean();
+      //   // 2. Find Ledger under that GroupLedger
+      //   const tdsOrTcsLedger = await Ledger.findOne({
+      //     schoolId,
+      //     groupLedgerId: tdsOrTcsGroupLedger._id,
+      //   })
+      //     .select("ledgerName")
+      //     .lean();
 
-          if (tdsOrTcsLedger) {
-            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
-          }
-        }
-      }
+      //   if (tdsOrTcsLedger) {
+      //     TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+      //   }
+      // }
+      // }
 
       const entryData = {
         accountingEntry: "Journal",
@@ -506,17 +506,17 @@ async function getAllBySchoolId(req, res) {
         documentDate: entry.documentDate,
         narration: entry.narration,
         subTotalOfDebit: entry.subTotalOfDebit || 0,
-        TDSTCSRateWithDebitAmount: entry.TDSTCSRateWithDebitAmount || 0,
-        TDSTCSRateWithCreditAmount: entry.TDSTCSRateWithCreditAmount || 0,
+        // TDSTCSRateWithDebitAmount: entry.TDSTCSRateWithDebitAmount || 0,
+        // TDSTCSRateWithCreditAmount: entry.TDSTCSRateWithCreditAmount || 0,
         totalAmountOfDebit: entry.totalAmountOfDebit || 0,
         totalAmountOfCredit: entry.totalAmountOfCredit || 0,
         journalVoucherNumber: entry.journalVoucherNumber || null,
-        TDSorTCS: entry.TDSorTCS,
+        // TDSorTCS: entry.TDSorTCS,
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
 
-        TDSorTCSGroupLedgerName,
-        TDSorTCSLedgerName,
+        // TDSorTCSGroupLedgerName,
+        // TDSorTCSLedgerName,
 
         // Item details
         itemDetails: itemsWithLedgerNames,

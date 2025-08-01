@@ -49,6 +49,7 @@ async function draft(req, res) {
       TDSTCSRateWithAmount,
       ledgerIdWithPaymentMode,
       academicYear,
+      totalAmount,
     } = req.body;
 
     if (!academicYear || academicYear.trim() === "") {
@@ -93,9 +94,6 @@ async function draft(req, res) {
       (sum, item) => sum + (parseFloat(item.amount) || 0),
       0
     );
-
-    const totalAmount =
-      subTotalAmount - (parseFloat(TDSTCSRateWithAmount) || 0);
 
     const transactionNumber =
       paymentMode === "Online" ? await generateTransactionNumber() : null;

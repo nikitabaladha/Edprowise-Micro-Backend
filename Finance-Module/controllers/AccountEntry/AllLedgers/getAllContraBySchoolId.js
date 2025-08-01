@@ -154,7 +154,7 @@ async function getAllContraBySchoolId(req, res) {
         totalAmountOfDebit: entry.totalAmountOfDebit,
         TDSTCSRateAmount: entry.TDSTCSRateAmount,
         contraVoucherNumber: entry.contraVoucherNumber || null,
-        TDSorTCS: entry.TDSorTCS,
+        TDSorTCS: entry.TDSorTCS || null,
         status: entry.status,
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,

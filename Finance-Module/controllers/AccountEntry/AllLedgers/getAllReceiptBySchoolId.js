@@ -128,7 +128,7 @@ async function getAllReceiptBySchoolId(req, res) {
         groupLedgerNameWithPaymentMode:
           groupLedgerWithPaymentMode?.groupLedgerName || null,
         receiptVoucherNumber: entry.receiptVoucherNumber || null,
-        TDSorTCS: entry.TDSorTCS,
+        TDSorTCS: entry.TDSorTCS || null,
 
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,

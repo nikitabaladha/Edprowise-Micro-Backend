@@ -52,6 +52,7 @@ async function draft(req, res) {
       status,
       TDSTCSRateWithAmountBeforeGST,
       ledgerIdWithPaymentMode,
+      totalAmountAfterGST,
       academicYear,
     } = req.body;
 
@@ -111,8 +112,8 @@ async function draft(req, res) {
       0
     );
 
-    const totalAmountAfterGST =
-      subTotalAmountAfterGST - (parseFloat(TDSTCSRateWithAmountBeforeGST) || 0);
+    // const totalAmountAfterGST =
+    //   subTotalAmountAfterGST - (parseFloat(TDSTCSRateWithAmountBeforeGST) || 0);
 
     const transactionNumber =
       paymentMode === "Online" ? await generateTransactionNumber() : null;
