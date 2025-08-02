@@ -179,7 +179,7 @@ async function getAllExpenseBookBySchoolId(req, res) {
         groupLedgerNameWithPaymentMode:
           groupLedgerWithPaymentMode?.groupLedgerName || null,
         paymentVoucherNumber: entry.paymentVoucherNumber || null,
-        TDSorTCS: entry.TDSorTCS,
+        TDSorTCS: entry.TDSorTCS || null,
 
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
@@ -328,7 +328,7 @@ async function getAllExpenseBookBySchoolId(req, res) {
         groupLedgerNameWithPaymentMode:
           groupLedgerWithPaymentMode?.groupLedgerName || null,
         receiptVoucherNumber: entry.receiptVoucherNumber || null,
-        TDSorTCS: entry.TDSorTCS,
+        TDSorTCS: entry.TDSorTCS || null,
 
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
@@ -399,34 +399,34 @@ async function getAllExpenseBookBySchoolId(req, res) {
         continue;
       }
 
-      let TDSorTCSGroupLedgerName = null;
-      let TDSorTCSLedgerName = null;
+      // let TDSorTCSGroupLedgerName = null;
+      // let TDSorTCSLedgerName = null;
 
-      if (entry.TDSorTCS) {
-        // 1. Find GroupLedger by name
-        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
-          schoolId,
-          groupLedgerName: entry.TDSorTCS,
-        })
-          .select("_id groupLedgerName")
-          .lean();
+      // if (entry.TDSorTCS) {
+      //   // 1. Find GroupLedger by name
+      //   const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+      //     schoolId,
+      //     groupLedgerName: entry.TDSorTCS,
+      //   })
+      //     .select("_id groupLedgerName")
+      //     .lean();
 
-        if (tdsOrTcsGroupLedger) {
-          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+      //   if (tdsOrTcsGroupLedger) {
+      //     TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
 
-          // 2. Find Ledger under that GroupLedger
-          const tdsOrTcsLedger = await Ledger.findOne({
-            schoolId,
-            groupLedgerId: tdsOrTcsGroupLedger._id,
-          })
-            .select("ledgerName")
-            .lean();
+      //     // 2. Find Ledger under that GroupLedger
+      //     const tdsOrTcsLedger = await Ledger.findOne({
+      //       schoolId,
+      //       groupLedgerId: tdsOrTcsGroupLedger._id,
+      //     })
+      //       .select("ledgerName")
+      //       .lean();
 
-          if (tdsOrTcsLedger) {
-            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
-          }
-        }
-      }
+      //     if (tdsOrTcsLedger) {
+      //       TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+      //     }
+      //   }
+      // }
 
       const entryData = {
         accountingEntry: "Journal",
@@ -436,17 +436,17 @@ async function getAllExpenseBookBySchoolId(req, res) {
         documentDate: entry.documentDate,
         narration: entry.narration,
         subTotalOfDebit: entry.subTotalOfDebit,
-        TDSTCSRateWithDebitAmount: entry.TDSTCSRateWithDebitAmount,
-        TDSTCSRateWithCreditAmount: entry.TDSTCSRateWithCreditAmount,
+        // TDSTCSRateWithDebitAmount: entry.TDSTCSRateWithDebitAmount,
+        // TDSTCSRateWithCreditAmount: entry.TDSTCSRateWithCreditAmount,
         totalAmountOfDebit: entry.totalAmountOfDebit,
         totalAmountOfCredit: entry.totalAmountOfCredit,
         journalVoucherNumber: entry.journalVoucherNumber || null,
-        TDSorTCS: entry.TDSorTCS,
+        // TDSorTCS: entry.TDSorTCS,
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
 
-        TDSorTCSGroupLedgerName,
-        TDSorTCSLedgerName,
+        // TDSorTCSGroupLedgerName,
+        // TDSorTCSLedgerName,
 
         // Item details
         itemDetails: itemsWithLedgerNames,

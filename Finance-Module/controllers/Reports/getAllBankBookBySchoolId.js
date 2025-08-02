@@ -156,7 +156,7 @@ async function getAllBankBookBySchoolId(req, res) {
         groupLedgerNameWithPaymentMode:
           groupLedgerWithPaymentMode?.groupLedgerName || null,
         paymentVoucherNumber: entry.paymentVoucherNumber || null,
-        TDSorTCS: entry.TDSorTCS,
+        TDSorTCS: entry.TDSorTCS || null,
 
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
@@ -283,7 +283,7 @@ async function getAllBankBookBySchoolId(req, res) {
         groupLedgerNameWithPaymentMode:
           groupLedgerWithPaymentMode?.groupLedgerName || null,
         receiptVoucherNumber: entry.receiptVoucherNumber || null,
-        TDSorTCS: entry.TDSorTCS,
+        TDSorTCS: entry.TDSorTCS || null,
 
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
@@ -430,7 +430,7 @@ async function getAllBankBookBySchoolId(req, res) {
         totalAmountOfDebit: entry.totalAmountOfDebit,
         TDSTCSRateAmount: entry.TDSTCSRateAmount,
         contraVoucherNumber: entry.contraVoucherNumber || null,
-        TDSorTCS: entry.TDSorTCS,
+        TDSorTCS: entry.TDSorTCS || null,
         status: entry.status,
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
@@ -524,17 +524,17 @@ async function getAllBankBookBySchoolId(req, res) {
         documentDate: entry.documentDate,
         narration: entry.narration,
         subTotalOfDebit: entry.subTotalOfDebit,
-        TDSTCSRateWithDebitAmount: entry.TDSTCSRateWithDebitAmount,
-        TDSTCSRateWithCreditAmount: entry.TDSTCSRateWithCreditAmount,
+        // TDSTCSRateWithDebitAmount: entry.TDSTCSRateWithDebitAmount,
+        // TDSTCSRateWithCreditAmount: entry.TDSTCSRateWithCreditAmount,
         totalAmountOfDebit: entry.totalAmountOfDebit,
         totalAmountOfCredit: entry.totalAmountOfCredit,
         journalVoucherNumber: entry.journalVoucherNumber || null,
-        TDSorTCS: entry.TDSorTCS,
+        // TDSorTCS: entry.TDSorTCS,
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
 
-        TDSorTCSGroupLedgerName,
-        TDSorTCSLedgerName,
+        // TDSorTCSGroupLedgerName,
+        // TDSorTCSLedgerName,
 
         // Item details
         itemDetails: itemsWithLedgerNames,

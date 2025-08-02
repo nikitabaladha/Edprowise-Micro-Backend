@@ -76,7 +76,7 @@ const VendorSchema = new mongoose.Schema(
 );
 
 VendorSchema.index(
-  { schoolId: 1, vendorCode: 1, academicYear: 1 },
+  { schoolId: 1, vendorCode: 1, nameOfVendor: 1, academicYear: 1 },
   { unique: true }
 );
 
