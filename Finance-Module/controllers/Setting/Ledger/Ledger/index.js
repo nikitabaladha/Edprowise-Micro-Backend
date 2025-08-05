@@ -8,6 +8,7 @@ import getAllLedgerByBankName from "./getAllByBankName.js";
 import getAllLedgerByCashName from "./getAllByCashName.js";
 import getAllByPaymentMode from "./getAllByPaymentMode.js";
 import findLedgerByName from "./findLedgerByName.js";
+import getAllLedgerByGroupLedgerId from "./getAllLedgerByGroupLedgerId.js";
 
 export {
   createLedger,
@@ -20,4 +21,5 @@ export {
   findLedgerByName,
   getAllLedgerByBankName,
   getAllLedgerByCashName,
+  getAllLedgerByGroupLedgerId,
 };

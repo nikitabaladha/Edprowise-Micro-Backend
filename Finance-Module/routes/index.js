@@ -1,5 +1,4 @@
 import FinanceModuleYearRoutes from "./FinanceModuleYear.js";
-
 import ledgerRoutes from "./Ledger.js";
 import vendorRoutes from "./Vendor.js";
 import TDSTCSRateChartRoutes from "./TDSTCSRateChart.js";
@@ -9,10 +8,9 @@ import AuthorisedSignatureRoutes from "./AuthorisedSignature.js";
 import AllLedgerRoutes from "./AllLedgers.js";
 import ContraRoutes from "./Contra.js";
 import JournalRoutes from "./Journal.js";
-
 import FinancialInformationRoutes from "./FinancialInformation.js";
-
 import ReportsRoutes from "./AllReports.js";
+import DepreciationMasterRoutes from "./DepreciationMaster.js";
 
 export default (app) => {
   app.use("/api", ledgerRoutes);
@@ -27,4 +25,5 @@ export default (app) => {
   app.use("/api", JournalRoutes);
   app.use("/api", ReportsRoutes);
   app.use("/api", FinancialInformationRoutes);
+  app.use("/api", DepreciationMasterRoutes);
 };
