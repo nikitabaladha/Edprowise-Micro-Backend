@@ -225,7 +225,6 @@ async function create(req, res) {
 
     const { receiptImage, chequeImageForReceipt } = req.files || {};
 
-    // ✅ Make receiptImage optional
     let receiptImageFullPath = null;
     if (receiptImage?.[0]) {
       const receiptImagePath = receiptImage[0].mimetype.startsWith("image/")
@@ -235,7 +234,6 @@ async function create(req, res) {
       receiptImageFullPath = `${receiptImagePath}/${receiptImage[0].filename}`;
     }
 
-    // ✅ chequeImageForReceipt is already optional
     let chequeImageForReceiptFullPath = null;
     if (chequeImageForReceipt?.[0]) {
       const chequeImageForReceiptPath =

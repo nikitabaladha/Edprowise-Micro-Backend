@@ -92,6 +92,7 @@ import {
   deleteGroupLedgerById,
   getAllByBSPLLedgerId,
   findGroupLedgerByName,
+  getAllByFixedAssets,
 } from "../controllers/Setting/Ledger/GroupLedger/index.js";
 
 router.post(
@@ -104,6 +105,12 @@ router.get(
   "/get-all-group-ledger/:academicYear",
   roleBasedMiddleware("School"),
   getAllGroupLedgerBySchoolId
+);
+
+router.get(
+  "/get-all-group-ledger-by-fixed-assets/:academicYear",
+  roleBasedMiddleware("School"),
+  getAllByFixedAssets
 );
 
 router.get(
