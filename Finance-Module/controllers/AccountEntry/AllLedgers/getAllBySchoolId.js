@@ -10,6 +10,7 @@ async function getAllBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
     const { academicYear } = req.params;
+    const { startDate, endDate } = req.query;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -18,37 +19,75 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    const paymentEntries = await PaymentEntry.find({
+    const baseQuery = {
       schoolId,
-      academicYear,
       status: "Posted",
-    })
-      .sort({ createdAt: -1 })
-      .lean();
+    };
 
-    const receiptEntries = await Receipt.find({
-      schoolId,
-      academicYear,
-      status: "Posted",
-    })
-      .sort({ createdAt: -1 })
-      .lean();
+    if (!startDate && !endDate) {
+      baseQuery.academicYear = academicYear;
+    }
 
-    const contraEntries = await Contra.find({
-      schoolId,
-      academicYear,
-      status: "Posted",
-    })
-      .sort({ createdAt: -1 })
-      .lean();
+    // Add date range filter if provided (override academic year)
+    if (startDate || endDate) {
+      baseQuery.entryDate = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0); // Start of day
+        baseQuery.entryDate.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999); // End of day
+        baseQuery.entryDate.$lte = end;
+      }
+    } else {
+      // Default to academic year if no date range provided
+      baseQuery.academicYear = academicYear;
+    }
 
-    const JournalEntries = await Journal.find({
-      schoolId,
-      academicYear,
-      status: "Posted",
-    })
-      .sort({ createdAt: -1 })
-      .lean();
+    // const paymentEntries = await PaymentEntry.find(baseQuery)
+    //   .sort({ createdAt: -1 })
+    //   .lean();
+
+    // const receiptEntries = await Receipt.find({
+    //   schoolId,
+    //   academicYear,
+    //   status: "Posted",
+    // })
+    //   .sort({ createdAt: -1 })
+    //   .lean();
+
+    // const contraEntries = await Contra.find({
+    //   schoolId,
+    //   academicYear,
+    //   status: "Posted",
+    // })
+    //   .sort({ createdAt: -1 })
+    //   .lean();
+
+    // const JournalEntries = await Journal.find({
+    //   schoolId,
+    //   academicYear,
+    //   status: "Posted",
+    // })
+    //   .sort({ createdAt: -1 })
+    //   .lean();
+
+    const [paymentEntries, receiptEntries, contraEntries, journalEntries] =
+      await Promise.all([
+        PaymentEntry.find(baseQuery).sort({ createdAt: -1 }).lean(),
+        Receipt.find(baseQuery).sort({ createdAt: -1 }).lean(),
+        Contra.find(baseQuery).sort({ createdAt: -1 }).lean(),
+        Journal.find(baseQuery).sort({ createdAt: -1 }).lean(),
+      ]);
+
+    const allEntries = [
+      ...paymentEntries,
+      ...receiptEntries,
+      ...contraEntries,
+      ...journalEntries,
+    ];
 
     const formattedData = [];
 
@@ -434,7 +473,7 @@ async function getAllBySchoolId(req, res) {
 
     // Find Journal Entries
 
-    for (const entry of JournalEntries) {
+    for (const entry of journalEntries) {
       const itemsWithLedgerNames = [];
 
       for (const item of entry.itemDetails) {
