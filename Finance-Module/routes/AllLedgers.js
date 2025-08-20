@@ -9,12 +9,19 @@ import {
   getAllReceiptBySchoolId,
   getAllContraBySchoolId,
   getAllJournalBySchoolId,
+  getAllMonthWithdebitCredit,
 } from "../controllers/AccountEntry/AllLedgers/index.js";
 
 router.get(
   "/get-all-entry/:academicYear",
   roleBasedMiddleware("School"),
   getAllBySchoolId
+);
+
+router.get(
+  "/get-all-month-with-debit-credit/:academicYear",
+  roleBasedMiddleware("School"),
+  getAllMonthWithdebitCredit
 );
 
 router.get(
