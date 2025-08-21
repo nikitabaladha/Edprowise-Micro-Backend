@@ -118,9 +118,8 @@ const transactionNumber = Joi.string().allow(null, "").optional().messages({
 const itemDetails = Joi.array()
   .items(
     Joi.object({
-      itemName: Joi.string().required().messages({
-        "any.required": "Item name is required.",
-        "string.base": "Item name must be a string.",
+      itemName: Joi.string().allow(null, "").messages({
+        "string.base": "Description must be a string.",
       }),
       ledgerId: Joi.string().required().messages({
         "any.required": "Ledger ID is required.",

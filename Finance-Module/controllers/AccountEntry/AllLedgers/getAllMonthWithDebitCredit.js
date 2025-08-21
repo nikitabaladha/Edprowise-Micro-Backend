@@ -304,6 +304,12 @@ async function getAllBySchoolId(req, res) {
 
         entryDate: entry.entryDate,
         academicYear: entry.academicYear,
+
+        invoiceDate: entry.invoiceDate,
+        narration: entry.narration,
+        chequeNumber: entry.chequeNumber || null,
+        transactionNumber: entry.transactionNumber || null,
+        paymentVoucherNumber: entry.paymentVoucherNumber || null,
       };
 
       formattedData.push(entryData);
@@ -458,7 +464,7 @@ async function getAllBySchoolId(req, res) {
       }
 
       const entryData = {
-        // PaymentEntry fields
+        // Receipt fields
         accountingEntry: "Receipt",
         _id: entry._id,
         schoolId: entry.schoolId,
@@ -503,6 +509,13 @@ async function getAllBySchoolId(req, res) {
 
         entryDate: entry.entryDate,
         academicYear: entry.academicYear,
+
+        receiptDate: entry.receiptDate,
+        narration: entry.narration,
+        chequeNumber: entry.chequeNumber || null,
+        transactionNumber: entry.transactionNumber || null,
+
+        receiptVoucherNumber: entry.receiptVoucherNumber || null,
       };
 
       formattedData.push(entryData);
@@ -513,7 +526,6 @@ async function getAllBySchoolId(req, res) {
     for (const entry of contraEntries) {
       const itemsWithLedgerNames = [];
 
-      // Collect all ledger IDs (both ledgerId and ledgerIdOfCashAccount)
       const allLedgerIds = new Set();
       entry.itemDetails.forEach((item) => {
         if (item.ledgerId && mongoose.Types.ObjectId.isValid(item.ledgerId)) {
@@ -532,27 +544,63 @@ async function getAllBySchoolId(req, res) {
         _id: { $in: Array.from(allLedgerIds) },
         schoolId,
       })
-        .select("ledgerName groupLedgerId")
+        .select(
+          "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
+        )
         .lean();
 
+      const headOfAccountIds = new Set();
+      const bsplLedgerIds = new Set();
+
+      ledgers.forEach((ledger) => {
+        if (ledger.headOfAccountId)
+          headOfAccountIds.add(ledger.headOfAccountId);
+        if (ledger.bSPLLedgerId) bsplLedgerIds.add(ledger.bSPLLedgerId);
+      });
+
+      const headOfAccounts = await HeadOfAccount.find({
+        _id: { $in: Array.from(headOfAccountIds) },
+      }).lean();
+
+      const bsplLedgers = await BSPLLedger.find({
+        _id: { $in: Array.from(bsplLedgerIds) },
+      }).lean();
+
+      const headOfAccountMap = {};
+      headOfAccounts.forEach((hoa) => {
+        headOfAccountMap[hoa._id.toString()] = hoa.headOfAccountName;
+      });
+
+      const bsplLedgerMap = {};
+      bsplLedgers.forEach((bspl) => {
+        bsplLedgerMap[bspl._id.toString()] = bspl.bSPLLedgerName;
+      });
+
       // Create maps for quick lookup
+
       const ledgerMap = {};
       const ledgerGroupMap = {};
+
       ledgers.forEach((ledger) => {
         ledgerMap[ledger._id.toString()] = {
           ledgerName: ledger.ledgerName,
+          openingBalance: ledger.openingBalance,
           groupLedgerId: ledger.groupLedgerId?.toString(),
+          headOfAccountName: ledger.headOfAccountId
+            ? headOfAccountMap[ledger.headOfAccountId.toString()]
+            : null,
+          bSPLLedgerName: ledger.bSPLLedgerId
+            ? bsplLedgerMap[ledger.bSPLLedgerId.toString()]
+            : null,
         };
       });
 
-      // Get all unique group ledger IDs
       const groupLedgerIds = new Set(
         ledgers
           .map((ledger) => ledger.groupLedgerId?.toString())
           .filter((id) => id)
       );
 
-      // Fetch all required group ledgers in one query
       const groupLedgers = await GroupLedger.find({
         _id: { $in: Array.from(groupLedgerIds) },
         schoolId,
@@ -560,14 +608,12 @@ async function getAllBySchoolId(req, res) {
         .select("groupLedgerName")
         .lean();
 
-      // Create map for group ledgers
       const groupLedgerMap = {};
       groupLedgers.forEach((groupLedger) => {
         groupLedgerMap[groupLedger._id.toString()] =
           groupLedger.groupLedgerName;
       });
 
-      // Process each item in the contra entry
       for (const item of entry.itemDetails) {
         const ledgerInfo = ledgerMap[item.ledgerId?.toString()] || {};
         const cashLedgerInfo =
@@ -576,17 +622,30 @@ async function getAllBySchoolId(req, res) {
         itemsWithLedgerNames.push({
           ledgerId: item.ledgerId || null,
           ledgerName: ledgerInfo.ledgerName || null,
+          openingBalance: ledgerInfo.openingBalance || null,
+          openingBalanceOfCashAccount: cashLedgerInfo.openingBalance || null,
+
           groupLedgerId: ledgerInfo.groupLedgerId || null,
           groupLedgerName: ledgerInfo.groupLedgerId
             ? groupLedgerMap[ledgerInfo.groupLedgerId]
             : null,
 
+          // Add these for the main ledger
+          headOfAccountName: ledgerInfo.headOfAccountName || null,
+          bSPLLedgerName: ledgerInfo.bSPLLedgerName || null,
+
           ledgerIdOfCashAccount: item.ledgerIdOfCashAccount || null,
           ledgerNameOfCashAccount: cashLedgerInfo.ledgerName || null,
+
           groupLedgerIdOfCashAccount: cashLedgerInfo.groupLedgerId || null,
           groupLedgerNameOfCashAccount: cashLedgerInfo.groupLedgerId
             ? groupLedgerMap[cashLedgerInfo.groupLedgerId]
             : null,
+
+          // Add these for the cash account ledger
+          headOfAccountNameOfCashAccount:
+            cashLedgerInfo.headOfAccountName || null,
+          bSPLLedgerNameOfCashAccount: cashLedgerInfo.bSPLLedgerName || null,
 
           debitAmount: item.debitAmount || 0,
           creditAmount: item.creditAmount || 0,
@@ -596,6 +655,9 @@ async function getAllBySchoolId(req, res) {
       // Handle TDS/TCS information if present
       let TDSorTCSGroupLedgerName = null;
       let TDSorTCSLedgerName = null;
+      let TDSorTCSHeadOfAccountName = null;
+      let TDSorTCSBSPLLedgerName = null;
+      let TDSorTCSOpeningBalance = null;
 
       if (entry.TDSorTCS) {
         const tdsOrTcsGroupLedger = await GroupLedger.findOne({
@@ -612,11 +674,32 @@ async function getAllBySchoolId(req, res) {
             schoolId,
             groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName")
+            .select("ledgerName headOfAccountId bSPLLedgerId openingBalance")
             .lean();
 
           if (tdsOrTcsLedger) {
             TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+            TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || null;
+
+            // Get headOfAccountName
+            const headOfAccount = tdsOrTcsLedger.headOfAccountId
+              ? await HeadOfAccount.findOne({
+                  _id: tdsOrTcsLedger.headOfAccountId,
+                })
+                  .select("headOfAccountName")
+                  .lean()
+              : null;
+
+            // Get bSPLLedgerName
+            const bsplLedger = tdsOrTcsLedger.bSPLLedgerId
+              ? await BSPLLedger.findOne({ _id: tdsOrTcsLedger.bSPLLedgerId })
+                  .select("bSPLLedgerName")
+                  .lean()
+              : null;
+
+            TDSorTCSHeadOfAccountName =
+              headOfAccount?.headOfAccountName || null;
+            TDSorTCSBSPLLedgerName = bsplLedger?.bSPLLedgerName || null;
           }
         }
       }
@@ -632,22 +715,29 @@ async function getAllBySchoolId(req, res) {
         narration: entry.narration,
         chequeNumber: entry.chequeNumber || null,
         chequeImageForContra: entry.chequeImageForContra || null,
+        contraVoucherNumber: entry.contraVoucherNumber || null,
+
         subTotalOfDebit: entry.subTotalOfDebit || 0,
         subTotalOfCredit: entry.subTotalOfCredit || 0,
         totalAmountOfCredit: entry.totalAmountOfCredit || 0,
         totalAmountOfDebit: entry.totalAmountOfDebit || 0,
         TDSTCSRateAmount: entry.TDSTCSRateAmount || 0,
-        contraVoucherNumber: entry.contraVoucherNumber || null,
         TDSorTCS: entry.TDSorTCS || null,
+
         status: entry.status,
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
-        TDSorTCSGroupLedgerName,
-        TDSorTCSLedgerName,
         itemDetails: itemsWithLedgerNames,
 
         entryDate: entry.entryDate,
         academicYear: entry.academicYear,
+
+        TDSorTCSHeadOfAccountName,
+        TDSorTCSBSPLLedgerName,
+        TDSorTCSGroupLedgerName,
+        TDSorTCSLedgerName,
+
+        TDSorTCSOpeningBalance: TDSorTCSOpeningBalance || null,
       };
 
       formattedData.push(entryData);
@@ -665,7 +755,9 @@ async function getAllBySchoolId(req, res) {
             _id: item.ledgerId,
             schoolId,
           })
-            .select("ledgerName groupLedgerId")
+            .select(
+              "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
+            )
             .lean();
         }
 
@@ -679,14 +771,35 @@ async function getAllBySchoolId(req, res) {
             .lean();
         }
 
+        const headOfAccount = ledger?.headOfAccountId
+          ? await HeadOfAccount.findOne({ _id: ledger.headOfAccountId })
+              .select("headOfAccountName")
+              .lean()
+          : null;
+
+        const bsplLedger = ledger?.bSPLLedgerId
+          ? await BSPLLedger.findOne({ _id: ledger.bSPLLedgerId })
+              .select("bSPLLedgerName")
+              .lean()
+          : null;
+
         itemsWithLedgerNames.push({
           description: item.description,
-          ledgerId: item.ledgerId || null,
           debitAmount: item.debitAmount || 0,
           creditAmount: item.creditAmount || 0,
+
+          ledgerId: item.ledgerId || null,
           ledgerName: ledger?.ledgerName || null,
+          openingBalance: ledger?.openingBalance || null,
+
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
+
+          headOfAccountId: ledger?.headOfAccountId || null,
+          headOfAccountName: headOfAccount?.headOfAccountName || null,
+
+          bSPLLedgerId: ledger?.bSPLLedgerId || null,
+          bSPLLedgerName: bsplLedger?.bSPLLedgerName || null,
         });
       }
 
@@ -696,11 +809,13 @@ async function getAllBySchoolId(req, res) {
         schoolId: entry.schoolId,
         entryDate: entry.entryDate,
         documentDate: entry.documentDate,
+        journalVoucherNumber: entry.journalVoucherNumber || null,
         narration: entry.narration,
+
         subTotalOfDebit: entry.subTotalOfDebit || 0,
         totalAmountOfDebit: entry.totalAmountOfDebit || 0,
         totalAmountOfCredit: entry.totalAmountOfCredit || 0,
-        journalVoucherNumber: entry.journalVoucherNumber || null,
+
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
 

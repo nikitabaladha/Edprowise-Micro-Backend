@@ -76,20 +76,25 @@ async function create(req, res) {
 
     const { invoiceImage, chequeImage } = req.files || {};
 
-    const invoiceImageFullPath = invoiceImage?.[0]
-      ? `${
-          invoiceImage[0].mimetype.startsWith("image/")
-            ? "/Images/FinanceModule/InvoiceImage"
-            : "/Documents/FinanceModule/InvoiceImage"
-        }/${invoiceImage[0].filename}`
-      : null;
+    if (!invoiceImage?.[0]) {
+      return res.status(400).json({
+        hasError: true,
+        message: "Invoice is required.",
+      });
+    }
+
+    const invoiceImagePath = invoiceImage[0].mimetype.startsWith("image/")
+      ? "/Images/FinanceModule/InvoiceImage"
+      : "/Documents/FinanceModule/InvoiceImage";
+
+    const invoiceImageFullPath = `${invoiceImagePath}/${invoiceImage[0].filename}`;
+
+    const chequeImagePath = chequeImage?.[0]?.mimetype.startsWith("image/")
+      ? "/Images/FinanceModule/ChequeImage"
+      : "/Documents/FinanceModule/ChequeImage";
 
     const chequeImageFullPath = chequeImage?.[0]
-      ? `${
-          chequeImage[0].mimetype.startsWith("image/")
-            ? "/Images/FinanceModule/ChequeImage"
-            : "/Documents/FinanceModule/ChequeImage"
-        }/${chequeImage[0].filename}`
+      ? `${chequeImagePath}/${chequeImage[0].filename}`
       : null;
 
     const updatedItemDetails = itemDetails.map((item) => ({
@@ -115,6 +120,9 @@ async function create(req, res) {
       (sum, item) => sum + (parseFloat(item.amountAfterGST) || 0),
       0
     );
+
+    // const totalAmountAfterGST =
+    //   subTotalAmountAfterGST - (parseFloat(TDSTCSRateWithAmountBeforeGST) || 0);
 
     const transactionNumber =
       paymentMode === "Online" ? await generateTransactionNumber() : null;
