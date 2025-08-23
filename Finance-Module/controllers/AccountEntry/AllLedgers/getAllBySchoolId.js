@@ -318,6 +318,8 @@ async function getAllBySchoolId(req, res) {
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
         subTotalAmount: entry.subTotalAmount || 0,
+        totalAmount: entry.totalAmount,
+
         TDSTCSRateWithAmount: entry.TDSTCSRateWithAmount || 0,
 
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,

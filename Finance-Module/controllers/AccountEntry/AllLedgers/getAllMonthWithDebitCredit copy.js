@@ -1,5 +1,7 @@
 import PaymentEntry from "../../../models/PaymentEntry.js";
 import Receipt from "../../../models/Receipt.js";
+import Contra from "../../../models/Contra.js";
+import Journal from "../../../models/Journal.js";
 
 import BSPLLedger from "../../../models/BSPLLedger.js";
 import HeadOfAccount from "../../../models/HeadOfAccount.js";
@@ -11,7 +13,7 @@ async function getAllBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
     const { academicYear } = req.params;
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, month } = req.query;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -29,8 +31,50 @@ async function getAllBySchoolId(req, res) {
       baseQuery.academicYear = academicYear;
     }
 
+    if (month) {
+      // Parse month string like "January 2025"
+      const [monthName, year] = month.split(" ");
+
+      const monthNames = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+
+      const monthIndex = monthNames.findIndex(
+        (m) => m.toLowerCase() === monthName.toLowerCase()
+      );
+
+      if (monthIndex === -1) {
+        return res.status(400).json({
+          hasError: true,
+          message: "Invalid month name provided.",
+        });
+      }
+
+      // Calculate start and end dates for the specific month
+      const startOfMonth = new Date(year, monthIndex, 1);
+      const endOfMonth = new Date(year, monthIndex + 1, 0);
+
+      startOfMonth.setHours(0, 0, 0, 0);
+      endOfMonth.setHours(23, 59, 59, 999);
+
+      baseQuery.entryDate = {
+        $gte: startOfMonth,
+        $lte: endOfMonth,
+      };
+    }
     // Add date range filter if provided (override academic year)
-    if (startDate || endDate) {
+    else if (startDate || endDate) {
       baseQuery.entryDate = {};
       if (startDate) {
         const start = new Date(startDate);
@@ -47,12 +91,20 @@ async function getAllBySchoolId(req, res) {
       baseQuery.academicYear = academicYear;
     }
 
-    const [paymentEntries, receiptEntries] = await Promise.all([
-      PaymentEntry.find(baseQuery).sort({ createdAt: -1 }).lean(),
-      Receipt.find(baseQuery).sort({ createdAt: -1 }).lean(),
-    ]);
+    const [paymentEntries, receiptEntries, contraEntries, journalEntries] =
+      await Promise.all([
+        PaymentEntry.find(baseQuery).sort({ createdAt: -1 }).lean(),
+        Receipt.find(baseQuery).sort({ createdAt: -1 }).lean(),
+        Contra.find(baseQuery).sort({ createdAt: -1 }).lean(),
+        Journal.find(baseQuery).sort({ createdAt: -1 }).lean(),
+      ]);
 
-    const allEntries = [...paymentEntries, receiptEntries];
+    const allEntries = [
+      ...paymentEntries,
+      ...receiptEntries,
+      ...contraEntries,
+      ...journalEntries,
+    ];
 
     const formattedData = [];
     const months = [];
@@ -252,6 +304,12 @@ async function getAllBySchoolId(req, res) {
 
         entryDate: entry.entryDate,
         academicYear: entry.academicYear,
+
+        invoiceDate: entry.invoiceDate,
+        narration: entry.narration,
+        chequeNumber: entry.chequeNumber || null,
+        transactionNumber: entry.transactionNumber || null,
+        paymentVoucherNumber: entry.paymentVoucherNumber || null,
       };
 
       formattedData.push(entryData);
@@ -406,7 +464,7 @@ async function getAllBySchoolId(req, res) {
       }
 
       const entryData = {
-        // PaymentEntry fields
+        // Receipt fields
         accountingEntry: "Receipt",
         _id: entry._id,
         schoolId: entry.schoolId,
@@ -445,6 +503,321 @@ async function getAllBySchoolId(req, res) {
         TDSorTCSHeadOfAccountName,
         TDSorTCSBSPLLedgerName,
         TDSorTCSOpeningBalance: TDSorTCSOpeningBalance || null,
+
+        // Item details
+        itemDetails: itemsWithLedgerNames,
+
+        entryDate: entry.entryDate,
+        academicYear: entry.academicYear,
+
+        receiptDate: entry.receiptDate,
+        narration: entry.narration,
+        chequeNumber: entry.chequeNumber || null,
+        transactionNumber: entry.transactionNumber || null,
+
+        receiptVoucherNumber: entry.receiptVoucherNumber || null,
+      };
+
+      formattedData.push(entryData);
+    }
+
+    // Find Contra Entries
+
+    for (const entry of contraEntries) {
+      const itemsWithLedgerNames = [];
+
+      const allLedgerIds = new Set();
+      entry.itemDetails.forEach((item) => {
+        if (item.ledgerId && mongoose.Types.ObjectId.isValid(item.ledgerId)) {
+          allLedgerIds.add(item.ledgerId.toString());
+        }
+        if (
+          item.ledgerIdOfCashAccount &&
+          mongoose.Types.ObjectId.isValid(item.ledgerIdOfCashAccount)
+        ) {
+          allLedgerIds.add(item.ledgerIdOfCashAccount.toString());
+        }
+      });
+
+      // Fetch all required ledgers in one query
+      const ledgers = await Ledger.find({
+        _id: { $in: Array.from(allLedgerIds) },
+        schoolId,
+      })
+        .select(
+          "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
+        )
+        .lean();
+
+      const headOfAccountIds = new Set();
+      const bsplLedgerIds = new Set();
+
+      ledgers.forEach((ledger) => {
+        if (ledger.headOfAccountId)
+          headOfAccountIds.add(ledger.headOfAccountId);
+        if (ledger.bSPLLedgerId) bsplLedgerIds.add(ledger.bSPLLedgerId);
+      });
+
+      const headOfAccounts = await HeadOfAccount.find({
+        _id: { $in: Array.from(headOfAccountIds) },
+      }).lean();
+
+      const bsplLedgers = await BSPLLedger.find({
+        _id: { $in: Array.from(bsplLedgerIds) },
+      }).lean();
+
+      const headOfAccountMap = {};
+      headOfAccounts.forEach((hoa) => {
+        headOfAccountMap[hoa._id.toString()] = hoa.headOfAccountName;
+      });
+
+      const bsplLedgerMap = {};
+      bsplLedgers.forEach((bspl) => {
+        bsplLedgerMap[bspl._id.toString()] = bspl.bSPLLedgerName;
+      });
+
+      // Create maps for quick lookup
+
+      const ledgerMap = {};
+      const ledgerGroupMap = {};
+
+      ledgers.forEach((ledger) => {
+        ledgerMap[ledger._id.toString()] = {
+          ledgerName: ledger.ledgerName,
+          openingBalance: ledger.openingBalance,
+          groupLedgerId: ledger.groupLedgerId?.toString(),
+          headOfAccountName: ledger.headOfAccountId
+            ? headOfAccountMap[ledger.headOfAccountId.toString()]
+            : null,
+          bSPLLedgerName: ledger.bSPLLedgerId
+            ? bsplLedgerMap[ledger.bSPLLedgerId.toString()]
+            : null,
+        };
+      });
+
+      const groupLedgerIds = new Set(
+        ledgers
+          .map((ledger) => ledger.groupLedgerId?.toString())
+          .filter((id) => id)
+      );
+
+      const groupLedgers = await GroupLedger.find({
+        _id: { $in: Array.from(groupLedgerIds) },
+        schoolId,
+      })
+        .select("groupLedgerName")
+        .lean();
+
+      const groupLedgerMap = {};
+      groupLedgers.forEach((groupLedger) => {
+        groupLedgerMap[groupLedger._id.toString()] =
+          groupLedger.groupLedgerName;
+      });
+
+      for (const item of entry.itemDetails) {
+        const ledgerInfo = ledgerMap[item.ledgerId?.toString()] || {};
+        const cashLedgerInfo =
+          ledgerMap[item.ledgerIdOfCashAccount?.toString()] || {};
+
+        itemsWithLedgerNames.push({
+          ledgerId: item.ledgerId || null,
+          ledgerName: ledgerInfo.ledgerName || null,
+          openingBalance: ledgerInfo.openingBalance || null,
+          openingBalanceOfCashAccount: cashLedgerInfo.openingBalance || null,
+
+          groupLedgerId: ledgerInfo.groupLedgerId || null,
+          groupLedgerName: ledgerInfo.groupLedgerId
+            ? groupLedgerMap[ledgerInfo.groupLedgerId]
+            : null,
+
+          // Add these for the main ledger
+          headOfAccountName: ledgerInfo.headOfAccountName || null,
+          bSPLLedgerName: ledgerInfo.bSPLLedgerName || null,
+
+          ledgerIdOfCashAccount: item.ledgerIdOfCashAccount || null,
+          ledgerNameOfCashAccount: cashLedgerInfo.ledgerName || null,
+
+          groupLedgerIdOfCashAccount: cashLedgerInfo.groupLedgerId || null,
+          groupLedgerNameOfCashAccount: cashLedgerInfo.groupLedgerId
+            ? groupLedgerMap[cashLedgerInfo.groupLedgerId]
+            : null,
+
+          // Add these for the cash account ledger
+          headOfAccountNameOfCashAccount:
+            cashLedgerInfo.headOfAccountName || null,
+          bSPLLedgerNameOfCashAccount: cashLedgerInfo.bSPLLedgerName || null,
+
+          debitAmount: item.debitAmount || 0,
+          creditAmount: item.creditAmount || 0,
+        });
+      }
+
+      // Handle TDS/TCS information if present
+      let TDSorTCSGroupLedgerName = null;
+      let TDSorTCSLedgerName = null;
+      let TDSorTCSHeadOfAccountName = null;
+      let TDSorTCSBSPLLedgerName = null;
+      let TDSorTCSOpeningBalance = null;
+
+      if (entry.TDSorTCS) {
+        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+          schoolId,
+          groupLedgerName: entry.TDSorTCS,
+        })
+          .select("_id groupLedgerName")
+          .lean();
+
+        if (tdsOrTcsGroupLedger) {
+          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+
+          const tdsOrTcsLedger = await Ledger.findOne({
+            schoolId,
+            groupLedgerId: tdsOrTcsGroupLedger._id,
+          })
+            .select("ledgerName headOfAccountId bSPLLedgerId openingBalance")
+            .lean();
+
+          if (tdsOrTcsLedger) {
+            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+            TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || null;
+
+            // Get headOfAccountName
+            const headOfAccount = tdsOrTcsLedger.headOfAccountId
+              ? await HeadOfAccount.findOne({
+                  _id: tdsOrTcsLedger.headOfAccountId,
+                })
+                  .select("headOfAccountName")
+                  .lean()
+              : null;
+
+            // Get bSPLLedgerName
+            const bsplLedger = tdsOrTcsLedger.bSPLLedgerId
+              ? await BSPLLedger.findOne({ _id: tdsOrTcsLedger.bSPLLedgerId })
+                  .select("bSPLLedgerName")
+                  .lean()
+              : null;
+
+            TDSorTCSHeadOfAccountName =
+              headOfAccount?.headOfAccountName || null;
+            TDSorTCSBSPLLedgerName = bsplLedger?.bSPLLedgerName || null;
+          }
+        }
+      }
+
+      const entryData = {
+        accountingEntry: "Contra",
+        _id: entry._id,
+        schoolId: entry.schoolId,
+        entryDate: entry.entryDate,
+        dateOfCashDepositedWithdrawlDate:
+          entry.dateOfCashDepositedWithdrawlDate,
+        contraEntryName: entry.contraEntryName,
+        narration: entry.narration,
+        chequeNumber: entry.chequeNumber || null,
+        chequeImageForContra: entry.chequeImageForContra || null,
+        contraVoucherNumber: entry.contraVoucherNumber || null,
+
+        subTotalOfDebit: entry.subTotalOfDebit || 0,
+        subTotalOfCredit: entry.subTotalOfCredit || 0,
+        totalAmountOfCredit: entry.totalAmountOfCredit || 0,
+        totalAmountOfDebit: entry.totalAmountOfDebit || 0,
+        TDSTCSRateAmount: entry.TDSTCSRateAmount || 0,
+        TDSorTCS: entry.TDSorTCS || null,
+
+        status: entry.status,
+        createdAt: entry.createdAt,
+        updatedAt: entry.updatedAt,
+        itemDetails: itemsWithLedgerNames,
+
+        entryDate: entry.entryDate,
+        academicYear: entry.academicYear,
+
+        TDSorTCSHeadOfAccountName,
+        TDSorTCSBSPLLedgerName,
+        TDSorTCSGroupLedgerName,
+        TDSorTCSLedgerName,
+
+        TDSorTCSOpeningBalance: TDSorTCSOpeningBalance || null,
+      };
+
+      formattedData.push(entryData);
+    }
+
+    // Find Journal Entries
+
+    for (const entry of journalEntries) {
+      const itemsWithLedgerNames = [];
+
+      for (const item of entry.itemDetails) {
+        let ledger = null;
+        if (item.ledgerId && mongoose.Types.ObjectId.isValid(item.ledgerId)) {
+          ledger = await Ledger.findOne({
+            _id: item.ledgerId,
+            schoolId,
+          })
+            .select(
+              "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
+            )
+            .lean();
+        }
+
+        let groupLedger = null;
+        if (ledger?.groupLedgerId) {
+          groupLedger = await GroupLedger.findOne({
+            _id: ledger.groupLedgerId,
+            schoolId,
+          })
+            .select("groupLedgerName")
+            .lean();
+        }
+
+        const headOfAccount = ledger?.headOfAccountId
+          ? await HeadOfAccount.findOne({ _id: ledger.headOfAccountId })
+              .select("headOfAccountName")
+              .lean()
+          : null;
+
+        const bsplLedger = ledger?.bSPLLedgerId
+          ? await BSPLLedger.findOne({ _id: ledger.bSPLLedgerId })
+              .select("bSPLLedgerName")
+              .lean()
+          : null;
+
+        itemsWithLedgerNames.push({
+          description: item.description,
+          debitAmount: item.debitAmount || 0,
+          creditAmount: item.creditAmount || 0,
+
+          ledgerId: item.ledgerId || null,
+          ledgerName: ledger?.ledgerName || null,
+          openingBalance: ledger?.openingBalance || null,
+
+          groupLedgerId: ledger?.groupLedgerId || null,
+          groupLedgerName: groupLedger?.groupLedgerName || null,
+
+          headOfAccountId: ledger?.headOfAccountId || null,
+          headOfAccountName: headOfAccount?.headOfAccountName || null,
+
+          bSPLLedgerId: ledger?.bSPLLedgerId || null,
+          bSPLLedgerName: bsplLedger?.bSPLLedgerName || null,
+        });
+      }
+
+      const entryData = {
+        accountingEntry: "Journal",
+        _id: entry._id,
+        schoolId: entry.schoolId,
+        entryDate: entry.entryDate,
+        documentDate: entry.documentDate,
+        journalVoucherNumber: entry.journalVoucherNumber || null,
+        narration: entry.narration,
+
+        subTotalOfDebit: entry.subTotalOfDebit || 0,
+        totalAmountOfDebit: entry.totalAmountOfDebit || 0,
+        totalAmountOfCredit: entry.totalAmountOfCredit || 0,
+
+        createdAt: entry.createdAt,
+        updatedAt: entry.updatedAt,
 
         // Item details
         itemDetails: itemsWithLedgerNames,
