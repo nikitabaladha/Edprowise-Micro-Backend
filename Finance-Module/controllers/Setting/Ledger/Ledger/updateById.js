@@ -27,6 +27,7 @@ async function updateById(req, res) {
       groupLedgerId,
       bSPLLedgerId,
       openingBalance,
+      balanceType,
     } = req.body;
 
     const existingLedger = await Ledger.findOne({
@@ -53,6 +54,8 @@ async function updateById(req, res) {
 
     existingLedger.openingBalance =
       openingBalance || existingLedger.openingBalance;
+
+    existingLedger.balanceType = balanceType || existingLedger.balanceType;
 
     await existingLedger.save();
 

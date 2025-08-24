@@ -167,11 +167,6 @@ const TDSorTCS = Joi.string()
     "string.base": "TDSorTCS must be a string.",
   });
 
-// const TDSTCSRateChartId = Joi.string().required().messages({
-//   "any.required": "TDS/TCS rate chart ID is required.",
-//   "string.base": "TDS/TCS rate chart ID must be a string.",
-// });
-
 const TDSTCSRateChartId = Joi.string().allow("").optional().messages({
   "string.base": "TDS/TCS rate chart ID must be a string.",
 });

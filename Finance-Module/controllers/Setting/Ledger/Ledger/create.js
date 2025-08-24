@@ -31,6 +31,7 @@ async function create(req, res) {
       bSPLLedgerId,
       openingBalance,
       academicYear,
+      balanceType,
     } = req.body;
 
     // First, get the HeadOfAccount to determine the type
@@ -81,6 +82,7 @@ async function create(req, res) {
       openingBalance: finalOpeningBalance,
       academicYear,
       ledgerCode: ledgerCode.toString(),
+      balanceType,
     });
 
     await newLedger.save();

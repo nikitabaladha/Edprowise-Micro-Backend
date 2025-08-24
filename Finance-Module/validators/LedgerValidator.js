@@ -40,12 +40,22 @@ const openingBalance = Joi.number().optional().messages({
   "number.base": "Opening Balance must be a number.",
 });
 
+const balanceType = Joi.string()
+  .allow("")
+  .optional()
+  .valid("Debit", "Credit")
+  .messages({
+    "number.base": "Balance Type must be a string.",
+    "any.only": `"Balance Type" must be either 'Debit' or 'Credit'`,
+  });
+
 const LedgerValidator = Joi.object({
   ledgerName,
   headOfAccountId,
   groupLedgerId,
   bSPLLedgerId,
   openingBalance,
+  balanceType,
   academicYear: academicYearCreate,
 });
 
@@ -55,6 +65,7 @@ const LedgerValidatorUpdate = Joi.object({
   groupLedgerId,
   bSPLLedgerId,
   openingBalance,
+  balanceType,
   academicYear: academicYearUpdate,
 });
 
