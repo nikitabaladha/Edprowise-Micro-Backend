@@ -2,6 +2,7 @@ import moment from "moment";
 
 import PaymentEntry from "../../../models/PaymentEntry.js";
 import PaymentEntryValidator from "../../../validators/PaymentEntryValidator.js";
+import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 
 async function generatePaymentVoucherNumber(schoolId, academicYear) {
   const count = await PaymentEntry.countDocuments({ schoolId, academicYear });
@@ -150,6 +151,143 @@ async function create(req, res) {
     });
 
     await newPaymentEntry.save();
+
+    // example : data going to be stored in payment table
+
+    // _id:68ab00a2513a09dc77511db0
+    // schoolId:"SID144732"
+    // academicYear:"2025-2026"
+    // paymentVoucherNumber:"PVN/2025-2026/1"
+    // vendorCode:"VEN-001"
+    // vendorId:"6889a25b3a71e55803bf9747"
+    // entryDate:2025-08-24T00:00:00.000+00:00
+    // invoiceDate:2025-08-24T00:00:00.000+00:00
+    // invoiceNumber:"1234567890"
+    // poNumber:""
+    // dueDate:2025-08-24T00:00:00.000+00:00
+    // narration:"Test"
+    // paymentMode:"Cash"
+    // chequeNumber:""
+    // transactionNumber:null
+    // itemDetails:[
+    // {
+    // itemName:"Deficit",
+    // ledgerId:"68a9a476f46f002cf6a5433e",
+    // amountBeforeGST:100,
+    // GSTAmount:10,
+    // amountAfterGST:110,
+    // _id:68ab00a2513a09dc77511db1
+    // },
+    // {
+    // itemName:"Surplus",
+    // ledgerId:"68a9a476f46f002cf6a54339",
+    // amountBeforeGST:100,
+    // GSTAmount:10,
+    // amountAfterGST:110,
+    // _id:68ab0f3ea23368dd177d44d7
+    // }
+    // ]
+    // subTotalAmountAfterGST:110
+    // TDSorTCS:"TDS"
+    // TDSTCSRateChartId:"6889a4ca3a71e55803bf97f0"
+    // TDSTCSRate:5
+    // TDSTCSRateWithAmountBeforeGST:5
+    // totalAmountBeforeGST:100
+    // totalGSTAmount:10
+    // totalAmountAfterGST:105
+    // invoiceImage:null
+    // chequeImage:null
+    // ledgerIdWithPaymentMode:"68a9a46af46f002cf6a5420d"
+    // status:"Posted"
+
+    // after payment entry i want that in table OpeningClosingBalance
+    // find for entryDate and itemDetilas.ledgerId,ledgerIdWithPaymentMode, and TDSTCSRateChartId
+    // if not exist then store
+
+    //schoolId:SID144732
+    //academicYear: 2025-2026
+    //ledgerId: 68a9a476f46f002cf6a5433e
+    //entryDate:2025-08-24T00:00:00.000+00:00,
+    //if this is first entry of this academicYear for this perticular ledgerId
+    //then here in openingBalance store whatever openingBalance is with ledgerId in ledgerTable
+    //or if any previous date entry present and have closingbalance then store that closing balance as opening Balance for this entry
+    //here i am assuming there in no entry then store
+    //balanceDetails: [
+    //{entryId:68ab00a2513a09dc77511db0
+    //openingBalance: 1000
+    //debit:amountAfterGST=110
+    //credit:0
+    //closingBalance:openingBalance+credit-debit = 1000+0-110=890
+    //},
+    //],
+    // balanceType:Credit(It is stored in ledgerTable),
+
+    //schoolId:SID144732
+    //academicYear: 2025-2026
+    //ledgerId: 68a9a476f46f002cf6a54339
+    //entryDate:2025-08-24T00:00:00.000+00:00,
+    //if this is first entry of this academicYear for this perticular ledgerId
+    //then here in openingBalance store whatever openingBalance is with ledgerId in ledgerTable
+    //or if any previous date entry present and have closingbalance then store that closing balance as opening Balance for this entry
+    //here i am assuming there in no entry then store
+    //balanceDetails: [
+    //{entryId:68ab00a2513a09dc77511db0
+    //openingBalance: 1000
+    //debit:amountAfterGST=110
+    //credit:0
+    //closingBalance:openingBalance+credit-debit = 1000+0-110=890
+    //},
+    //],
+    // balanceType:Credit(It is stored in ledgerTable),
+
+    // if TDS
+    //schoolId:SID144732
+    //academicYear: 2025-2026
+    //ledgerId: 6889a4ca3a71e55803bf97f0
+    //entryDate:2025-08-24T00:00:00.000+00:00,
+    //balanceDetails: [
+    //{entryId:68ab00a2513a09dc77511db0
+    //openingBalance: 1000
+    //debit:0
+    //credit:TDSTCSRateWithAmountBeforeGST=5
+    //closingBalance:openingBalance+credit-debit = 1000+5-0=1005
+    //},
+    //],
+    // balanceType:Credit(It is stored in ledgerTable),
+
+    // Cash Account
+    //schoolId:SID144732
+    //academicYear: 2025-2026
+    //ledgerId: 68a9a46af46f002cf6a5420d
+    //entryDate:2025-08-24T00:00:00.000+00:00,
+    //balanceDetails: [
+    //{entryId:68ab00a2513a09dc77511db0
+    //openingBalance: 1000
+    //debit:0
+    //credit:subTotalAmountAfterGST-TDSTCSRateWithAmountBeforeGST= 220-5=215
+    //closingBalance:openingBalance+debit-credit = 1000+0-215=785
+    //},
+    //],
+    // balanceType:Debit(It is stored in ledgerTable),
+
+    //if new entry but if ledger alredy exist then closing balance will be openingBalnce for new entry
+    // other things will be according to calculation
+    // if entryDate change then store new entry for that perticular ledger but make sure
+    // opening date will be like last date of that perticular ledgerId and its closingbalance
+    // so each time for new entryDate there wll be new data will be store in OpeningClosingBalance
+    // if same entryDate then just add one more entry thing in balanceDetails
+
+    // example: cash account
+
+    // entryDate	  Op.Balance	Debit	Credit	  Cl. Balance
+    // 24-08-2025	    1000	     0.00	 105.00	  895
+    // 24-08-2025	     895	     0.00	 105.00	  790
+    // 24-08-2025	     790	     0.00	 105.00	  685
+    // 27-08-2025	     685	     0.00	 205.00   480
+
+    // above three for 24-08-2025 will be in same and for date change like 27-08-2025 it will be
+    // so stored in another entry with same ledger id but the opening balance will be closing balance of
+    // last date
 
     return res.status(201).json({
       hasError: false,
