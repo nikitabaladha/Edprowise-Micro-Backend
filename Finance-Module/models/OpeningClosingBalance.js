@@ -17,7 +17,6 @@ const OpeningClosingBalanceSchema = new mongoose.Schema(
     },
     balanceDetails: [
       {
-        // here enrtyId will be whatever _id of PaymentEntry
         entryId: { type: String },
         entryDate: { type: Date },
         openingBalance: {

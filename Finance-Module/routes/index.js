@@ -11,7 +11,8 @@ import JournalRoutes from "./Journal.js";
 import FinancialInformationRoutes from "./FinancialInformation.js";
 import ReportsRoutes from "./AllReports.js";
 import DepreciationMasterRoutes from "./DepreciationMaster.js";
-import TrialBalanceroutes from "./TrialBalance.js";
+import TrialBalanceRoutes from "./TrialBalance.js";
+import OpeningClosingBalanceRoutes from "./OpeningClosingBalance.js";
 
 export default (app) => {
   app.use("/api", ledgerRoutes);
@@ -27,5 +28,6 @@ export default (app) => {
   app.use("/api", ReportsRoutes);
   app.use("/api", FinancialInformationRoutes);
   app.use("/api", DepreciationMasterRoutes);
-  app.use("/api", TrialBalanceroutes);
+  app.use("/api", TrialBalanceRoutes);
+  app.use("/api", OpeningClosingBalanceRoutes);
 };
