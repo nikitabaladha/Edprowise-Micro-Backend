@@ -7,6 +7,11 @@ import BSPLLedger from "../../../models/BSPLLedger.js";
 import HeadOfAccount from "../../../models/HeadOfAccount.js";
 import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
+
+import Vendor from "../../../models/Vendor.js";
+import TDSTCSRateChart from "../../../models/TDSTCSRateChart.js";
+import AuthorisedSignature from "../../../models/AuthorisedSignature.js";
+
 import mongoose from "mongoose";
 
 async function getAllBySchoolId(req, res) {
@@ -21,6 +26,13 @@ async function getAllBySchoolId(req, res) {
         message: "Access denied: School ID not found in user context.",
       });
     }
+
+    const authorisedSignature = await AuthorisedSignature.findOne({
+      schoolId,
+      academicYear,
+    })
+      .select("authorisedSignatureImage")
+      .lean();
 
     const baseQuery = {
       schoolId,
@@ -112,6 +124,13 @@ async function getAllBySchoolId(req, res) {
     // Find Payment Entries
 
     for (const entry of paymentEntries) {
+      const vendor = entry.vendorCode
+        ? await Vendor.findOne({
+            vendorCode: entry.vendorCode,
+            schoolId,
+          }).lean()
+        : null;
+
       const itemsWithLedgerNames = [];
 
       for (const item of entry.itemDetails) {
@@ -122,7 +141,7 @@ async function getAllBySchoolId(req, res) {
             schoolId,
           })
             .select(
-              "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
+              "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance balanceType"
             )
             .lean();
         }
@@ -157,7 +176,8 @@ async function getAllBySchoolId(req, res) {
 
           ledgerId: item.ledgerId || null,
           ledgerName: ledger?.ledgerName || null,
-          openingBalance: ledger?.openingBalance || null,
+          openingBalance: ledger?.openingBalance || 0,
+          balanceType: ledger?.balanceType || null,
 
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
@@ -170,12 +190,19 @@ async function getAllBySchoolId(req, res) {
         });
       }
 
+      // Fetch TDS/TCS Rate Chart
+      const tdsTcsRateChart =
+        entry.TDSTCSRateChartId &&
+        mongoose.Types.ObjectId.isValid(entry.TDSTCSRateChartId)
+          ? await TDSTCSRateChart.findById(entry.TDSTCSRateChartId).lean()
+          : null;
+
       const ledgerWithPaymentMode =
         entry.ledgerIdWithPaymentMode &&
         mongoose.Types.ObjectId.isValid(entry.ledgerIdWithPaymentMode)
           ? await Ledger.findById(entry.ledgerIdWithPaymentMode)
               .select(
-                "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
+                "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance balanceType"
               )
               .lean()
           : null;
@@ -212,6 +239,7 @@ async function getAllBySchoolId(req, res) {
       let TDSorTCSHeadOfAccountName = null;
       let TDSorTCSBSPLLedgerName = null;
       let TDSorTCSOpeningBalance = null;
+      let TDSorTCSBalanceType = null;
 
       if (entry.TDSorTCS) {
         // 1. Find GroupLedger by name
@@ -230,12 +258,15 @@ async function getAllBySchoolId(req, res) {
             schoolId,
             groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName headOfAccountId bSPLLedgerId openingBalance")
+            .select(
+              "ledgerName headOfAccountId bSPLLedgerId openingBalance balanceType"
+            )
             .lean();
 
           if (tdsOrTcsLedger) {
             TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
-            TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || null;
+            TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || 0;
+            TDSorTCSBalanceType = tdsOrTcsLedger.balanceType || null;
 
             // Get headOfAccountName
             const headOfAccount = tdsOrTcsLedger.headOfAccountId
@@ -265,13 +296,14 @@ async function getAllBySchoolId(req, res) {
         accountingEntry: "Payment",
         _id: entry._id,
         schoolId: entry.schoolId,
+        invoiceNumber: entry.invoiceNumber,
+
         subTotalAmountAfterGST: entry.subTotalAmountAfterGST,
         TDSTCSRateWithAmountBeforeGST: entry.TDSTCSRateWithAmountBeforeGST || 0,
         totalAmountAfterGST: entry.totalAmountAfterGST || 0,
+
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
         ledgerNameWithPaymentMode: ledgerWithPaymentMode?.ledgerName || null,
-        openingBalanceWithPaymentMode:
-          ledgerWithPaymentMode?.openingBalance || null,
 
         groupLedgerIdWithPaymentMode:
           ledgerWithPaymentMode?.groupLedgerId || null,
@@ -288,6 +320,10 @@ async function getAllBySchoolId(req, res) {
         bSPLLedgerNameWithPaymentMode:
           bsplLedgerWithPaymentMode?.bSPLLedgerName || null,
 
+        openingBalanceWithPaymentMode:
+          ledgerWithPaymentMode?.openingBalance || 0,
+        balanceTypeWithPaymentMode: ledgerWithPaymentMode?.balanceType || null,
+
         TDSorTCS: entry.TDSorTCS || null,
 
         createdAt: entry.createdAt,
@@ -297,7 +333,8 @@ async function getAllBySchoolId(req, res) {
         TDSorTCSLedgerName,
         TDSorTCSHeadOfAccountName,
         TDSorTCSBSPLLedgerName,
-        TDSorTCSOpeningBalance: TDSorTCSOpeningBalance || null,
+        TDSorTCSOpeningBalance: TDSorTCSOpeningBalance || 0,
+        TDSorTCSBalanceType: TDSorTCSBalanceType || null,
 
         // Item details
         itemDetails: itemsWithLedgerNames,
@@ -310,6 +347,46 @@ async function getAllBySchoolId(req, res) {
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
         paymentVoucherNumber: entry.paymentVoucherNumber || null,
+
+        vendorCode: entry.vendorCode,
+        vendorId: entry.vendorId,
+        entryDate: entry.entryDate,
+        invoiceDate: entry.invoiceDate,
+        invoiceNumber: entry.invoiceNumber,
+        poNumber: entry.poNumber,
+        dueDate: entry.dueDate,
+        paymentMode: entry.paymentMode,
+
+        TDSTCSRateChartId: entry.TDSTCSRateChartId,
+        TDSTCSRate: entry.TDSTCSRate,
+        totalAmountBeforeGST: entry.totalAmountBeforeGST,
+        totalGSTAmount: entry.totalGSTAmount,
+        totalAmountAfterGST: entry.totalAmountAfterGST,
+        invoiceImage: entry.invoiceImage,
+        chequeImage: entry.chequeImage || null,
+        status: entry.status || null,
+
+        // Vendor fields
+        nameOfVendor: vendor?.nameOfVendor || null,
+        email: vendor?.email || null,
+        contactNumber: vendor?.contactNumber || null,
+        gstNumber: vendor?.gstNumber || null,
+        panNumber: vendor?.panNumber || null,
+        address: vendor?.address || null,
+        state: vendor?.state || null,
+        nameOfAccountHolder: vendor?.nameOfAccountHolder || null,
+        nameOfBank: vendor?.nameOfBank || null,
+        ifscCode: vendor?.ifscCode || null,
+        accountNumber: vendor?.accountNumber || null,
+        accountType: vendor?.accountType || null,
+
+        // TDS/TCS Rate Chart fields
+        natureOfTransaction: tdsTcsRateChart?.natureOfTransaction || null,
+        rate: tdsTcsRateChart?.rate || null,
+
+        // Authorised Signature
+        authorisedSignatureImage:
+          authorisedSignature?.authorisedSignatureImage || null,
       };
 
       formattedData.push(entryData);
@@ -328,7 +405,7 @@ async function getAllBySchoolId(req, res) {
             schoolId,
           })
             .select(
-              "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
+              "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance balanceType"
             )
             .lean();
         }
@@ -361,7 +438,6 @@ async function getAllBySchoolId(req, res) {
 
           ledgerId: item.ledgerId || null,
           ledgerName: ledger?.ledgerName || null,
-          openingBalance: ledger?.openingBalance || null,
 
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
@@ -371,15 +447,25 @@ async function getAllBySchoolId(req, res) {
 
           bSPLLedgerId: ledger?.bSPLLedgerId || null,
           bSPLLedgerName: bsplLedger?.bSPLLedgerName || null,
+
+          openingBalance: ledger?.openingBalance || 0,
+          balanceType: ledger?.balanceType || null,
         });
       }
+
+      // Fetch TDS/TCS Rate Chart
+      const tdsTcsRateChart =
+        entry.TDSTCSRateChartId &&
+        mongoose.Types.ObjectId.isValid(entry.TDSTCSRateChartId)
+          ? await TDSTCSRateChart.findById(entry.TDSTCSRateChartId).lean()
+          : null;
 
       const ledgerWithPaymentMode =
         entry.ledgerIdWithPaymentMode &&
         mongoose.Types.ObjectId.isValid(entry.ledgerIdWithPaymentMode)
           ? await Ledger.findById(entry.ledgerIdWithPaymentMode)
               .select(
-                "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
+                "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance balanceType"
               )
               .lean()
           : null;
@@ -416,6 +502,7 @@ async function getAllBySchoolId(req, res) {
       let TDSorTCSHeadOfAccountName = null;
       let TDSorTCSBSPLLedgerName = null;
       let TDSorTCSOpeningBalance = null;
+      let TDSorTCSBalanceType = null;
 
       if (entry.TDSorTCS) {
         // 1. Find GroupLedger by name
@@ -434,12 +521,15 @@ async function getAllBySchoolId(req, res) {
             schoolId,
             groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName headOfAccountId bSPLLedgerId openingBalance")
+            .select(
+              "ledgerName headOfAccountId bSPLLedgerId openingBalance balanceType"
+            )
             .lean();
 
           if (tdsOrTcsLedger) {
             TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
             TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || null;
+            TDSorTCSBalanceType = tdsOrTcsLedger.balanceType || null;
 
             const headOfAccount = tdsOrTcsLedger.headOfAccountId
               ? await HeadOfAccount.findOne({
@@ -475,8 +565,6 @@ async function getAllBySchoolId(req, res) {
 
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
         ledgerNameWithPaymentMode: ledgerWithPaymentMode?.ledgerName || null,
-        openingBalanceWithPaymentMode:
-          ledgerWithPaymentMode?.openingBalance || null,
 
         groupLedgerIdWithPaymentMode:
           ledgerWithPaymentMode?.groupLedgerId || null,
@@ -493,6 +581,10 @@ async function getAllBySchoolId(req, res) {
         bSPLLedgerNameWithPaymentMode:
           bsplLedgerWithPaymentMode?.bSPLLedgerName || null,
 
+        openingBalanceWithPaymentMode:
+          ledgerWithPaymentMode?.openingBalance || null,
+        balanceTypeWithPaymentMode: ledgerWithPaymentMode?.balanceType || null,
+
         TDSorTCS: entry.TDSorTCS || null,
 
         createdAt: entry.createdAt,
@@ -502,7 +594,8 @@ async function getAllBySchoolId(req, res) {
         TDSorTCSLedgerName,
         TDSorTCSHeadOfAccountName,
         TDSorTCSBSPLLedgerName,
-        TDSorTCSOpeningBalance: TDSorTCSOpeningBalance || null,
+        TDSorTCSOpeningBalance: TDSorTCSOpeningBalance || 0,
+        TDSorTCSBalance: TDSorTCSBalanceType || null,
 
         // Item details
         itemDetails: itemsWithLedgerNames,
@@ -516,6 +609,24 @@ async function getAllBySchoolId(req, res) {
         transactionNumber: entry.transactionNumber || null,
 
         receiptVoucherNumber: entry.receiptVoucherNumber || null,
+
+        // ==============
+
+        paymentMode: entry.paymentMode,
+        TDSorTCS: entry.TDSorTCS || null,
+        TDSTCSRateChartId: entry.TDSTCSRateChartId,
+        TDSTCSRate: entry.TDSTCSRate,
+        receiptImage: entry.receiptImage,
+        chequeImageForReceipt: entry.chequeImageForReceipt || null,
+        status: entry.status || null,
+
+        // TDS/TCS Rate Chart fields
+        natureOfTransaction: tdsTcsRateChart?.natureOfTransaction || null,
+        rate: tdsTcsRateChart?.rate || null,
+
+        // Authorised Signature
+        authorisedSignatureImage:
+          authorisedSignature?.authorisedSignatureImage || null,
       };
 
       formattedData.push(entryData);
@@ -545,7 +656,7 @@ async function getAllBySchoolId(req, res) {
         schoolId,
       })
         .select(
-          "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
+          "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance balanceType"
         )
         .lean();
 
@@ -584,7 +695,6 @@ async function getAllBySchoolId(req, res) {
       ledgers.forEach((ledger) => {
         ledgerMap[ledger._id.toString()] = {
           ledgerName: ledger.ledgerName,
-          openingBalance: ledger.openingBalance,
           groupLedgerId: ledger.groupLedgerId?.toString(),
           headOfAccountName: ledger.headOfAccountId
             ? headOfAccountMap[ledger.headOfAccountId.toString()]
@@ -592,6 +702,9 @@ async function getAllBySchoolId(req, res) {
           bSPLLedgerName: ledger.bSPLLedgerId
             ? bsplLedgerMap[ledger.bSPLLedgerId.toString()]
             : null,
+
+          openingBalance: ledger.openingBalance,
+          balanceType: ledger.balanceType,
         };
       });
 
@@ -622,8 +735,6 @@ async function getAllBySchoolId(req, res) {
         itemsWithLedgerNames.push({
           ledgerId: item.ledgerId || null,
           ledgerName: ledgerInfo.ledgerName || null,
-          openingBalance: ledgerInfo.openingBalance || null,
-          openingBalanceOfCashAccount: cashLedgerInfo.openingBalance || null,
 
           groupLedgerId: ledgerInfo.groupLedgerId || null,
           groupLedgerName: ledgerInfo.groupLedgerId
@@ -647,6 +758,12 @@ async function getAllBySchoolId(req, res) {
             cashLedgerInfo.headOfAccountName || null,
           bSPLLedgerNameOfCashAccount: cashLedgerInfo.bSPLLedgerName || null,
 
+          openingBalance: ledgerInfo.openingBalance || null,
+          balanceType: ledgerInfo.balanceType || null,
+
+          openingBalanceOfCashAccount: cashLedgerInfo.openingBalance || null,
+          balanceTypeOfCashAccount: cashLedgerInfo.balanceType || null,
+
           debitAmount: item.debitAmount || 0,
           creditAmount: item.creditAmount || 0,
         });
@@ -658,6 +775,7 @@ async function getAllBySchoolId(req, res) {
       let TDSorTCSHeadOfAccountName = null;
       let TDSorTCSBSPLLedgerName = null;
       let TDSorTCSOpeningBalance = null;
+      let TDSorTCSBalanceType = null;
 
       if (entry.TDSorTCS) {
         const tdsOrTcsGroupLedger = await GroupLedger.findOne({
@@ -674,12 +792,15 @@ async function getAllBySchoolId(req, res) {
             schoolId,
             groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName headOfAccountId bSPLLedgerId openingBalance")
+            .select(
+              "ledgerName headOfAccountId bSPLLedgerId openingBalance balanceType"
+            )
             .lean();
 
           if (tdsOrTcsLedger) {
             TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
             TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || null;
+            TDSorTCSBalanceType = tdsOrTcsLedger.balanceType || null;
 
             // Get headOfAccountName
             const headOfAccount = tdsOrTcsLedger.headOfAccountId
@@ -738,6 +859,7 @@ async function getAllBySchoolId(req, res) {
         TDSorTCSLedgerName,
 
         TDSorTCSOpeningBalance: TDSorTCSOpeningBalance || null,
+        TDSorTCSBalanceType: TDSorTCSBalanceType || null,
       };
 
       formattedData.push(entryData);
@@ -756,7 +878,7 @@ async function getAllBySchoolId(req, res) {
             schoolId,
           })
             .select(
-              "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
+              "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance balanceType"
             )
             .lean();
         }
@@ -790,7 +912,6 @@ async function getAllBySchoolId(req, res) {
 
           ledgerId: item.ledgerId || null,
           ledgerName: ledger?.ledgerName || null,
-          openingBalance: ledger?.openingBalance || null,
 
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
@@ -800,6 +921,9 @@ async function getAllBySchoolId(req, res) {
 
           bSPLLedgerId: ledger?.bSPLLedgerId || null,
           bSPLLedgerName: bsplLedger?.bSPLLedgerName || null,
+
+          openingBalance: ledger?.openingBalance || null,
+          balanceType: ledger?.balanceType || null,
         });
       }
 

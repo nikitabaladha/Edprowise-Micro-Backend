@@ -7,6 +7,11 @@ import BSPLLedger from "../../../models/BSPLLedger.js";
 import HeadOfAccount from "../../../models/HeadOfAccount.js";
 import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
+
+import Vendor from "../../../models/Vendor.js";
+import TDSTCSRateChart from "../../../models/TDSTCSRateChart.js";
+import AuthorisedSignature from "../../../models/AuthorisedSignature.js";
+
 import mongoose from "mongoose";
 
 async function getAllBySchoolId(req, res) {
@@ -21,6 +26,13 @@ async function getAllBySchoolId(req, res) {
         message: "Access denied: School ID not found in user context.",
       });
     }
+
+    const authorisedSignature = await AuthorisedSignature.findOne({
+      schoolId,
+      academicYear,
+    })
+      .select("authorisedSignatureImage")
+      .lean();
 
     const baseQuery = {
       schoolId,
@@ -112,6 +124,13 @@ async function getAllBySchoolId(req, res) {
     // Find Payment Entries
 
     for (const entry of paymentEntries) {
+      const vendor = entry.vendorCode
+        ? await Vendor.findOne({
+            vendorCode: entry.vendorCode,
+            schoolId,
+          }).lean()
+        : null;
+
       const itemsWithLedgerNames = [];
 
       for (const item of entry.itemDetails) {
@@ -170,6 +189,13 @@ async function getAllBySchoolId(req, res) {
           bSPLLedgerName: bsplLedger?.bSPLLedgerName || null,
         });
       }
+
+      // Fetch TDS/TCS Rate Chart
+      const tdsTcsRateChart =
+        entry.TDSTCSRateChartId &&
+        mongoose.Types.ObjectId.isValid(entry.TDSTCSRateChartId)
+          ? await TDSTCSRateChart.findById(entry.TDSTCSRateChartId).lean()
+          : null;
 
       const ledgerWithPaymentMode =
         entry.ledgerIdWithPaymentMode &&
@@ -270,6 +296,8 @@ async function getAllBySchoolId(req, res) {
         accountingEntry: "Payment",
         _id: entry._id,
         schoolId: entry.schoolId,
+        invoiceNumber: entry.invoiceNumber,
+
         subTotalAmountAfterGST: entry.subTotalAmountAfterGST,
         TDSTCSRateWithAmountBeforeGST: entry.TDSTCSRateWithAmountBeforeGST || 0,
         totalAmountAfterGST: entry.totalAmountAfterGST || 0,
@@ -319,6 +347,46 @@ async function getAllBySchoolId(req, res) {
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
         paymentVoucherNumber: entry.paymentVoucherNumber || null,
+
+        vendorCode: entry.vendorCode,
+        vendorId: entry.vendorId,
+        entryDate: entry.entryDate,
+        invoiceDate: entry.invoiceDate,
+        invoiceNumber: entry.invoiceNumber,
+        poNumber: entry.poNumber,
+        dueDate: entry.dueDate,
+        paymentMode: entry.paymentMode,
+
+        TDSTCSRateChartId: entry.TDSTCSRateChartId,
+        TDSTCSRate: entry.TDSTCSRate,
+        totalAmountBeforeGST: entry.totalAmountBeforeGST,
+        totalGSTAmount: entry.totalGSTAmount,
+        totalAmountAfterGST: entry.totalAmountAfterGST,
+        invoiceImage: entry.invoiceImage,
+        chequeImage: entry.chequeImage || null,
+        status: entry.status || null,
+
+        // Vendor fields
+        nameOfVendor: vendor?.nameOfVendor || null,
+        email: vendor?.email || null,
+        contactNumber: vendor?.contactNumber || null,
+        gstNumber: vendor?.gstNumber || null,
+        panNumber: vendor?.panNumber || null,
+        address: vendor?.address || null,
+        state: vendor?.state || null,
+        nameOfAccountHolder: vendor?.nameOfAccountHolder || null,
+        nameOfBank: vendor?.nameOfBank || null,
+        ifscCode: vendor?.ifscCode || null,
+        accountNumber: vendor?.accountNumber || null,
+        accountType: vendor?.accountType || null,
+
+        // TDS/TCS Rate Chart fields
+        natureOfTransaction: tdsTcsRateChart?.natureOfTransaction || null,
+        rate: tdsTcsRateChart?.rate || null,
+
+        // Authorised Signature
+        authorisedSignatureImage:
+          authorisedSignature?.authorisedSignatureImage || null,
       };
 
       formattedData.push(entryData);
@@ -384,6 +452,13 @@ async function getAllBySchoolId(req, res) {
           balanceType: ledger?.balanceType || null,
         });
       }
+
+      // Fetch TDS/TCS Rate Chart
+      const tdsTcsRateChart =
+        entry.TDSTCSRateChartId &&
+        mongoose.Types.ObjectId.isValid(entry.TDSTCSRateChartId)
+          ? await TDSTCSRateChart.findById(entry.TDSTCSRateChartId).lean()
+          : null;
 
       const ledgerWithPaymentMode =
         entry.ledgerIdWithPaymentMode &&
@@ -534,6 +609,24 @@ async function getAllBySchoolId(req, res) {
         transactionNumber: entry.transactionNumber || null,
 
         receiptVoucherNumber: entry.receiptVoucherNumber || null,
+
+        // ==============
+
+        paymentMode: entry.paymentMode,
+        TDSorTCS: entry.TDSorTCS || null,
+        TDSTCSRateChartId: entry.TDSTCSRateChartId,
+        TDSTCSRate: entry.TDSTCSRate,
+        receiptImage: entry.receiptImage,
+        chequeImageForReceipt: entry.chequeImageForReceipt || null,
+        status: entry.status || null,
+
+        // TDS/TCS Rate Chart fields
+        natureOfTransaction: tdsTcsRateChart?.natureOfTransaction || null,
+        rate: tdsTcsRateChart?.rate || null,
+
+        // Authorised Signature
+        authorisedSignatureImage:
+          authorisedSignature?.authorisedSignatureImage || null,
       };
 
       formattedData.push(entryData);

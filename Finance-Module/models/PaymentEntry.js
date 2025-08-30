@@ -56,7 +56,6 @@ const PaymentEntrySchema = new mongoose.Schema(
     },
     TDSorTCS: {
       type: String,
-
       enum: ["TDS", "TCS"],
     },
     TDSTCSRateChartId: { type: String },

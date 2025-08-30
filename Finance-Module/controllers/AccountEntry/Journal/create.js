@@ -94,7 +94,7 @@ async function updateOpeningClosingBalance(
   if (balanceType === "Debit") {
     closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
   } else {
-    closingBalance = effectiveOpeningBalance + creditAmount - debitAmount;
+    closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
   }
 
   // Check if exact same entry already exists
@@ -183,7 +183,7 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
     if (balanceType === "Debit") {
       detail.closingBalance = currentBalance + detail.debit - detail.credit;
     } else {
-      detail.closingBalance = currentBalance + detail.credit - detail.debit;
+      detail.closingBalance = currentBalance + detail.debit - detail.credit;
     }
 
     currentBalance = detail.closingBalance;
@@ -241,7 +241,7 @@ async function recalculateAllBalancesAfterDate(
     if (balanceType === "Debit") {
       detail.closingBalance = currentBalance + detail.debit - detail.credit;
     } else {
-      detail.closingBalance = currentBalance + detail.credit - detail.debit;
+      detail.closingBalance = currentBalance + detail.debit - detail.credit;
     }
 
     currentBalance = detail.closingBalance;

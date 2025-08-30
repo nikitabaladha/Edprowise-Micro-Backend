@@ -26,7 +26,7 @@ async function getAllOpeningClosingBalanceBySchoolId(req, res) {
 
     // Fetch records with populated ledgerId
     const openingClosingBalances = await OpeningClosingBalance.find(filter)
-      .populate("ledgerId", "ledgerName") // only bring ledgerName + _id
+      .populate("ledgerId", "ledgerName")
       .lean();
 
     // Filter balanceDetails if date range provided
