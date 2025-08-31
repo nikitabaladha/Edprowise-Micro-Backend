@@ -64,10 +64,16 @@ const VendorSchema = new mongoose.Schema(
     },
     openingBalance: {
       type: Number,
-      default: 0,
+      default: 0, // Default to 0 if not provided
     },
-    paymentTerms: { type: Number },
-    documentImage: { type: String },
+    paymentTerms: {
+      type: Number,
+      default: null, // Allow null
+    },
+    documentImage: {
+      type: String,
+      default: null, // Allow null
+    },
     ledgerId: { type: String },
   },
   {

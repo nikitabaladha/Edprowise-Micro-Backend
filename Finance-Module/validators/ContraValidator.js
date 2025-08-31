@@ -45,9 +45,11 @@ const itemDetails = Joi.array()
       ledgerId: Joi.string().required().messages({
         "any.required": "Ledger ID is required.",
         "string.base": "Ledger ID must be a string.",
+        "string.empty": "Ledger is required.",
       }),
       ledgerIdOfCashAccount: Joi.string().allow(null, "").optional().messages({
         "string.base": "LedgerId Of Cash Account must be a string.",
+        "string.empty": "Ledger is required.",
       }),
       debitAmount: Joi.number().required().messages({
         "any.required": "Debit Amount is required.",

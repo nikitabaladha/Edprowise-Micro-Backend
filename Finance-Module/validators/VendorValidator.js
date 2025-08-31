@@ -99,10 +99,14 @@ const documentImage = Joi.string().allow("").optional().messages({
   "string.empty": "Attachment Image cannot be empty",
 });
 
-const openingBalance = Joi.number().optional().messages({
-  "number.base": "Opening Balance must be a number.",
-});
-const paymentTerms = Joi.number().optional().messages({
+const openingBalance = Joi.number()
+  .allow(null, "")
+  .default(0)
+  .optional()
+  .messages({
+    "number.base": "Opening Balance must be a number.",
+  });
+const paymentTerms = Joi.number().allow(null, "").optional().messages({
   "number.base": "Payment Terms must be a number.",
 });
 

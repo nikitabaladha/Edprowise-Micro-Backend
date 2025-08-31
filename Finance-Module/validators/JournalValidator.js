@@ -42,12 +42,13 @@ const documentImage = Joi.string().allow("").optional().messages({
 const itemDetails = Joi.array()
   .items(
     Joi.object({
+      description: Joi.string().allow(null, "").optional().messages({
+        "string.base": "Description must be a string.",
+      }),
       ledgerId: Joi.string().required().messages({
         "any.required": "Ledger ID is required.",
         "string.base": "Ledger ID must be a string.",
-      }),
-      description: Joi.string().allow(null, "").optional().messages({
-        "string.base": "Description must be a string.",
+        "string.empty": "Ledger is required.",
       }),
       debitAmount: Joi.number().required().messages({
         "any.required": "Debit Amount is required.",

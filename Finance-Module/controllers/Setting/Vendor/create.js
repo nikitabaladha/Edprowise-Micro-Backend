@@ -184,6 +184,7 @@ async function create(req, res) {
         groupLedgerId: groupLedger._id,
         ledgerName: nameOfVendor,
         openingBalance: 0,
+        balanceType: "Credit",
         paymentMode: "Not Defined",
         ledgerCode: ledgerCode.toString(),
         academicYear,

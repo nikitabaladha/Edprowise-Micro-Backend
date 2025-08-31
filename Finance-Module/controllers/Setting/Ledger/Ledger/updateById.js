@@ -1,4 +1,5 @@
 import Ledger from "../../../../models/Ledger.js";
+import HeadOfAccount from "../../../../models/HeadOfAccount.js";
 import LedgerValidator from "../../../../validators/LedgerValidator.js";
 
 async function updateById(req, res) {
@@ -27,7 +28,7 @@ async function updateById(req, res) {
       groupLedgerId,
       bSPLLedgerId,
       openingBalance,
-      balanceType,
+      // balanceType,
     } = req.body;
 
     const existingLedger = await Ledger.findOne({
@@ -40,6 +41,31 @@ async function updateById(req, res) {
         hasError: true,
         message: "Ledger not found.",
       });
+    }
+
+    // Get the HeadOfAccount to determine the balance type
+    let headOfAccount;
+    if (headOfAccountId && headOfAccountId !== existingLedger.headOfAccountId) {
+      headOfAccount = await HeadOfAccount.findById(headOfAccountId);
+      if (!headOfAccount) {
+        return res.status(404).json({
+          hasError: true,
+          message: "Head of Account not found",
+        });
+      }
+    } else {
+      // Use the existing head of account if not changed
+      headOfAccount = await HeadOfAccount.findById(
+        existingLedger.headOfAccountId
+      );
+    }
+
+    // Automatically set balanceType based on headOfAccountName
+    let balanceType;
+    if (headOfAccount.headOfAccountName === "Liabilities") {
+      balanceType = "Credit"; // Liabilities have credit balance
+    } else {
+      balanceType = "Debit"; // Assets, Income, Expenses have debit balance
     }
 
     existingLedger.ledgerName = ledgerName || existingLedger.ledgerName;
@@ -55,7 +81,7 @@ async function updateById(req, res) {
     existingLedger.openingBalance =
       openingBalance || existingLedger.openingBalance;
 
-    existingLedger.balanceType = balanceType || existingLedger.balanceType;
+    existingLedger.balanceType = balanceType;
 
     await existingLedger.save();
 

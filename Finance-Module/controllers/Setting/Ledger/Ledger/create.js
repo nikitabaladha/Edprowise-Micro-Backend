@@ -31,7 +31,6 @@ async function create(req, res) {
       bSPLLedgerId,
       openingBalance,
       academicYear,
-      balanceType,
     } = req.body;
 
     // First, get the HeadOfAccount to determine the type
@@ -55,8 +54,16 @@ async function create(req, res) {
     if (!baseCode) {
       return res.status(400).json({
         hasError: true,
-        message: "Invalid Head of Account type",
+        message:
+          "Head of Account must from 'Assets','Liabilities','Income', or 'Expenses'",
       });
+    }
+
+    let balanceType;
+    if (headOfAccount.headOfAccountName === "Liabilities") {
+      balanceType = "Credit";
+    } else {
+      balanceType = "Debit";
     }
 
     // Atomically find and increment the counter
@@ -72,6 +79,11 @@ async function create(req, res) {
       headOfAccount.headOfAccountName
     );
     const finalOpeningBalance = isAssetOrLiability ? openingBalance || 0 : 0;
+
+    // here i want that if headOfAccountName is Liabilities. then balanceType by default "Credit"
+    // here i want that if headOfAccountName is Assets,Income,Expenses then balanceType by default "Debit"
+
+    // i will not send balanceType from frontend drectly from backend
 
     const newLedger = new Ledger({
       schoolId,

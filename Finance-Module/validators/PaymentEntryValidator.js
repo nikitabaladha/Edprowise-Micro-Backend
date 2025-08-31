@@ -34,27 +34,11 @@ const chequeImage = Joi.string().allow("").optional().messages({
   "string.empty": "chequeImage cannot be empty",
 });
 
-// const vendorCode = Joi.string().required().messages({
-//   "any.required": "Vendor code is required",
-//   "string.base": "Vendor code must be a string",
-//   "string.empty": "Vendor code cannot be empty",
-// });
-
 const vendorCode = Joi.string().allow(null, "").messages({
   "any.required": "Vendor code is required",
   "string.base": "Vendor code must be a string",
   "string.empty": "Vendor code cannot be empty",
 });
-
-// const vendorId = Joi.string()
-//   .required()
-//   .regex(/^[0-9a-fA-F]{24}$/)
-//   .messages({
-//     "any.required": "Vendor ID is required",
-//     "string.base": "Vendor ID must be a string",
-//     "string.empty": "Vendor ID cannot be empty",
-//     "string.pattern.base": "Vendor ID must be a valid MongoDB ObjectId",
-//   });
 
 const vendorId = Joi.string()
   .regex(/^[0-9a-fA-F]{24}$/)
@@ -101,10 +85,10 @@ const paymentMode = Joi.string()
   .valid("Cash", "Online", "Cheque")
   .required()
   .messages({
+    "string.empty": "Payment Mode is required.",
     "any.required": "Payment mode is required",
     "string.base": "Payment mode must be a string",
     "any.only": "Payment mode must be either 'Cash', 'Online' or 'Cheque'.",
-    "string.empty": "Payment mode cannot be empty",
   });
 
 const chequeNumber = Joi.string().allow(null, "").optional().messages({
@@ -124,6 +108,7 @@ const itemDetails = Joi.array()
       ledgerId: Joi.string().required().messages({
         "any.required": "Ledger ID is required.",
         "string.base": "Ledger ID must be a string.",
+        "string.empty": "Ledger is required.",
       }),
       amountBeforeGST: Joi.number().required().messages({
         "any.required": "Amount before GST is required.",
@@ -151,12 +136,6 @@ const subTotalAmountAfterGST = Joi.number().required().messages({
   "any.required": "SubTotal Amount after GST is required.",
   "number.base": "SubTotal Amount after GST must be a number.",
 });
-
-// const TDSorTCS = Joi.string().valid("TDS", "TCS").required().messages({
-//   "any.required": "TDS or TCS type is required.",
-//   "any.only": "TDSorTCS must be either 'TDS' or 'TCS'.",
-//   "string.base": "TDSorTCS must be a string.",
-// });
 
 const TDSorTCS = Joi.string()
   .valid("TDS", "TCS")
@@ -199,6 +178,7 @@ const totalAmountAfterGST = Joi.number().required().messages({
 const ledgerIdWithPaymentMode = Joi.string().required().messages({
   "any.required": "Ledger Id With Payment Mode is required.",
   "string.base": "Ledger Id With Payment Mode must be a string.",
+  "string.empty": "Ledger With Payment Mode is required.",
 });
 
 const status = Joi.string()
