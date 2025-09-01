@@ -30,7 +30,9 @@ async function getByCashName(req, res) {
       schoolId,
       academicYear,
       groupLedgerId: cashGroup._id,
-    }).sort({ createdAt: -1 });
+    })
+      .populate("headOfAccountId")
+      .sort({ createdAt: -1 });
 
     if (!cashLedger) {
       return res.status(404).json({

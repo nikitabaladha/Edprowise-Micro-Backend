@@ -26,12 +26,21 @@ async function getAllByBankName(req, res) {
       schoolId,
       academicYear,
       groupLedgerId: { $in: groupLedgerIds },
-    }).sort({ createdAt: -1 });
+    })
+      .populate("headOfAccountId")
+      .sort({ createdAt: -1 });
+
+    const formattedLedgers = ledgers.map((ledger) => ({
+      _id: ledger._id,
+      ledgerName: ledger.ledgerName,
+      headOfAccountName: ledger.headOfAccountId?.headOfAccountName,
+      ...ledger.toObject(),
+    }));
 
     return res.status(200).json({
       hasError: false,
       message: "Ledgers fetched successfully!",
-      data: ledgers,
+      data: formattedLedgers,
     });
   } catch (error) {
     console.error("Error fetching Ledgers:", error);
