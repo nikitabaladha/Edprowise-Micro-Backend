@@ -167,6 +167,14 @@ async function create(req, res) {
 
     const ledgerCode = baseCode + counter.lastLedgerCode;
 
+    let balanceType = "Debit";
+    let openingBal = Number(openingBalance) || 0;
+
+    if (openingBal < 0) {
+      balanceType = "Credit";
+      openingBal = Math.abs(openingBal); // keep stored balance positive
+    }
+
     // 4. Create Ledger with vendor's name and generated ledger code
     let ledger = await Ledger.findOneAndUpdate(
       {
@@ -183,8 +191,8 @@ async function create(req, res) {
         bSPLLedgerId: bsplLedger._id,
         groupLedgerId: groupLedger._id,
         ledgerName: nameOfVendor,
-        openingBalance: 0,
-        balanceType: "Credit",
+        openingBalance: openingBal,
+        balanceType,
         paymentMode: "Not Defined",
         ledgerCode: ledgerCode.toString(),
         academicYear,

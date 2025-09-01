@@ -63,10 +63,26 @@ async function updateById(req, res) {
     const isNameChanged =
       nameOfVendor && nameOfVendor !== existingVendor.nameOfVendor;
 
-    existingVendor.nameOfVendor = nameOfVendor || existingVendor.nameOfVendor;
-    // see if new nameOfVendor then you must need to change the LedgerName also
-    // so what to do for that?
+    // ---- Opening Balance & Balance Type Logic ----
+    let newOpeningBalance = existingVendor.openingBalance;
+    let newBalanceType = existingVendor.balanceType;
 
+    if (openingBalance !== undefined) {
+      let openingBalNum = Number(openingBalance);
+
+      if (openingBalNum < 0) {
+        newBalanceType = "Credit";
+        newOpeningBalance = Math.abs(openingBalNum);
+      } else {
+        newBalanceType = "Debit";
+        newOpeningBalance = openingBalNum;
+      }
+    }
+
+    // here also i want like if user change openingBalance and if it is -ve negative then store
+    // balanceType Credit otherwise Debit and if no change then keep as it is
+
+    existingVendor.nameOfVendor = nameOfVendor || existingVendor.nameOfVendor;
     existingVendor.email = email || existingVendor.email;
     existingVendor.contactNumber =
       contactNumber || existingVendor.contactNumber;
@@ -84,13 +100,25 @@ async function updateById(req, res) {
     existingVendor.openingBalance =
       openingBalance || existingVendor.openingBalance;
     existingVendor.paymentTerms = paymentTerms || existingVendor.paymentTerms;
+    existingVendor.openingBalance = newOpeningBalance;
+    existingVendor.balanceType = newBalanceType;
+
+    // and then after you also need to change balanceType or openingBalance in ledgerTable also
+    // by comparing ledgerName with nameOfVendor
 
     await existingVendor.save();
 
-    if (isNameChanged && existingVendor.ledgerId) {
-      await Ledger.findByIdAndUpdate(existingVendor.ledgerId, {
-        ledgerName: existingVendor.nameOfVendor,
-      });
+    if (existingVendor.ledgerId) {
+      const ledgerUpdates = {
+        openingBalance: newOpeningBalance,
+        balanceType: newBalanceType,
+      };
+
+      if (isNameChanged) {
+        ledgerUpdates.ledgerName = existingVendor.nameOfVendor;
+      }
+
+      await Ledger.findByIdAndUpdate(existingVendor.ledgerId, ledgerUpdates);
     }
 
     return res.status(200).json({

@@ -61,11 +61,13 @@ async function updateById(req, res) {
     }
 
     // Automatically set balanceType based on headOfAccountName
+
+    // Determine balanceType based on openingBalance
     let balanceType;
-    if (headOfAccount.headOfAccountName === "Liabilities") {
-      balanceType = "Credit"; // Liabilities have credit balance
+    if (Number(openingBalance) < 0) {
+      balanceType = "Credit";
     } else {
-      balanceType = "Debit"; // Assets, Income, Expenses have debit balance
+      balanceType = "Debit"; // includes 0 and positive
     }
 
     existingLedger.ledgerName = ledgerName || existingLedger.ledgerName;
