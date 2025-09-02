@@ -1,8 +1,8 @@
 import PaymentEntry from "../../../models/PaymentEntry.js";
 import Receipt from "../../../models/Receipt.js";
+
 import Contra from "../../../models/Contra.js";
 import Journal from "../../../models/Journal.js";
-
 import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
 import mongoose from "mongoose";
@@ -11,7 +11,7 @@ async function getAllBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
     const { academicYear } = req.params;
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, month } = req.query;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -20,60 +20,92 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    // Create date filter object
-    const dateFilter = {};
-    if (startDate && endDate) {
-      dateFilter.entryDate = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate),
+    const baseQuery = {
+      schoolId,
+      status: "Posted",
+    };
+
+    // Handle month filtering if provided
+    if (month) {
+      // Parse month string like "January-2025" or "February 2028"
+      const [monthName, year] = month.split(/[- ]/);
+
+      const monthNames = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+
+      const monthIndex = monthNames.findIndex(
+        (m) => m.toLowerCase() === monthName.toLowerCase()
+      );
+
+      if (monthIndex === -1) {
+        return res.status(400).json({
+          hasError: true,
+          message: "Invalid month name provided.",
+        });
+      }
+
+      // Calculate start and end dates for the specific month
+      const startOfMonth = new Date(year, monthIndex, 1);
+      const endOfMonth = new Date(year, monthIndex + 1, 0);
+
+      startOfMonth.setHours(0, 0, 0, 0);
+      endOfMonth.setHours(23, 59, 59, 999);
+
+      baseQuery.entryDate = {
+        $gte: startOfMonth,
+        $lte: endOfMonth,
       };
-    } else if (academicYear) {
-      const yearParts = academicYear.split("-");
-      if (yearParts.length === 2) {
-        const startYear = parseInt(yearParts[0]);
-        const endYear = parseInt(yearParts[1]);
-        dateFilter.entryDate = {
-          $gte: new Date(`${startYear}-04-01`),
-          $lte: new Date(`${endYear}-03-31`),
-        };
+    }
+    // Handle date range filtering if provided (override academic year)
+    else if (startDate || endDate) {
+      baseQuery.entryDate = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        baseQuery.entryDate.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        baseQuery.entryDate.$lte = end;
       }
     }
+    // Default to academic year if no specific filtering
+    else if (!startDate && !endDate) {
+      baseQuery.academicYear = academicYear;
+    }
 
-    const paymentEntries = await PaymentEntry.find({
-      schoolId,
-      ...dateFilter,
-      status: "Posted",
-    })
-      .sort({ createdAt: -1 })
-      .lean();
+    const [paymentEntries, receiptEntries, contraEntries, journalEntries] =
+      await Promise.all([
+        PaymentEntry.find(baseQuery).sort({ createdAt: -1 }).lean(),
+        Receipt.find(baseQuery).sort({ createdAt: -1 }).lean(),
+        Contra.find(baseQuery).sort({ createdAt: -1 }).lean(),
+        Journal.find(baseQuery).sort({ createdAt: -1 }).lean(),
+      ]);
 
-    const receiptEntries = await Receipt.find({
-      schoolId,
-      ...dateFilter,
-      status: "Posted",
-    })
-      .sort({ createdAt: -1 })
-      .lean();
-
-    const contraEntries = await Contra.find({
-      schoolId,
-      ...dateFilter,
-      status: "Posted",
-    })
-      .sort({ createdAt: -1 })
-      .lean();
-
-    const JournalEntries = await Journal.find({
-      schoolId,
-      ...dateFilter,
-      status: "Posted",
-    })
-      .sort({ createdAt: -1 })
-      .lean();
+    const allEntries = [
+      ...paymentEntries,
+      ...receiptEntries,
+      ...contraEntries,
+      ...journalEntries,
+    ];
 
     const formattedData = [];
 
     // Find Payment Entries
+
     for (const entry of paymentEntries) {
       const itemsWithLedgerNames = [];
 
@@ -99,11 +131,11 @@ async function getAllBySchoolId(req, res) {
         }
 
         itemsWithLedgerNames.push({
-          itemName: item.itemName,
+          itemName: item.itemName || null,
           ledgerId: item.ledgerId || null,
-          amountBeforeGST: item.amountBeforeGST,
-          GSTAmount: item.GSTAmount,
-          amountAfterGST: item.amountAfterGST,
+          amountBeforeGST: item.amountBeforeGST || 0,
+          GSTAmount: item.GSTAmount || 0,
+          amountAfterGST: item.amountAfterGST || 0,
           ledgerName: ledger?.ledgerName || null,
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
@@ -168,8 +200,8 @@ async function getAllBySchoolId(req, res) {
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
         subTotalAmountAfterGST: entry.subTotalAmountAfterGST,
-        TDSTCSRateWithAmountBeforeGST: entry.TDSTCSRateWithAmountBeforeGST,
-        totalAmountAfterGST: entry.totalAmountAfterGST,
+        TDSTCSRateWithAmountBeforeGST: entry.TDSTCSRateWithAmountBeforeGST || 0,
+        totalAmountAfterGST: entry.totalAmountAfterGST || 0,
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
         ledgerNameWithPaymentMode: ledgerWithPaymentMode?.ledgerName || null,
         groupLedgerIdWithPaymentMode:
@@ -221,7 +253,7 @@ async function getAllBySchoolId(req, res) {
         itemsWithLedgerNames.push({
           itemName: item.itemName,
           ledgerId: item.ledgerId || null,
-          amount: item.amount,
+          amount: item.amount || 0,
           ledgerName: ledger?.ledgerName || null,
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
@@ -276,7 +308,7 @@ async function getAllBySchoolId(req, res) {
       }
 
       const entryData = {
-        // PaymentEntry fields
+        // Receipt fields
         accountingEntry: "Receipt",
         _id: entry._id,
         schoolId: entry.schoolId,
@@ -285,8 +317,8 @@ async function getAllBySchoolId(req, res) {
         narration: entry.narration,
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
-        subTotalAmount: entry.subTotalAmount,
-        TDSTCSRateWithAmount: entry.TDSTCSRateWithAmount,
+        subTotalAmount: entry.subTotalAmount || 0,
+        TDSTCSRateWithAmount: entry.TDSTCSRateWithAmount || 0,
 
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
         ledgerNameWithPaymentMode: ledgerWithPaymentMode?.ledgerName || null,
@@ -312,7 +344,6 @@ async function getAllBySchoolId(req, res) {
 
     // Find Contra Entries
 
-    // Find Contra Entries
     for (const entry of contraEntries) {
       const itemsWithLedgerNames = [];
 
@@ -435,11 +466,11 @@ async function getAllBySchoolId(req, res) {
         narration: entry.narration,
         chequeNumber: entry.chequeNumber || null,
         chequeImageForContra: entry.chequeImageForContra || null,
-        subTotalOfDebit: entry.subTotalOfDebit,
-        subTotalOfCredit: entry.subTotalOfCredit,
-        totalAmountOfCredit: entry.totalAmountOfCredit,
-        totalAmountOfDebit: entry.totalAmountOfDebit,
-        TDSTCSRateAmount: entry.TDSTCSRateAmount,
+        subTotalOfDebit: entry.subTotalOfDebit || 0,
+        subTotalOfCredit: entry.subTotalOfCredit || 0,
+        totalAmountOfCredit: entry.totalAmountOfCredit || 0,
+        totalAmountOfDebit: entry.totalAmountOfDebit || 0,
+        TDSTCSRateAmount: entry.TDSTCSRateAmount || 0,
         contraVoucherNumber: entry.contraVoucherNumber || null,
         TDSorTCS: entry.TDSorTCS || null,
         status: entry.status,
@@ -455,7 +486,7 @@ async function getAllBySchoolId(req, res) {
 
     // Find Journal Entries
 
-    for (const entry of JournalEntries) {
+    for (const entry of journalEntries) {
       const itemsWithLedgerNames = [];
 
       for (const item of entry.itemDetails) {
@@ -482,8 +513,8 @@ async function getAllBySchoolId(req, res) {
         itemsWithLedgerNames.push({
           description: item.description,
           ledgerId: item.ledgerId || null,
-          debitAmount: item.debitAmount,
-          creditAmount: item.creditAmount,
+          debitAmount: item.debitAmount || 0,
+          creditAmount: item.creditAmount || 0,
           ledgerName: ledger?.ledgerName || null,
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
@@ -497,14 +528,10 @@ async function getAllBySchoolId(req, res) {
         entryDate: entry.entryDate,
         documentDate: entry.documentDate,
         narration: entry.narration,
-        subTotalOfDebit: entry.subTotalOfDebit,
-        TDSTCSRateWithDebitAmount: entry.TDSTCSRateWithDebitAmount,
-        TDSTCSRateWithCreditAmount: entry.TDSTCSRateWithCreditAmount,
-
-        totalAmountOfDebit: entry.totalAmountOfDebit,
-        totalAmountOfCredit: entry.totalAmountOfCredit,
+        subTotalOfDebit: entry.subTotalOfDebit || 0,
+        totalAmountOfDebit: entry.totalAmountOfDebit || 0,
+        totalAmountOfCredit: entry.totalAmountOfCredit || 0,
         journalVoucherNumber: entry.journalVoucherNumber || null,
-
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
 

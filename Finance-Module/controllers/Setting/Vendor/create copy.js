@@ -168,6 +168,7 @@ async function create(req, res) {
     const ledgerCode = baseCode + counter.lastLedgerCode;
 
     // 4. Create Ledger with vendor's name and generated ledger code
+    // when new Ledger create at that time i want to store new field also like balanceType "Credit"
     let ledger = await Ledger.findOneAndUpdate(
       {
         schoolId,

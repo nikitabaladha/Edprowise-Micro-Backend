@@ -7,6 +7,7 @@ async function getAllJournalBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
     const { academicYear } = req.params;
+    const { startDate, endDate } = req.query;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -15,9 +16,28 @@ async function getAllJournalBySchoolId(req, res) {
       });
     }
 
+    // Create date filter object
+    const dateFilter = {};
+    if (startDate && endDate) {
+      dateFilter.entryDate = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
+    } else if (academicYear) {
+      const yearParts = academicYear.split("-");
+      if (yearParts.length === 2) {
+        const startYear = parseInt(yearParts[0]);
+        const endYear = parseInt(yearParts[1]);
+        dateFilter.entryDate = {
+          $gte: new Date(`${startYear}-04-01`),
+          $lte: new Date(`${endYear}-03-31`),
+        };
+      }
+    }
+
     const JournalEntries = await Journal.find({
       schoolId,
-      academicYear,
+      ...dateFilter,
       status: "Posted",
     })
       .sort({ createdAt: -1 })

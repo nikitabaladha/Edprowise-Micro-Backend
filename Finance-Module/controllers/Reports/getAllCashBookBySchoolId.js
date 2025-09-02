@@ -10,6 +10,7 @@ async function getAllCashBookBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
     const { academicYear } = req.params;
+    const { startDate, endDate } = req.query;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -18,9 +19,28 @@ async function getAllCashBookBySchoolId(req, res) {
       });
     }
 
+    // Create date filter object
+    const dateFilter = {};
+    if (startDate && endDate) {
+      dateFilter.entryDate = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
+    } else if (academicYear) {
+      const yearParts = academicYear.split("-");
+      if (yearParts.length === 2) {
+        const startYear = parseInt(yearParts[0]);
+        const endYear = parseInt(yearParts[1]);
+        dateFilter.entryDate = {
+          $gte: new Date(`${startYear}-04-01`),
+          $lte: new Date(`${endYear}-03-31`),
+        };
+      }
+    }
+
     const paymentEntries = await PaymentEntry.find({
       schoolId,
-      academicYear,
+      ...dateFilter,
       status: "Posted",
     })
       .sort({ createdAt: -1 })
@@ -28,7 +48,7 @@ async function getAllCashBookBySchoolId(req, res) {
 
     const receiptEntries = await Receipt.find({
       schoolId,
-      academicYear,
+      ...dateFilter,
       status: "Posted",
     })
       .sort({ createdAt: -1 })
@@ -36,7 +56,7 @@ async function getAllCashBookBySchoolId(req, res) {
 
     const contraEntries = await Contra.find({
       schoolId,
-      academicYear,
+      ...dateFilter,
       status: "Posted",
     })
       .sort({ createdAt: -1 })
@@ -44,7 +64,7 @@ async function getAllCashBookBySchoolId(req, res) {
 
     const JournalEntries = await Journal.find({
       schoolId,
-      academicYear,
+      ...dateFilter,
       status: "Posted",
     })
       .sort({ createdAt: -1 })
@@ -524,17 +544,11 @@ async function getAllCashBookBySchoolId(req, res) {
         documentDate: entry.documentDate,
         narration: entry.narration,
         subTotalOfDebit: entry.subTotalOfDebit,
-        // TDSTCSRateWithDebitAmount: entry.TDSTCSRateWithDebitAmount,
-        // TDSTCSRateWithCreditAmount: entry.TDSTCSRateWithCreditAmount,
         totalAmountOfDebit: entry.totalAmountOfDebit,
         totalAmountOfCredit: entry.totalAmountOfCredit,
         journalVoucherNumber: entry.journalVoucherNumber || null,
-        // TDSorTCS: entry.TDSorTCS,
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
-
-        // TDSorTCSGroupLedgerName,
-        // TDSorTCSLedgerName,
 
         // Item details
         itemDetails: itemsWithLedgerNames,

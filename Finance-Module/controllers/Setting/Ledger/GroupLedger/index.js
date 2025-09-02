@@ -6,6 +6,7 @@ import deleteGroupLedgerById from "./deleteById.js";
 
 import findGroupLedgerByName from "./findGroupLedgerByName.js";
 import getAllByFixedAssets from "./getAllByFixedAssets.js";
+import getAllGroupLedgerBySchoolIdWithDate from "./getAllBySchoolIdWithDate.js";
 
 export {
   createGroupLedger,
@@ -15,4 +16,5 @@ export {
   deleteGroupLedgerById,
   findGroupLedgerByName,
   getAllByFixedAssets,
+  getAllGroupLedgerBySchoolIdWithDate,
 };

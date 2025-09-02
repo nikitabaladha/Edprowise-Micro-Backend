@@ -7,6 +7,7 @@ async function getAllJournalWIthoutBankCashBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
     const { academicYear } = req.params;
+    const { startDate, endDate } = req.query;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -15,9 +16,28 @@ async function getAllJournalWIthoutBankCashBySchoolId(req, res) {
       });
     }
 
+    // Create date filter object
+    const dateFilter = {};
+    if (startDate && endDate) {
+      dateFilter.entryDate = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
+    } else if (academicYear) {
+      const yearParts = academicYear.split("-");
+      if (yearParts.length === 2) {
+        const startYear = parseInt(yearParts[0]);
+        const endYear = parseInt(yearParts[1]);
+        dateFilter.entryDate = {
+          $gte: new Date(`${startYear}-04-01`),
+          $lte: new Date(`${endYear}-03-31`),
+        };
+      }
+    }
+
     const JournalEntries = await Journal.find({
       schoolId,
-      academicYear,
+      ...dateFilter,
       status: "Posted",
     })
       .sort({ createdAt: -1 })
@@ -62,35 +82,6 @@ async function getAllJournalWIthoutBankCashBySchoolId(req, res) {
         });
       }
 
-      // let TDSorTCSGroupLedgerName = null;
-      // let TDSorTCSLedgerName = null;
-
-      // if (entry.TDSorTCS) {
-      //   // 1. Find GroupLedger by name
-      //   const tdsOrTcsGroupLedger = await GroupLedger.findOne({
-      //     schoolId,
-      //     groupLedgerName: entry.TDSorTCS,
-      //   })
-      //     .select("_id groupLedgerName")
-      //     .lean();
-
-      //   if (tdsOrTcsGroupLedger) {
-      //     TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
-
-      //     // 2. Find Ledger under that GroupLedger
-      //     const tdsOrTcsLedger = await Ledger.findOne({
-      //       schoolId,
-      //       groupLedgerId: tdsOrTcsGroupLedger._id,
-      //     })
-      //       .select("ledgerName")
-      //       .lean();
-
-      //     if (tdsOrTcsLedger) {
-      //       TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
-      //     }
-      //   }
-      // }
-
       const entryData = {
         accountingEntry: "Journal",
         _id: entry._id,
@@ -99,19 +90,13 @@ async function getAllJournalWIthoutBankCashBySchoolId(req, res) {
         documentDate: entry.documentDate,
         narration: entry.narration,
         subTotalOfDebit: entry.subTotalOfDebit,
-        // TDSTCSRateWithDebitAmount: entry.TDSTCSRateWithDebitAmount,
-        // TDSTCSRateWithCreditAmount: entry.TDSTCSRateWithCreditAmount,
 
         totalAmountOfDebit: entry.totalAmountOfDebit,
         totalAmountOfCredit: entry.totalAmountOfCredit,
         journalVoucherNumber: entry.journalVoucherNumber || null,
-        // TDSorTCS: entry.TDSorTCS,
 
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
-
-        // TDSorTCSGroupLedgerName,
-        // TDSorTCSLedgerName,
 
         // Item details
         itemDetails: itemsWithLedgerNames,

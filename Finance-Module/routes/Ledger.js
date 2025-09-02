@@ -93,6 +93,7 @@ import {
   getAllByBSPLLedgerId,
   findGroupLedgerByName,
   getAllByFixedAssets,
+  getAllGroupLedgerBySchoolIdWithDate,
 } from "../controllers/Setting/Ledger/GroupLedger/index.js";
 
 router.post(
@@ -105,6 +106,12 @@ router.get(
   "/get-all-group-ledger/:academicYear",
   roleBasedMiddleware("School"),
   getAllGroupLedgerBySchoolId
+);
+
+router.get(
+  "/get-all-group-ledger-with-date/:academicYear",
+  roleBasedMiddleware("School"),
+  getAllGroupLedgerBySchoolIdWithDate
 );
 
 router.get(
@@ -149,6 +156,7 @@ import {
   getAllLedgerByBankName,
   getAllLedgerByCashName,
   getAllLedgerByGroupLedgerId,
+  getAllBySchoolIdWithDate,
 } from "../controllers/Setting/Ledger/Ledger/index.js";
 
 router.post("/create-ledger", roleBasedMiddleware("School"), createLedger);
@@ -157,6 +165,12 @@ router.get(
   "/get-all-ledger/:academicYear",
   roleBasedMiddleware("School"),
   getAllLedgerBySchoolId
+);
+
+router.get(
+  "/get-all-ledger-with-date/:academicYear",
+  roleBasedMiddleware("School"),
+  getAllBySchoolIdWithDate
 );
 
 router.get(
