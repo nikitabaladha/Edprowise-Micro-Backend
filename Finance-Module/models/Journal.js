@@ -11,6 +11,11 @@ const JournalSchema = new mongoose.Schema(
       required: true,
     },
     journalVoucherNumber: { type: String, required: true },
+    customizeEntry: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
     entryDate: { type: Date },
     documentDate: { type: Date },
     itemDetails: [
@@ -37,16 +42,7 @@ const JournalSchema = new mongoose.Schema(
     subTotalOfCredit: {
       type: Number,
     },
-    // TDSorTCS: {
-    //   type: String,
-    //   enum: ["TDS", "TCS", ""],
-    // },
-    // TDSTCSRateWithDebitAmount: {
-    //   type: Number,
-    // },
-    // TDSTCSRateWithCreditAmount: {
-    //   type: Number,
-    // },
+
     totalAmountOfDebit: {
       type: Number,
     },

@@ -13,8 +13,14 @@ const ContraSchema = new mongoose.Schema(
     contraEntryName: {
       type: String,
       enum: ["Cash Deposited", "Cash Withdrawn", "Bank Transfer", ""],
+      default: "",
     },
     contraVoucherNumber: { type: String, required: true },
+    customizeEntry: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
     entryDate: { type: Date },
     dateOfCashDepositedWithdrawlDate: { type: Date },
     itemDetails: [

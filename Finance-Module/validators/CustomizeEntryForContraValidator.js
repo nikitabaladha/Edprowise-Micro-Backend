@@ -16,33 +16,27 @@ const entryDate = Joi.date().required().messages({
   "date.base": "Entry date must be a valid date",
 });
 
-const documentDate = Joi.date().required().messages({
-  "any.required": "Document date is required",
-  "date.base": "Document date must be a valid date",
-});
-
-const documentImage = Joi.string().allow("").optional().messages({
-  "string.base": "Document Image must be a string",
-  "string.empty": "Document Image cannot be empty",
+const dateOfCashDepositedWithdrawlDate = Joi.date().required().messages({
+  "any.required": "Date of Cash Deposited/Withdrawl/BankTransfer is required",
+  "date.base":
+    "Date of Cash Deposited/Withdrawl/BankTransfer must be a valid date",
 });
 
 const itemDetails = Joi.array()
   .items(
     Joi.object({
-      description: Joi.string().allow(null, "").optional().messages({
-        "string.base": "Description must be a string.",
-      }),
       ledgerId: Joi.string().required().messages({
         "any.required": "Ledger ID is required.",
         "string.base": "Ledger ID must be a string.",
         "string.empty": "Ledger is required.",
       }),
-      debitAmount: Joi.number().required().messages({
-        "any.required": "Debit Amount is required.",
+      ledgerIdOfCashAccount: Joi.string().allow(null, "").optional().messages({
+        "string.base": "LedgerId Of Cash Account must be a string.",
+      }),
+      debitAmount: Joi.number().allow(null, "").optional().messages({
         "number.base": "Debit Amount must be a number.",
       }),
-      creditAmount: Joi.number().required().messages({
-        "any.required": "Credit Amount is required.",
+      creditAmount: Joi.number().allow(null, "").optional().messages({
         "number.base": "Credit Amount must be a number.",
       }),
     })
@@ -81,6 +75,11 @@ const narration = Joi.string().required().messages({
   "string.empty": "Narration cannot be empty",
 });
 
+const chequeImageForContra = Joi.string().allow("").optional().messages({
+  "string.base": "Cheque Image must be a string",
+  "string.empty": "Cheque Image cannot be empty",
+});
+
 const status = Joi.string()
   .valid("Posted", "Draft", "Reversed", "Cancelled")
   .required()
@@ -96,9 +95,9 @@ const customizeEntry = Joi.boolean().default(false).messages({
   "boolean.base": "Customize entry must be a boolean",
 });
 
-const CustomizeEntryJournalValidator = Joi.object({
+const ContraValidator = Joi.object({
   entryDate,
-  documentDate,
+  dateOfCashDepositedWithdrawlDate,
   narration,
   itemDetails,
   subTotalOfDebit,
@@ -110,9 +109,9 @@ const CustomizeEntryJournalValidator = Joi.object({
   customizeEntry,
 });
 
-const JournalValidator = Joi.object({
+const ContraValidatorUpdate = Joi.object({
   entryDate,
-  documentDate,
+  dateOfCashDepositedWithdrawlDate,
   narration,
   itemDetails,
   subTotalOfDebit,
@@ -120,25 +119,12 @@ const JournalValidator = Joi.object({
   totalAmountOfCredit,
   totalAmountOfDebit,
   status,
-  academicYear: academicYearCreate,
-});
-
-const JournalValidatorUpdate = Joi.object({
-  entryDate,
-  documentDate,
-  narration,
-  itemDetails,
-  subTotalOfDebit,
-  subTotalOfCredit,
-  totalAmountOfCredit,
-  totalAmountOfDebit,
-  documentImage,
-  status,
+  chequeImageForContra,
   academicYear: academicYearUpdate,
+  customizeEntry,
 });
 
 export default {
-  JournalValidator,
-  JournalValidatorUpdate,
-  CustomizeEntryJournalValidator,
+  ContraValidator,
+  ContraValidatorUpdate,
 };

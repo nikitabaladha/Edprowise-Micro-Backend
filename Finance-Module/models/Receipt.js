@@ -11,7 +11,11 @@ const ReceiptSchema = new mongoose.Schema(
       required: true,
     },
     receiptVoucherNumber: { type: String, required: true },
-
+    customizeEntry: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
     entryDate: { type: Date },
     receiptDate: { type: Date },
     narration: { type: String },
@@ -36,9 +40,15 @@ const ReceiptSchema = new mongoose.Schema(
         amount: {
           type: Number,
         },
+        debitAmount: {
+          type: Number,
+        },
       },
     ],
     subTotalAmount: {
+      type: Number,
+    },
+    subTotalOfDebit: {
       type: Number,
     },
     TDSorTCS: {
@@ -55,6 +65,9 @@ const ReceiptSchema = new mongoose.Schema(
       type: Number,
     },
     totalAmount: {
+      type: Number,
+    },
+    totalDebitAmount: {
       type: Number,
     },
     receiptImage: {

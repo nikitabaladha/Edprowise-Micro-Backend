@@ -13,6 +13,7 @@ import ReportsRoutes from "./AllReports.js";
 import DepreciationMasterRoutes from "./DepreciationMaster.js";
 import TrialBalanceRoutes from "./TrialBalance.js";
 import OpeningClosingBalanceRoutes from "./OpeningClosingBalance.js";
+import CustomizeEntryRoutes from "./CustomizeEntry.js";
 
 export default (app) => {
   app.use("/api", ledgerRoutes);
@@ -20,11 +21,12 @@ export default (app) => {
   app.use("/api", TDSTCSRateChartRoutes);
   app.use("/api", PaymentEntryRoutes);
   app.use("/api", ReceiptRoutes);
+  app.use("/api", ContraRoutes);
+  app.use("/api", JournalRoutes);
+  app.use("/api", CustomizeEntryRoutes);
   app.use("/api", AuthorisedSignatureRoutes);
   app.use("/api", FinanceModuleYearRoutes);
   app.use("/api", AllLedgerRoutes);
-  app.use("/api", ContraRoutes);
-  app.use("/api", JournalRoutes);
   app.use("/api", ReportsRoutes);
   app.use("/api", FinancialInformationRoutes);
   app.use("/api", DepreciationMasterRoutes);

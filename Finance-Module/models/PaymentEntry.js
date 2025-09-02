@@ -11,6 +11,11 @@ const PaymentEntrySchema = new mongoose.Schema(
       required: true,
     },
     paymentVoucherNumber: { type: String, required: true },
+    customizeEntry: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
     vendorCode: { type: String },
     vendorId: {
       type: String,
@@ -49,9 +54,15 @@ const PaymentEntrySchema = new mongoose.Schema(
         amountAfterGST: {
           type: Number,
         },
+        creditAmount: {
+          type: Number,
+        },
       },
     ],
     subTotalAmountAfterGST: {
+      type: Number,
+    },
+    subTotalOfCredit: {
       type: Number,
     },
     TDSorTCS: {
@@ -63,7 +74,6 @@ const PaymentEntrySchema = new mongoose.Schema(
     TDSTCSRateWithAmountBeforeGST: {
       type: Number,
     },
-
     totalAmountBeforeGST: {
       type: Number,
     },
@@ -71,6 +81,9 @@ const PaymentEntrySchema = new mongoose.Schema(
       type: Number,
     },
     totalAmountAfterGST: {
+      type: Number,
+    },
+    totalCreditAmount: {
       type: Number,
     },
     invoiceImage: {
