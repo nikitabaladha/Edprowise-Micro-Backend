@@ -104,6 +104,7 @@ async function getAllBankBookBySchoolId(req, res) {
           amountBeforeGST: item.amountBeforeGST,
           GSTAmount: item.GSTAmount,
           amountAfterGST: item.amountAfterGST,
+          creditAmount: item.creditAmount || null,
           ledgerName: ledger?.ledgerName || null,
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
@@ -166,9 +167,7 @@ async function getAllBankBookBySchoolId(req, res) {
         narration: entry.narration,
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
-        subTotalAmountAfterGST: entry.subTotalAmountAfterGST,
         TDSTCSRateWithAmountBeforeGST: entry.TDSTCSRateWithAmountBeforeGST,
-        totalAmountAfterGST: entry.totalAmountAfterGST,
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
         ledgerNameWithPaymentMode: ledgerWithPaymentMode?.ledgerName || null,
         groupLedgerIdWithPaymentMode:
@@ -186,6 +185,13 @@ async function getAllBankBookBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
+
+        subTotalAmountAfterGST: entry.subTotalAmountAfterGST || null,
+        subTotalOfCredit: entry.subTotalOfCredit || null,
+
+        totalAmountAfterGST: entry.totalAmountAfterGST || null,
+        totalCreditAmount: entry.totalCreditAmount || null,
       };
 
       const hasCashInItems = itemsWithLedgerNames.some(
@@ -229,10 +235,12 @@ async function getAllBankBookBySchoolId(req, res) {
         itemsWithLedgerNames.push({
           itemName: item.itemName,
           ledgerId: item.ledgerId || null,
-          amount: item.amount,
           ledgerName: ledger?.ledgerName || null,
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
+
+          debitAmount: item.debitAmount || null,
+          amount: item.amount,
         });
       }
 
@@ -293,7 +301,6 @@ async function getAllBankBookBySchoolId(req, res) {
         narration: entry.narration,
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
-        subTotalAmount: entry.subTotalAmount,
         TDSTCSRateWithAmount: entry.TDSTCSRateWithAmount,
 
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
@@ -313,6 +320,12 @@ async function getAllBankBookBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
+
+        subTotalAmount: entry.subTotalAmount || null,
+        subTotalOfDebit: entry.subTotalOfDebit || null,
+        totalAmount: entry.totalAmount || null,
+        totalDebitAmount: entry.totalDebitAmount || null,
       };
 
       const hasCashInItems = itemsWithLedgerNames.some(
@@ -457,6 +470,7 @@ async function getAllBankBookBySchoolId(req, res) {
         TDSorTCSGroupLedgerName,
         TDSorTCSLedgerName,
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
       };
 
       const hasCashInItems = itemsWithLedgerNames.some(
@@ -507,35 +521,6 @@ async function getAllBankBookBySchoolId(req, res) {
         });
       }
 
-      let TDSorTCSGroupLedgerName = null;
-      let TDSorTCSLedgerName = null;
-
-      if (entry.TDSorTCS) {
-        // 1. Find GroupLedger by name
-        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
-          schoolId,
-          groupLedgerName: entry.TDSorTCS,
-        })
-          .select("_id groupLedgerName")
-          .lean();
-
-        if (tdsOrTcsGroupLedger) {
-          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
-
-          // 2. Find Ledger under that GroupLedger
-          const tdsOrTcsLedger = await Ledger.findOne({
-            schoolId,
-            groupLedgerId: tdsOrTcsGroupLedger._id,
-          })
-            .select("ledgerName")
-            .lean();
-
-          if (tdsOrTcsLedger) {
-            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
-          }
-        }
-      }
-
       const entryData = {
         accountingEntry: "Journal",
         _id: entry._id,
@@ -544,20 +529,15 @@ async function getAllBankBookBySchoolId(req, res) {
         documentDate: entry.documentDate,
         narration: entry.narration,
         subTotalOfDebit: entry.subTotalOfDebit,
-        // TDSTCSRateWithDebitAmount: entry.TDSTCSRateWithDebitAmount,
-        // TDSTCSRateWithCreditAmount: entry.TDSTCSRateWithCreditAmount,
         totalAmountOfDebit: entry.totalAmountOfDebit,
         totalAmountOfCredit: entry.totalAmountOfCredit,
         journalVoucherNumber: entry.journalVoucherNumber || null,
-        // TDSorTCS: entry.TDSorTCS,
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
 
-        // TDSorTCSGroupLedgerName,
-        // TDSorTCSLedgerName,
-
         // Item details
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
       };
 
       const hasCashInItems = itemsWithLedgerNames.some(

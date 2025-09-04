@@ -8,7 +8,7 @@ import GroupLedger from "../../models/GroupLedger.js";
 import HeadOfAccount from "../../models/HeadOfAccount.js";
 import mongoose from "mongoose";
 
-async function getAllExpenseBookBySchoolId(req, res) {
+async function getAllIncomeBookBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
     const { academicYear } = req.params;
@@ -78,7 +78,7 @@ async function getAllExpenseBookBySchoolId(req, res) {
 
     for (const entry of paymentEntries) {
       const itemsWithLedgerNames = [];
-      let hasExpensesHeadOfAccount = false;
+      let hasIncomeHeadOfAccount = false;
 
       for (const item of entry.itemDetails) {
         let ledger = null;
@@ -90,16 +90,16 @@ async function getAllExpenseBookBySchoolId(req, res) {
             .select("ledgerName groupLedgerId headOfAccountId")
             .lean();
 
-          // Check if this ledger has "Expenses" HeadOfAccount
+          // Check if this ledger has "Income" HeadOfAccount
           if (ledger?.headOfAccountId) {
             const headOfAccount = await HeadOfAccount.findOne({
               _id: ledger.headOfAccountId,
               schoolId,
-              headOfAccountName: "Expenses",
+              headOfAccountName: "Income",
             }).lean();
 
             if (headOfAccount) {
-              hasExpensesHeadOfAccount = true;
+              hasIncomeHeadOfAccount = true;
             }
           }
         }
@@ -119,7 +119,10 @@ async function getAllExpenseBookBySchoolId(req, res) {
           ledgerId: item.ledgerId || null,
           amountBeforeGST: item.amountBeforeGST,
           GSTAmount: item.GSTAmount,
-          amountAfterGST: item.amountAfterGST,
+
+          amountAfterGST: item.amountAfterGST || null,
+          creditAmount: item.creditAmount || null,
+
           ledgerName: ledger?.ledgerName || null,
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
@@ -138,16 +141,16 @@ async function getAllExpenseBookBySchoolId(req, res) {
         const headOfAccount = await HeadOfAccount.findOne({
           _id: ledgerWithPaymentMode.headOfAccountId,
           schoolId,
-          headOfAccountName: "Expenses",
+          headOfAccountName: "Income",
         }).lean();
 
         if (headOfAccount) {
-          hasExpensesHeadOfAccount = true;
+          hasIncomeHeadOfAccount = true;
         }
       }
 
-      // Skip this entry if no Expenses head of account found
-      if (!hasExpensesHeadOfAccount) {
+      // Skip this entry if no Income head of account found
+      if (!hasIncomeHeadOfAccount) {
         continue;
       }
 
@@ -199,9 +202,7 @@ async function getAllExpenseBookBySchoolId(req, res) {
         narration: entry.narration,
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
-        subTotalAmountAfterGST: entry.subTotalAmountAfterGST,
         TDSTCSRateWithAmountBeforeGST: entry.TDSTCSRateWithAmountBeforeGST,
-        totalAmountAfterGST: entry.totalAmountAfterGST,
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
         ledgerNameWithPaymentMode: ledgerWithPaymentMode?.ledgerName || null,
         groupLedgerIdWithPaymentMode:
@@ -219,6 +220,13 @@ async function getAllExpenseBookBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
+
+        subTotalAmountAfterGST: entry.subTotalAmountAfterGST || null,
+        subTotalOfCredit: entry.subTotalOfCredit || null,
+
+        totalAmountAfterGST: entry.totalAmountAfterGST || null,
+        totalCreditAmount: entry.totalCreditAmount || null,
       };
 
       formattedData.push(entryData);
@@ -228,7 +236,7 @@ async function getAllExpenseBookBySchoolId(req, res) {
 
     for (const entry of receiptEntries) {
       const itemsWithLedgerNames = [];
-      let hasExpensesHeadOfAccount = false;
+      let hasIncomeHeadOfAccount = false;
 
       for (const item of entry.itemDetails) {
         let ledger = null;
@@ -240,16 +248,16 @@ async function getAllExpenseBookBySchoolId(req, res) {
             .select("ledgerName groupLedgerId headOfAccountId")
             .lean();
 
-          // Check if this ledger has "Expenses" HeadOfAccount
+          // Check if this ledger has "Income" HeadOfAccount
           if (ledger?.headOfAccountId) {
             const headOfAccount = await HeadOfAccount.findOne({
               _id: ledger.headOfAccountId,
               schoolId,
-              headOfAccountName: "Expenses",
+              headOfAccountName: "Income",
             }).lean();
 
             if (headOfAccount) {
-              hasExpensesHeadOfAccount = true;
+              hasIncomeHeadOfAccount = true;
             }
           }
         }
@@ -267,10 +275,11 @@ async function getAllExpenseBookBySchoolId(req, res) {
         itemsWithLedgerNames.push({
           itemName: item.itemName,
           ledgerId: item.ledgerId || null,
-          amount: item.amount,
           ledgerName: ledger?.ledgerName || null,
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
+          debitAmount: item.debitAmount || null,
+          amount: item.amount,
         });
       }
 
@@ -286,16 +295,16 @@ async function getAllExpenseBookBySchoolId(req, res) {
         const headOfAccount = await HeadOfAccount.findOne({
           _id: ledgerWithPaymentMode.headOfAccountId,
           schoolId,
-          headOfAccountName: "Expenses",
+          headOfAccountName: "Income",
         }).lean();
 
         if (headOfAccount) {
-          hasExpensesHeadOfAccount = true;
+          hasIncomeHeadOfAccount = true;
         }
       }
 
-      // Skip this entry if no Expenses head of account found
-      if (!hasExpensesHeadOfAccount) {
+      // Skip this entry if no Income head of account found
+      if (!hasIncomeHeadOfAccount) {
         continue;
       }
 
@@ -348,7 +357,6 @@ async function getAllExpenseBookBySchoolId(req, res) {
         narration: entry.narration,
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
-        subTotalAmount: entry.subTotalAmount,
         TDSTCSRateWithAmount: entry.TDSTCSRateWithAmount,
 
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
@@ -368,6 +376,12 @@ async function getAllExpenseBookBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
+
+        subTotalAmount: entry.subTotalAmount || null,
+        subTotalOfDebit: entry.subTotalOfDebit || null,
+        totalAmount: entry.totalAmount || null,
+        totalDebitAmount: entry.totalDebitAmount || null,
       };
 
       formattedData.push(entryData);
@@ -377,7 +391,7 @@ async function getAllExpenseBookBySchoolId(req, res) {
 
     for (const entry of JournalEntries) {
       const itemsWithLedgerNames = [];
-      let hasExpensesHeadOfAccount = false;
+      let hasIncomeHeadOfAccount = false;
 
       for (const item of entry.itemDetails) {
         let ledger = null;
@@ -389,16 +403,16 @@ async function getAllExpenseBookBySchoolId(req, res) {
             .select("ledgerName groupLedgerId headOfAccountId")
             .lean();
 
-          // Check if this ledger has "Expenses" HeadOfAccount
+          // Check if this ledger has "Income" HeadOfAccount
           if (ledger?.headOfAccountId) {
             const headOfAccount = await HeadOfAccount.findOne({
               _id: ledger.headOfAccountId,
               schoolId,
-              headOfAccountName: "Expenses",
+              headOfAccountName: "Income",
             }).lean();
 
             if (headOfAccount) {
-              hasExpensesHeadOfAccount = true;
+              hasIncomeHeadOfAccount = true;
             }
           }
         }
@@ -424,8 +438,8 @@ async function getAllExpenseBookBySchoolId(req, res) {
         });
       }
 
-      // Skip this entry if no Expenses head of account found
-      if (!hasExpensesHeadOfAccount) {
+      // Skip this entry if no Income head of account found
+      if (!hasIncomeHeadOfAccount) {
         continue;
       }
 
@@ -445,6 +459,7 @@ async function getAllExpenseBookBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
       };
 
       formattedData.push(entryData);
@@ -453,7 +468,8 @@ async function getAllExpenseBookBySchoolId(req, res) {
     // Find Contra Entries
 
     for (const entry of contraEntries) {
-      let hasExpensesHeadOfAccount = false;
+      let hasIncomeHeadOfAccount = false;
+
       const itemsWithLedgerNames = [];
 
       // Collect all ledger IDs (both ledgerId and ledgerIdOfCashAccount)
@@ -475,29 +491,8 @@ async function getAllExpenseBookBySchoolId(req, res) {
         _id: { $in: Array.from(allLedgerIds) },
         schoolId,
       })
-        .select("ledgerName groupLedgerId headOfAccountId")
+        .select("ledgerName groupLedgerId")
         .lean();
-
-      // Check if any ledger has "Expenses" HeadOfAccount
-      for (const ledger of ledgers) {
-        if (ledger.headOfAccountId) {
-          const headOfAccount = await HeadOfAccount.findOne({
-            _id: ledger.headOfAccountId,
-            schoolId,
-            headOfAccountName: "Expenses",
-          }).lean();
-
-          if (headOfAccount) {
-            hasExpensesHeadOfAccount = true;
-            break; // No need to check further if we found one
-          }
-        }
-      }
-
-      // Skip this entry if no Expenses head of account found
-      if (!hasExpensesHeadOfAccount) {
-        continue;
-      }
 
       // Create maps for quick lookup
       const ledgerMap = {};
@@ -629,4 +624,4 @@ async function getAllExpenseBookBySchoolId(req, res) {
   }
 }
 
-export default getAllExpenseBookBySchoolId;
+export default getAllIncomeBookBySchoolId;

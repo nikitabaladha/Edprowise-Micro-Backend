@@ -15,7 +15,11 @@ async function getAllBySchoolId(req, res) {
     }
 
     // Get all Contras for the school & year
-    const Contras = await Contra.find({ schoolId, academicYear })
+    const Contras = await Contra.find({
+      schoolId,
+      academicYear,
+      customizeEntry: false,
+    })
       .sort({ createdAt: -1 })
       .lean();
 

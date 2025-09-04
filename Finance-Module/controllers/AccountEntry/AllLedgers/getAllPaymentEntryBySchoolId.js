@@ -76,6 +76,7 @@ async function getAllBySchoolId(req, res) {
           amountBeforeGST: item.amountBeforeGST,
           GSTAmount: item.GSTAmount,
           amountAfterGST: item.amountAfterGST,
+          creditAmount: item.creditAmount || null,
           ledgerName: ledger?.ledgerName || null,
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
@@ -139,9 +140,7 @@ async function getAllBySchoolId(req, res) {
         narration: entry.narration,
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
-        subTotalAmountAfterGST: entry.subTotalAmountAfterGST,
         TDSTCSRateWithAmountBeforeGST: entry.TDSTCSRateWithAmountBeforeGST,
-        totalAmountAfterGST: entry.totalAmountAfterGST,
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
         ledgerNameWithPaymentMode: ledgerWithPaymentMode?.ledgerName || null,
         groupLedgerIdWithPaymentMode:
@@ -159,6 +158,13 @@ async function getAllBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
+
+        subTotalAmountAfterGST: entry.subTotalAmountAfterGST,
+        subTotalOfCredit: entry.subTotalOfCredit,
+
+        totalAmountAfterGST: entry.totalAmountAfterGST,
+        totalCreditAmount: entry.totalCreditAmount,
       };
 
       formattedData.push(entryData);

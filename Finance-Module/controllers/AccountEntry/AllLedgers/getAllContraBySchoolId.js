@@ -181,6 +181,7 @@ async function getAllContraBySchoolId(req, res) {
         TDSorTCSGroupLedgerName,
         TDSorTCSLedgerName,
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
       };
 
       formattedData.push(entryData);

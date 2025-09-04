@@ -104,6 +104,7 @@ async function getAllBySchoolId(req, res) {
           amountBeforeGST: item.amountBeforeGST,
           GSTAmount: item.GSTAmount,
           amountAfterGST: item.amountAfterGST,
+          creditAmount: item.creditAmount || null,
           ledgerName: ledger?.ledgerName || null,
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
@@ -167,9 +168,7 @@ async function getAllBySchoolId(req, res) {
         narration: entry.narration,
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
-        subTotalAmountAfterGST: entry.subTotalAmountAfterGST,
         TDSTCSRateWithAmountBeforeGST: entry.TDSTCSRateWithAmountBeforeGST,
-        totalAmountAfterGST: entry.totalAmountAfterGST,
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
         ledgerNameWithPaymentMode: ledgerWithPaymentMode?.ledgerName || null,
         groupLedgerIdWithPaymentMode:
@@ -187,6 +186,14 @@ async function getAllBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
+
+        customizeEntry: entry.customizeEntry,
+
+        subTotalAmountAfterGST: entry.subTotalAmountAfterGST || null,
+        subTotalOfCredit: entry.subTotalOfCredit || null,
+
+        totalAmountAfterGST: entry.totalAmountAfterGST || null,
+        totalCreditAmount: entry.totalCreditAmount || null,
       };
 
       formattedData.push(entryData);
@@ -221,10 +228,12 @@ async function getAllBySchoolId(req, res) {
         itemsWithLedgerNames.push({
           itemName: item.itemName,
           ledgerId: item.ledgerId || null,
-          amount: item.amount,
           ledgerName: ledger?.ledgerName || null,
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
+
+          debitAmount: item.debitAmount || null,
+          amount: item.amount,
         });
       }
 
@@ -285,7 +294,6 @@ async function getAllBySchoolId(req, res) {
         narration: entry.narration,
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
-        subTotalAmount: entry.subTotalAmount,
         TDSTCSRateWithAmount: entry.TDSTCSRateWithAmount,
 
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
@@ -305,6 +313,12 @@ async function getAllBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
+
+        subTotalAmount: entry.subTotalAmount || null,
+        subTotalOfDebit: entry.subTotalOfDebit || null,
+        totalAmount: entry.totalAmount || null,
+        totalDebitAmount: entry.totalDebitAmount || null,
       };
 
       formattedData.push(entryData);
@@ -312,7 +326,6 @@ async function getAllBySchoolId(req, res) {
 
     // Find Contra Entries
 
-    // Find Contra Entries
     for (const entry of contraEntries) {
       const itemsWithLedgerNames = [];
 
@@ -448,6 +461,7 @@ async function getAllBySchoolId(req, res) {
         TDSorTCSGroupLedgerName,
         TDSorTCSLedgerName,
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
       };
 
       formattedData.push(entryData);
@@ -498,8 +512,6 @@ async function getAllBySchoolId(req, res) {
         documentDate: entry.documentDate,
         narration: entry.narration,
         subTotalOfDebit: entry.subTotalOfDebit,
-        TDSTCSRateWithDebitAmount: entry.TDSTCSRateWithDebitAmount,
-        TDSTCSRateWithCreditAmount: entry.TDSTCSRateWithCreditAmount,
 
         totalAmountOfDebit: entry.totalAmountOfDebit,
         totalAmountOfCredit: entry.totalAmountOfCredit,
@@ -510,6 +522,7 @@ async function getAllBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
       };
 
       formattedData.push(entryData);

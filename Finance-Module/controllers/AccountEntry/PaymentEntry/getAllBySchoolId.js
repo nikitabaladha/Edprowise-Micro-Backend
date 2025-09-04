@@ -24,7 +24,11 @@ async function getAllBySchoolId(req, res) {
       .select("authorisedSignatureImage")
       .lean();
 
-    const paymentEntries = await PaymentEntry.find({ schoolId, academicYear })
+    const paymentEntries = await PaymentEntry.find({
+      schoolId,
+      academicYear,
+      customizeEntry: false,
+    })
       .sort({ createdAt: -1 })
       .lean();
 

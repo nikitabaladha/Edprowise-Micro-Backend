@@ -126,7 +126,6 @@ const PaymentEntryValidatorUpdate = Joi.object({
   status,
   academicYear: academicYearUpdate,
   invoiceImage,
-  customizeEntry,
 });
 
 export default {

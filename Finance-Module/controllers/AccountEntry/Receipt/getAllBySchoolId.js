@@ -23,7 +23,11 @@ async function getAllBySchoolId(req, res) {
       .select("authorisedSignatureImage")
       .lean();
 
-    const receipts = await Receipt.find({ schoolId, academicYear })
+    const receipts = await Receipt.find({
+      schoolId,
+      academicYear,
+      customizeEntry: false,
+    })
       .sort({ createdAt: -1 })
       .lean();
 

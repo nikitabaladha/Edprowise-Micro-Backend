@@ -1,15 +1,10 @@
 import mongoose from "mongoose";
-import Contra from "../../../models/Contra.js";
-import ContraValidator from "../../../validators/CustomizeEntryForContraValidator.js";
+import Receipt from "../../../models/Receipt.js";
+import ReceiptValidator from "../../../validators/CustomizeEntryForReceiptValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
 
-async function generateContraVoucherNumber(schoolId, academicYear) {
-  const count = await Contra.countDocuments({ schoolId, academicYear });
-  const nextNumber = count + 1;
-  return `CVN/${academicYear}/${nextNumber}`;
-}
-
+// Reuse the same helper functions from your create API
 async function getOrCreateOpeningBalanceRecord(
   schoolId,
   academicYear,
@@ -64,7 +59,7 @@ async function updateOpeningClosingBalance(
   academicYear,
   ledgerId,
   entryDate,
-  contraId,
+  receiptId,
   debitAmount = 0,
   creditAmount = 0
 ) {
@@ -79,7 +74,6 @@ async function updateOpeningClosingBalance(
       entryDate
     );
 
-  // Determine effective opening balance
   const previousBalanceDetails = record.balanceDetails
     .filter((detail) => new Date(detail.entryDate) <= new Date(entryDate))
     .sort((a, b) => new Date(b.entryDate) - new Date(a.entryDate));
@@ -89,7 +83,6 @@ async function updateOpeningClosingBalance(
     effectiveOpeningBalance = previousBalanceDetails[0].closingBalance;
   }
 
-  // Calculate closing balance
   let closingBalance;
   if (balanceType === "Debit") {
     closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
@@ -97,11 +90,10 @@ async function updateOpeningClosingBalance(
     closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
   }
 
-  // Check if exact same entry already exists
   const existingEntryIndex = record.balanceDetails.findIndex(
     (detail) =>
       new Date(detail.entryDate).getTime() === new Date(entryDate).getTime() &&
-      detail.entryId?.toString() === contraId.toString()
+      detail.entryId?.toString() === receiptId.toString()
   );
 
   if (existingEntryIndex !== -1) {
@@ -111,7 +103,7 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: contraId,
+      entryId: receiptId,
     };
   } else {
     const newBalanceDetail = {
@@ -120,13 +112,12 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: contraId,
+      entryId: receiptId,
     };
 
     record.balanceDetails.push(newBalanceDetail);
   }
 
-  // Sort by date (and then by _id to ensure chaining order within same day)
   record.balanceDetails.sort((a, b) => {
     const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
     return dateDiff !== 0
@@ -157,7 +148,6 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
 
   const balanceType = ledger?.balanceType || "Debit";
 
-  // Sort all entries by date, then by _id for consistent same-day order
   record.balanceDetails.sort((a, b) => {
     const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
     return dateDiff !== 0
@@ -165,7 +155,6 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
       : a._id.toString().localeCompare(b._id.toString());
   });
 
-  // Find the initial opening balance (from ledger or first entry)
   let currentBalance = record.balanceDetails[0].openingBalance;
 
   for (let i = 0; i < record.balanceDetails.length; i++) {
@@ -174,12 +163,10 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
     if (i === 0) {
       currentBalance = detail.openingBalance;
     } else {
-      // Update opening balance to previous closing balance
       detail.openingBalance = record.balanceDetails[i - 1].closingBalance;
       currentBalance = detail.openingBalance;
     }
 
-    // Calculate new closing balance
     if (balanceType === "Debit") {
       detail.closingBalance = currentBalance + detail.debit - detail.credit;
     } else {
@@ -208,16 +195,14 @@ async function recalculateAllBalancesAfterDate(
     return;
   }
 
-  // Find the index of the first entry after the specified date
   const startIndex = record.balanceDetails.findIndex(
     (detail) => new Date(detail.entryDate) > new Date(date)
   );
 
   if (startIndex === -1) {
-    return; // No entries after this date
+    return;
   }
 
-  // Get the balance just before the start index
   const previousBalance =
     startIndex > 0
       ? record.balanceDetails[startIndex - 1].closingBalance
@@ -225,7 +210,6 @@ async function recalculateAllBalancesAfterDate(
 
   let currentBalance = previousBalance;
 
-  // Recalculate all balances from the start index onward
   for (let i = startIndex; i < record.balanceDetails.length; i++) {
     const detail = record.balanceDetails[i];
     detail.openingBalance = currentBalance;
@@ -250,31 +234,62 @@ async function recalculateAllBalancesAfterDate(
   await record.save();
 }
 
-export async function create(req, res) {
+async function removeReceiptFromBalances(
+  schoolId,
+  academicYear,
+  receiptId,
+  entryDate
+) {
+  // Find all OpeningClosingBalance records that have this receipt entry
+  const balanceRecords = await OpeningClosingBalance.find({
+    schoolId,
+    academicYear,
+    "balanceDetails.entryId": receiptId,
+  });
+
+  for (const record of balanceRecords) {
+    // Remove the entry from balance details
+    record.balanceDetails = record.balanceDetails.filter(
+      (detail) => detail.entryId?.toString() !== receiptId.toString()
+    );
+
+    await record.save();
+
+    // Recalculate balances for this ledger
+    await recalculateLedgerBalances(schoolId, academicYear, record.ledgerId);
+    await recalculateAllBalancesAfterDate(
+      schoolId,
+      academicYear,
+      record.ledgerId,
+      entryDate
+    );
+  }
+}
+
+async function updateById(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const schoolId = req.user?.schoolId;
+    const { id, academicYear } = req.params;
 
     if (!schoolId) {
       await session.abortTransaction();
       session.endSession();
       return res.status(401).json({
         hasError: true,
-        message: "Access denied: You do not have permission.",
+        message: "Access denied: Unauthorized request.",
       });
     }
 
-    if (req.body.itemDetails && typeof req.body.itemDetails === "string") {
-      req.body.itemDetails = JSON.parse(req.body.itemDetails);
-    }
-
-    const { error } = ContraValidator.ContraValidator.validate(req.body);
+    const { error } = ReceiptValidator.ReceiptValidatorUpdate.validate(
+      req.body
+    );
     if (error) {
-      const errorMessages = error.details.map((err) => err.message).join(", ");
       await session.abortTransaction();
       session.endSession();
+      const errorMessages = error.details.map((err) => err.message).join(", ");
       return res.status(400).json({
         hasError: true,
         message: errorMessages,
@@ -283,168 +298,91 @@ export async function create(req, res) {
 
     const {
       entryDate,
-      dateOfCashDepositedWithdrawlDate,
+      receiptDate,
       narration,
       itemDetails,
       status,
-      academicYear,
-      contraEntryName,
-      customizeEntry,
+      totalAmount,
+      totalDebitAmount,
     } = req.body;
 
-    const ContraVoucherNumber = await generateContraVoucherNumber(
+    const existingReceipt = await Receipt.findOne({
+      _id: id,
       schoolId,
-      academicYear
-    );
+      academicYear,
+    }).session(session);
 
-    const { chequeImageForContra } = req.files || {};
-
-    let chequeImageForContraFullPath = "";
-    if (chequeImageForContra?.[0]) {
-      const basePath = chequeImageForContra[0].mimetype.startsWith("image/")
-        ? "/Images/FinanceModule/chequeImageForContra"
-        : "/Documents/FinanceModule/chequeImageForContra";
-      chequeImageForContraFullPath = `${basePath}/${chequeImageForContra[0].filename}`;
-    }
-
-    const updatedItemDetails = itemDetails.map((item) => ({
-      ...item,
-      debitAmount: parseFloat(item.debitAmount) || 0,
-      creditAmount: parseFloat(item.creditAmount) || 0,
-    }));
-
-    const subTotalOfDebit = updatedItemDetails.reduce(
-      (sum, item) => sum + item.debitAmount,
-      0
-    );
-
-    const subTotalOfCredit = updatedItemDetails.reduce(
-      (sum, item) => sum + item.creditAmount,
-      0
-    );
-
-    const totalAmountOfDebit = subTotalOfDebit;
-    const totalAmountOfCredit = subTotalOfCredit;
-
-    if (totalAmountOfDebit !== totalAmountOfCredit) {
+    if (!existingReceipt) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({
+      return res.status(404).json({
         hasError: true,
-        message: "Total Debit and Credit amounts must be equal.",
+        message: "Receipt not found.",
       });
     }
 
-    if (["Cash Deposited", "Cash Withdrawn"].includes(contraEntryName)) {
-      const missingCashAccount = updatedItemDetails.some(
-        (item) => !item.ledgerIdOfCashAccount
-      );
-      if (missingCashAccount) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({
-          hasError: true,
-          message:
-            "ledgerIdOfCashAccount is required for Cash Deposited or Cash Withdrawn entries.",
-        });
-      }
+    // Store old values for comparison
+    const oldEntryDate = existingReceipt.entryDate;
+    const oldItemDetails = existingReceipt.itemDetails;
+
+    // Handle uploaded files
+    const { receiptImage } = req.files || {};
+
+    if (receiptImage?.[0]) {
+      const receiptImagePath = receiptImage[0].mimetype.startsWith("image/")
+        ? "/Images/FinanceModule/ReceiptImage"
+        : "/Documents/FinanceModule/ReceiptImage";
+      existingReceipt.receiptImage = `${receiptImagePath}/${receiptImage[0].filename}`;
     }
 
-    const newContra = new Contra({
-      schoolId,
-      contraVoucherNumber: ContraVoucherNumber,
-      entryDate,
-      dateOfCashDepositedWithdrawlDate,
-      narration,
-      itemDetails: updatedItemDetails,
-      subTotalOfCredit: subTotalOfCredit,
-      subTotalOfDebit: subTotalOfDebit,
-      totalAmountOfDebit,
-      totalAmountOfCredit,
-      chequeImageForContra: chequeImageForContraFullPath,
-      status,
-      academicYear,
-      contraEntryName: contraEntryName || "",
-      customizeEntry,
-    });
+    // Recalculate item details amounts
+    const updatedItemDetails = itemDetails.map((item) => ({
+      ...item,
+      amount: parseFloat(item.amount) || 0,
+    }));
 
-    await newContra.save({ session });
+    const subTotalAmount = updatedItemDetails.reduce(
+      (sum, item) => sum + (parseFloat(item.amount) || 0),
+      0
+    );
+
+    // Update fields
+    existingReceipt.entryDate = entryDate;
+    existingReceipt.receiptDate = receiptDate;
+    existingReceipt.narration = narration;
+    existingReceipt.itemDetails = updatedItemDetails;
+    existingReceipt.subTotalAmount = subTotalAmount;
+    existingReceipt.totalAmount = totalAmount;
+    existingReceipt.status = status;
+
+    await existingReceipt.save({ session });
+
+    // Remove old balance entries first
+    await removeReceiptFromBalances(
+      schoolId,
+      academicYear,
+      existingReceipt._id,
+      oldEntryDate
+    );
 
     // Store all ledger IDs that need to be updated
     const ledgerIdsToUpdate = new Set();
 
-    // Process based on contra entry type
-    if (contraEntryName === "Cash Deposited") {
-      // For Cash Deposited: Debit main ledger, Credit cash account
-      for (const item of updatedItemDetails) {
-        // Debit the main ledger
-        await updateOpeningClosingBalance(
-          schoolId,
-          academicYear,
-          item.ledgerId,
-          entryDate,
-          newContra._id,
-          item.debitAmount,
-          0
-        );
-        ledgerIdsToUpdate.add(item.ledgerId.toString());
-
-        // Credit the cash account
-        await updateOpeningClosingBalance(
-          schoolId,
-          academicYear,
-          item.ledgerIdOfCashAccount,
-          entryDate,
-          newContra._id,
-          0,
-          item.creditAmount
-        );
-        ledgerIdsToUpdate.add(item.ledgerIdOfCashAccount.toString());
-      }
-    } else if (contraEntryName === "Cash Withdrawn") {
-      // For Cash Withdrawn: Credit main ledger, Debit cash account
-      for (const item of updatedItemDetails) {
-        // Credit the main ledger
-        await updateOpeningClosingBalance(
-          schoolId,
-          academicYear,
-          item.ledgerId,
-          entryDate,
-          newContra._id,
-          0,
-          item.creditAmount
-        );
-        ledgerIdsToUpdate.add(item.ledgerId.toString());
-
-        // Debit the cash account
-        await updateOpeningClosingBalance(
-          schoolId,
-          academicYear,
-          item.ledgerIdOfCashAccount,
-          entryDate,
-          newContra._id,
-          item.debitAmount,
-          0
-        );
-        ledgerIdsToUpdate.add(item.ledgerIdOfCashAccount.toString());
-      }
-    } else {
-      // For Bank Transfer or empty/null contraEntryName: Process each item normally
-      for (const item of updatedItemDetails) {
-        await updateOpeningClosingBalance(
-          schoolId,
-          academicYear,
-          item.ledgerId,
-          entryDate,
-          newContra._id,
-          item.debitAmount,
-          item.creditAmount
-        );
-        ledgerIdsToUpdate.add(item.ledgerId.toString());
-      }
+    // 1. Item Ledgers (Credit)
+    for (const item of updatedItemDetails) {
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        item.ledgerId,
+        entryDate,
+        existingReceipt._id,
+        0, // debit
+        item.amount // credit
+      );
+      ledgerIdsToUpdate.add(item.ledgerId.toString());
     }
 
-    // Recalculate all ledgers that were updated
+    // --- Recalculate all ledgers that were updated ---
     for (const ledgerId of ledgerIdsToUpdate) {
       await recalculateLedgerBalances(schoolId, academicYear, ledgerId);
       await recalculateAllBalancesAfterDate(
@@ -458,10 +396,10 @@ export async function create(req, res) {
     await session.commitTransaction();
     session.endSession();
 
-    return res.status(201).json({
+    return res.status(200).json({
       hasError: false,
-      message: "Contra created successfully!",
-      data: newContra,
+      message: "Receipt updated successfully!",
+      data: existingReceipt,
     });
   } catch (error) {
     await session.abortTransaction();
@@ -473,11 +411,11 @@ export async function create(req, res) {
         .join(", ");
       return res.status(400).json({
         hasError: true,
-        message: `Duplicate entry for ${field}. Contra already exists.`,
+        message: `Duplicate entry for ${field}. Receipt already exists.`,
       });
     }
 
-    console.error("Error creating Contra:", error);
+    console.error("Error updating Receipt Entry:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",
@@ -485,4 +423,4 @@ export async function create(req, res) {
   }
 }
 
-export default create;
+export default updateById;

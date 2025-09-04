@@ -121,7 +121,6 @@ const ContraValidatorUpdate = Joi.object({
   status,
   chequeImageForContra,
   academicYear: academicYearUpdate,
-  customizeEntry,
 });
 
 export default {

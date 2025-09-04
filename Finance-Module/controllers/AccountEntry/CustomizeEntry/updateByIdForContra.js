@@ -3,24 +3,21 @@ import Contra from "../../../models/Contra.js";
 import ContraValidator from "../../../validators/CustomizeEntryForContraValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
+import GroupLedger from "../../../models/GroupLedger.js";
 
-async function generateContraVoucherNumber(schoolId, academicYear) {
-  const count = await Contra.countDocuments({ schoolId, academicYear });
-  const nextNumber = count + 1;
-  return `CVN/${academicYear}/${nextNumber}`;
-}
-
+// Helper functions with session support
 async function getOrCreateOpeningBalanceRecord(
   schoolId,
   academicYear,
   ledgerId,
-  entryDate
+  entryDate,
+  session = null
 ) {
   const ledger = await Ledger.findOne({
     schoolId,
     academicYear,
     _id: ledgerId,
-  });
+  }).session(session);
 
   let openingBalance = 0;
   let balanceType = "Debit";
@@ -34,7 +31,7 @@ async function getOrCreateOpeningBalanceRecord(
     schoolId,
     academicYear,
     ledgerId,
-  });
+  }).session(session);
 
   if (!record) {
     record = new OpeningClosingBalance({
@@ -66,7 +63,8 @@ async function updateOpeningClosingBalance(
   entryDate,
   contraId,
   debitAmount = 0,
-  creditAmount = 0
+  creditAmount = 0,
+  session = null
 ) {
   debitAmount = Number(debitAmount);
   creditAmount = Number(creditAmount);
@@ -76,7 +74,8 @@ async function updateOpeningClosingBalance(
       schoolId,
       academicYear,
       ledgerId,
-      entryDate
+      entryDate,
+      session
     );
 
   // Determine effective opening balance
@@ -134,16 +133,21 @@ async function updateOpeningClosingBalance(
       : a._id.toString().localeCompare(b._id.toString());
   });
 
-  await record.save();
+  await record.save({ session });
   return record;
 }
 
-async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
+async function recalculateLedgerBalances(
+  schoolId,
+  academicYear,
+  ledgerId,
+  session = null
+) {
   const record = await OpeningClosingBalance.findOne({
     schoolId,
     academicYear,
     ledgerId,
-  });
+  }).session(session);
 
   if (!record || record.balanceDetails.length === 0) {
     return;
@@ -153,7 +157,7 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
     schoolId,
     academicYear,
     _id: ledgerId,
-  });
+  }).session(session);
 
   const balanceType = ledger?.balanceType || "Debit";
 
@@ -165,7 +169,6 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
       : a._id.toString().localeCompare(b._id.toString());
   });
 
-  // Find the initial opening balance (from ledger or first entry)
   let currentBalance = record.balanceDetails[0].openingBalance;
 
   for (let i = 0; i < record.balanceDetails.length; i++) {
@@ -189,20 +192,21 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
     currentBalance = detail.closingBalance;
   }
 
-  await record.save();
+  await record.save({ session });
 }
 
 async function recalculateAllBalancesAfterDate(
   schoolId,
   academicYear,
   ledgerId,
-  date
+  date,
+  session = null
 ) {
   const record = await OpeningClosingBalance.findOne({
     schoolId,
     academicYear,
     ledgerId,
-  });
+  }).session(session);
 
   if (!record || record.balanceDetails.length === 0) {
     return;
@@ -234,7 +238,7 @@ async function recalculateAllBalancesAfterDate(
       schoolId,
       academicYear,
       _id: ledgerId,
-    });
+    }).session(session);
 
     const balanceType = ledger?.balanceType || "Debit";
 
@@ -247,30 +251,27 @@ async function recalculateAllBalancesAfterDate(
     currentBalance = detail.closingBalance;
   }
 
-  await record.save();
+  await record.save({ session });
 }
 
-export async function create(req, res) {
+export async function updateById(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const schoolId = req.user?.schoolId;
+    const { id, academicYear } = req.params;
 
     if (!schoolId) {
       await session.abortTransaction();
       session.endSession();
       return res.status(401).json({
         hasError: true,
-        message: "Access denied: You do not have permission.",
+        message: "Access denied: Unauthorized request.",
       });
     }
 
-    if (req.body.itemDetails && typeof req.body.itemDetails === "string") {
-      req.body.itemDetails = JSON.parse(req.body.itemDetails);
-    }
-
-    const { error } = ContraValidator.ContraValidator.validate(req.body);
+    const { error } = ContraValidator.ContraValidatorUpdate.validate(req.body);
     if (error) {
       const errorMessages = error.details.map((err) => err.message).join(", ");
       await session.abortTransaction();
@@ -287,24 +288,35 @@ export async function create(req, res) {
       narration,
       itemDetails,
       status,
-      academicYear,
       contraEntryName,
-      customizeEntry,
     } = req.body;
 
-    const ContraVoucherNumber = await generateContraVoucherNumber(
+    const existingContra = await Contra.findOne({
+      _id: id,
       schoolId,
-      academicYear
-    );
+      academicYear,
+    }).session(session);
+
+    if (!existingContra) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        hasError: true,
+        message: "Contra not found.",
+      });
+    }
+
+    // Store old data for comparison and cleanup
+    const oldItemDetails = existingContra.itemDetails;
+    const oldEntryDate = existingContra.entryDate;
 
     const { chequeImageForContra } = req.files || {};
 
-    let chequeImageForContraFullPath = "";
     if (chequeImageForContra?.[0]) {
       const basePath = chequeImageForContra[0].mimetype.startsWith("image/")
         ? "/Images/FinanceModule/chequeImageForContra"
         : "/Documents/FinanceModule/chequeImageForContra";
-      chequeImageForContraFullPath = `${basePath}/${chequeImageForContra[0].filename}`;
+      existingContra.chequeImageForContra = `${basePath}/${chequeImageForContra[0].filename}`;
     }
 
     const updatedItemDetails = itemDetails.map((item) => ({
@@ -345,32 +357,74 @@ export async function create(req, res) {
         return res.status(400).json({
           hasError: true,
           message:
-            "ledgerIdOfCashAccount is required for Cash Deposited or Cash Withdrawn entries.",
+            "LedgerId Of CashAccount is required for Cash Deposited or Cash Withdrawn entries.",
         });
       }
     }
 
-    const newContra = new Contra({
-      schoolId,
-      contraVoucherNumber: ContraVoucherNumber,
-      entryDate,
-      dateOfCashDepositedWithdrawlDate,
-      narration,
-      itemDetails: updatedItemDetails,
-      subTotalOfCredit: subTotalOfCredit,
-      subTotalOfDebit: subTotalOfDebit,
-      totalAmountOfDebit,
-      totalAmountOfCredit,
-      chequeImageForContra: chequeImageForContraFullPath,
-      status,
-      academicYear,
-      contraEntryName: contraEntryName || "",
-      customizeEntry,
+    // Update fields
+    existingContra.entryDate = entryDate || existingContra.entryDate;
+    existingContra.contraEntryName =
+      contraEntryName || existingContra.contraEntryName;
+    existingContra.dateOfCashDepositedWithdrawlDate =
+      dateOfCashDepositedWithdrawlDate ||
+      existingContra.dateOfCashDepositedWithdrawlDate;
+    existingContra.narration = narration || existingContra.narration;
+    existingContra.itemDetails = updatedItemDetails;
+    existingContra.subTotalOfDebit = subTotalOfDebit;
+    existingContra.subTotalOfCredit = subTotalOfCredit;
+    existingContra.totalAmountOfDebit = totalAmountOfDebit;
+    existingContra.totalAmountOfCredit = totalAmountOfCredit;
+    existingContra.status = status || existingContra.status;
+
+    await existingContra.save({ session });
+
+    // Step 1: Remove old contra entry from OpeningClosingBalance
+    const allLedgerIds = new Set();
+
+    // Collect all ledger IDs from old item details
+    oldItemDetails.forEach((item) => {
+      allLedgerIds.add(item.ledgerId.toString());
+      if (item.ledgerIdOfCashAccount) {
+        allLedgerIds.add(item.ledgerIdOfCashAccount.toString());
+      }
     });
 
-    await newContra.save({ session });
+    // Remove the contra entry from all affected ledgers
+    for (const ledgerId of allLedgerIds) {
+      const record = await OpeningClosingBalance.findOne({
+        schoolId,
+        academicYear,
+        ledgerId,
+      }).session(session);
 
-    // Store all ledger IDs that need to be updated
+      if (record) {
+        // Remove the entry with this contra ID
+        record.balanceDetails = record.balanceDetails.filter(
+          (detail) => detail.entryId?.toString() !== id.toString()
+        );
+        await record.save({ session });
+      }
+    }
+
+    // Step 2: Recalculate balances for all affected ledgers after removing the old entry
+    for (const ledgerId of allLedgerIds) {
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        ledgerId,
+        session
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        ledgerId,
+        oldEntryDate,
+        session
+      );
+    }
+
+    // Step 3: Add the updated contra entry to OpeningClosingBalance
     const ledgerIdsToUpdate = new Set();
 
     // Process based on contra entry type
@@ -382,10 +436,11 @@ export async function create(req, res) {
           schoolId,
           academicYear,
           item.ledgerId,
-          entryDate,
-          newContra._id,
+          existingContra.entryDate,
+          existingContra._id,
           item.debitAmount,
-          0
+          item.creditAmount,
+          session
         );
         ledgerIdsToUpdate.add(item.ledgerId.toString());
 
@@ -394,10 +449,11 @@ export async function create(req, res) {
           schoolId,
           academicYear,
           item.ledgerIdOfCashAccount,
-          entryDate,
-          newContra._id,
-          0,
-          item.creditAmount
+          existingContra.entryDate,
+          existingContra._id,
+          item.debitAmount,
+          item.creditAmount,
+          session
         );
         ledgerIdsToUpdate.add(item.ledgerIdOfCashAccount.toString());
       }
@@ -409,10 +465,11 @@ export async function create(req, res) {
           schoolId,
           academicYear,
           item.ledgerId,
-          entryDate,
-          newContra._id,
-          0,
-          item.creditAmount
+          existingContra.entryDate,
+          existingContra._id,
+          item.debitAmount,
+          item.creditAmount,
+          session
         );
         ledgerIdsToUpdate.add(item.ledgerId.toString());
 
@@ -421,63 +478,61 @@ export async function create(req, res) {
           schoolId,
           academicYear,
           item.ledgerIdOfCashAccount,
-          entryDate,
-          newContra._id,
+          existingContra.entryDate,
+          existingContra._id,
           item.debitAmount,
-          0
+          item.creditAmount,
+          session
         );
         ledgerIdsToUpdate.add(item.ledgerIdOfCashAccount.toString());
       }
     } else {
-      // For Bank Transfer or empty/null contraEntryName: Process each item normally
+      // For Bank Transfer: Process each item normally
       for (const item of updatedItemDetails) {
         await updateOpeningClosingBalance(
           schoolId,
           academicYear,
           item.ledgerId,
-          entryDate,
-          newContra._id,
+          existingContra.entryDate,
+          existingContra._id,
           item.debitAmount,
-          item.creditAmount
+          item.creditAmount,
+          session
         );
         ledgerIdsToUpdate.add(item.ledgerId.toString());
       }
     }
 
-    // Recalculate all ledgers that were updated
+    // Step 4: Recalculate all ledgers that were updated
     for (const ledgerId of ledgerIdsToUpdate) {
-      await recalculateLedgerBalances(schoolId, academicYear, ledgerId);
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        ledgerId,
+        session
+      );
       await recalculateAllBalancesAfterDate(
         schoolId,
         academicYear,
         ledgerId,
-        entryDate
+        existingContra.entryDate,
+        session
       );
     }
 
     await session.commitTransaction();
     session.endSession();
 
-    return res.status(201).json({
+    return res.status(200).json({
       hasError: false,
-      message: "Contra created successfully!",
-      data: newContra,
+      message: "Contra updated successfully!",
+      data: existingContra,
     });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
 
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)
-        .map((key) => `${key}: ${error.keyValue[key]}`)
-        .join(", ");
-      return res.status(400).json({
-        hasError: true,
-        message: `Duplicate entry for ${field}. Contra already exists.`,
-      });
-    }
-
-    console.error("Error creating Contra:", error);
+    console.error("Error updating Contra Entry:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",
@@ -485,4 +540,4 @@ export async function create(req, res) {
   }
 }
 
-export default create;
+export default updateById;

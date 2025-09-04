@@ -15,7 +15,11 @@ async function getAllBySchoolId(req, res) {
     }
 
     // Get all Journals for the school & year
-    const Journals = await Journal.find({ schoolId, academicYear })
+    const Journals = await Journal.find({
+      schoolId,
+      academicYear,
+      customizeEntry: false,
+    })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -60,9 +64,6 @@ async function getAllBySchoolId(req, res) {
         narration: entry.narration,
         subTotalOfDebit: entry.subTotalOfDebit,
         subTotalOfCredit: entry.subTotalOfCredit,
-        // TDSorTCS: entry.TDSorTCS,
-        // TDSTCSRateWithDebitAmount: entry.TDSTCSRateWithDebitAmount,
-        // TDSTCSRateWithCreditAmount: entry.TDSTCSRateWithCreditAmount,
         totalAmountOfCredit: entry.totalAmountOfCredit,
         totalAmountOfDebit: entry.totalAmountOfDebit,
         status: entry.status || null,

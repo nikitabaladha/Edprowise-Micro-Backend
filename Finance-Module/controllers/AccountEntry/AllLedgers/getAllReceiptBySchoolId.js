@@ -74,8 +74,11 @@ async function getAllReceiptBySchoolId(req, res) {
         itemsWithLedgerNames.push({
           itemName: item.itemName,
           ledgerId: item.ledgerId || null,
-          amount: item.amount,
           ledgerName: ledger?.ledgerName || null,
+
+          debitAmount: item.debitAmount || null,
+          amount: item.amount,
+
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
         });
@@ -138,7 +141,6 @@ async function getAllReceiptBySchoolId(req, res) {
         narration: entry.narration,
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
-        subTotalAmount: entry.subTotalAmount,
         TDSTCSRateWithAmount: entry.TDSTCSRateWithAmount,
 
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
@@ -158,6 +160,13 @@ async function getAllReceiptBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
+
+        customizeEntry: entry.customizeEntry,
+
+        subTotalAmount: entry.subTotalAmount,
+        subTotalOfDebit: entry.subTotalOfDebit,
+        totalAmount: entry.totalAmount,
+        totalDebitAmount: entry.totalDebitAmount,
       };
 
       formattedData.push(entryData);

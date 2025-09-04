@@ -287,6 +287,7 @@ async function create(req, res) {
       academicYear,
       totalAmount,
       totalDebitAmount,
+      customizeEntry,
     } = req.body;
 
     const receiptVoucherNumber = await generateReceiptVoucherNumber(
@@ -334,6 +335,7 @@ async function create(req, res) {
       receiptImage: receiptImageFullPath,
       status,
       academicYear,
+      customizeEntry,
     });
 
     await newReceipt.save({ session });

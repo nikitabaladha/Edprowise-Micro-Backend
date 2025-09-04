@@ -89,9 +89,11 @@ async function getAllJournalBySchoolId(req, res) {
         entryDate: entry.entryDate,
         documentDate: entry.documentDate,
         narration: entry.narration,
-        subTotalOfDebit: entry.subTotalOfDebit,
         TDSTCSRateWithDebitAmount: entry.TDSTCSRateWithDebitAmount,
         TDSTCSRateWithCreditAmount: entry.TDSTCSRateWithCreditAmount,
+
+        subTotalOfDebit: entry.subTotalOfDebit,
+        subTotalOfCredit: entry.subTotalOfCredit,
 
         totalAmountOfDebit: entry.totalAmountOfDebit,
         totalAmountOfCredit: entry.totalAmountOfCredit,
@@ -102,6 +104,7 @@ async function getAllJournalBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
       };
 
       formattedData.push(entryData);

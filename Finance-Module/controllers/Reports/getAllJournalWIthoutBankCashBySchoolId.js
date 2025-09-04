@@ -100,6 +100,7 @@ async function getAllJournalWIthoutBankCashBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
       };
 
       const hasBankOrCash = itemsWithLedgerNames.some(

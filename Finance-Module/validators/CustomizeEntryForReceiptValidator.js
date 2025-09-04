@@ -120,7 +120,6 @@ const ReceiptValidatorUpdate = Joi.object({
   receiptImage,
   subTotalOfDebit,
   totalDebitAmount,
-  customizeEntry,
 });
 
 export default {
