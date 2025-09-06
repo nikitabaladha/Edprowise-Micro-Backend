@@ -22,7 +22,24 @@ async function generateTransactionNumber() {
   return transactionNumber;
 }
 
-// Reuse the same helper functions from your create API
+// Helper function to aggregate amounts by ledgerId
+function aggregateAmountsByLedger(itemDetails) {
+  const ledgerMap = new Map();
+
+  itemDetails.forEach((item) => {
+    const ledgerId = item.ledgerId.toString();
+    const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
+
+    if (ledgerMap.has(ledgerId)) {
+      ledgerMap.set(ledgerId, ledgerMap.get(ledgerId) + amountAfterGST);
+    } else {
+      ledgerMap.set(ledgerId, amountAfterGST);
+    }
+  });
+
+  return ledgerMap;
+}
+
 async function getOrCreateOpeningBalanceRecord(
   schoolId,
   academicYear,
@@ -109,9 +126,7 @@ async function updateOpeningClosingBalance(
   }
 
   const existingEntryIndex = record.balanceDetails.findIndex(
-    (detail) =>
-      new Date(detail.entryDate).getTime() === new Date(entryDate).getTime() &&
-      detail.entryId?.toString() === paymentEntryId.toString()
+    (detail) => detail.entryId?.toString() === paymentEntryId.toString()
   );
 
   if (existingEntryIndex !== -1) {
@@ -255,8 +270,7 @@ async function recalculateAllBalancesAfterDate(
 async function removePaymentEntryFromBalances(
   schoolId,
   academicYear,
-  paymentEntryId,
-  entryDate
+  paymentEntryId
 ) {
   // Find all OpeningClosingBalance records that have this payment entry
   const balanceRecords = await OpeningClosingBalance.find({
@@ -275,12 +289,6 @@ async function removePaymentEntryFromBalances(
 
     // Recalculate balances for this ledger
     await recalculateLedgerBalances(schoolId, academicYear, record.ledgerId);
-    await recalculateAllBalancesAfterDate(
-      schoolId,
-      academicYear,
-      record.ledgerId,
-      entryDate
-    );
   }
 }
 
@@ -477,25 +485,26 @@ async function updateById(req, res) {
     await removePaymentEntryFromBalances(
       schoolId,
       academicYear,
-      existingPaymentEntry._id,
-      oldEntryDate
+      existingPaymentEntry._id
     );
 
     // Store all ledger IDs that need to be updated
     const ledgerIdsToUpdate = new Set();
 
-    // 1. Item Ledgers (Debit)
-    for (const item of updatedItemDetails) {
+    // 1. Item Ledgers (Debit) - Aggregate amounts by ledgerId
+    const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
+
+    for (const [ledgerId, totalAmount] of ledgerAmounts) {
       await updateOpeningClosingBalance(
         schoolId,
         academicYear,
-        item.ledgerId,
+        ledgerId,
         entryDate,
         existingPaymentEntry._id,
-        item.amountAfterGST,
+        totalAmount,
         0
       );
-      ledgerIdsToUpdate.add(item.ledgerId.toString());
+      ledgerIdsToUpdate.add(ledgerId);
     }
 
     // 2. TDS/TCS Ledger
@@ -561,17 +570,24 @@ async function updateById(req, res) {
       0,
       paymentAmount
     );
-    ledgerIdsToUpdate.add(ledgerIdWithPaymentMode.toString());
+    ledgerIdsToUpdate.add(ledgerIdWithPaymentMode);
 
-    // --- Recalculate all ledgers that were updated ---
+    // Recalculate balances for all affected ledgers
     for (const ledgerId of ledgerIdsToUpdate) {
       await recalculateLedgerBalances(schoolId, academicYear, ledgerId);
-      await recalculateAllBalancesAfterDate(
-        schoolId,
-        academicYear,
-        ledgerId,
-        entryDate
-      );
+
+      // If entry date changed, recalculate balances after the old date as well
+      if (
+        oldEntryDate &&
+        new Date(entryDate).getTime() !== new Date(oldEntryDate).getTime()
+      ) {
+        await recalculateAllBalancesAfterDate(
+          schoolId,
+          academicYear,
+          ledgerId,
+          oldEntryDate
+        );
+      }
     }
 
     await session.commitTransaction();
@@ -579,27 +595,18 @@ async function updateById(req, res) {
 
     return res.status(200).json({
       hasError: false,
-      message: "PaymentEntry updated successfully!",
+      message: "PaymentEntry updated successfully.",
       data: existingPaymentEntry,
     });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
 
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)
-        .map((key) => `${key}: ${error.keyValue[key]}`)
-        .join(", ");
-      return res.status(400).json({
-        hasError: true,
-        message: `Duplicate entry for ${field}. PaymentEntry already exists.`,
-      });
-    }
-
-    console.error("Error updating Payment Entry:", error);
+    console.error("Error updating PaymentEntry:", error);
     return res.status(500).json({
       hasError: true,
-      message: "Internal server error. Please try again later.",
+      message:
+        error.message || "Internal server error while updating PaymentEntry.",
     });
   }
 }

@@ -266,6 +266,31 @@ async function removeReceiptFromBalances(
   }
 }
 
+function aggregateAmountsByLedger(itemDetails) {
+  const ledgerMap = new Map();
+
+  itemDetails.forEach((item) => {
+    const ledgerId = item.ledgerId.toString();
+    const debitAmount = parseFloat(item.debitAmount) || 0;
+    const amount = parseFloat(item.amount) || 0;
+
+    if (ledgerMap.has(ledgerId)) {
+      const existing = ledgerMap.get(ledgerId);
+      ledgerMap.set(ledgerId, {
+        debitAmount: existing.debitAmount + debitAmount,
+        amount: existing.amount + amount,
+      });
+    } else {
+      ledgerMap.set(ledgerId, {
+        debitAmount: debitAmount,
+        amount: amount,
+      });
+    }
+  });
+
+  return ledgerMap;
+}
+
 async function updateById(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -346,13 +371,21 @@ async function updateById(req, res) {
       0
     );
 
+    const subTotalOfDebit = updatedItemDetails.reduce(
+      (sum, item) => sum + (parseFloat(item.debitAmount) || 0),
+      0
+    );
+
     // Update fields
     existingReceipt.entryDate = entryDate;
     existingReceipt.receiptDate = receiptDate;
     existingReceipt.narration = narration;
     existingReceipt.itemDetails = updatedItemDetails;
     existingReceipt.subTotalAmount = subTotalAmount;
+    existingReceipt.subTotalOfDebit = subTotalOfDebit;
     existingReceipt.totalAmount = totalAmount;
+    existingReceipt.totalDebitAmount = totalDebitAmount;
+
     existingReceipt.status = status;
 
     await existingReceipt.save({ session });
@@ -369,17 +402,20 @@ async function updateById(req, res) {
     const ledgerIdsToUpdate = new Set();
 
     // 1. Item Ledgers (Credit)
-    for (const item of updatedItemDetails) {
+
+    const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
+
+    for (const [ledgerId, amounts] of ledgerAmounts) {
       await updateOpeningClosingBalance(
         schoolId,
         academicYear,
-        item.ledgerId,
+        ledgerId,
         entryDate,
         existingReceipt._id,
-        0, // debit
-        item.amount // credit
+        amounts.debitAmount,
+        amounts.amount
       );
-      ledgerIdsToUpdate.add(item.ledgerId.toString());
+      ledgerIdsToUpdate.add(ledgerId);
     }
 
     // --- Recalculate all ledgers that were updated ---

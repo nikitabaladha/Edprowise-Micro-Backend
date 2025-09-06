@@ -251,6 +251,58 @@ async function recalculateAllBalancesAfterDate(
   await record.save();
 }
 
+function aggregateAmountsByLedger(itemDetails) {
+  const ledgerMap = new Map();
+
+  itemDetails.forEach((item) => {
+    const ledgerId = item.ledgerId.toString();
+    const debitAmount = parseFloat(item.debitAmount) || 0;
+    const creditAmount = parseFloat(item.creditAmount) || 0;
+
+    if (ledgerMap.has(ledgerId)) {
+      const existing = ledgerMap.get(ledgerId);
+      ledgerMap.set(ledgerId, {
+        debitAmount: existing.debitAmount + debitAmount,
+        creditAmount: existing.creditAmount + creditAmount,
+      });
+    } else {
+      ledgerMap.set(ledgerId, {
+        debitAmount: debitAmount,
+        creditAmount: creditAmount,
+      });
+    }
+  });
+
+  return ledgerMap;
+}
+
+function aggregateCashAccountAmounts(itemDetails) {
+  const cashAccountMap = new Map();
+
+  itemDetails.forEach((item) => {
+    if (item.ledgerIdOfCashAccount) {
+      const cashAccountId = item.ledgerIdOfCashAccount.toString();
+      const debitAmount = parseFloat(item.debitAmount) || 0;
+      const creditAmount = parseFloat(item.creditAmount) || 0;
+
+      if (cashAccountMap.has(cashAccountId)) {
+        const existing = cashAccountMap.get(cashAccountId);
+        cashAccountMap.set(cashAccountId, {
+          debitAmount: existing.debitAmount + debitAmount,
+          creditAmount: existing.creditAmount + creditAmount,
+        });
+      } else {
+        cashAccountMap.set(cashAccountId, {
+          debitAmount: debitAmount,
+          creditAmount: creditAmount,
+        });
+      }
+    }
+  });
+
+  return cashAccountMap;
+}
+
 export async function create(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -377,72 +429,88 @@ export async function create(req, res) {
 
     // Process based on contra entry type
     if (contraEntryName === "Cash Deposited") {
-      // For Cash Deposited: Debit main ledger, Credit cash account
-      for (const item of updatedItemDetails) {
-        // Debit the main ledger
+      const mainLedgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
+      for (const [ledgerId, amounts] of mainLedgerAmounts) {
+        // Debit the main ledger (aggregated)
         await updateOpeningClosingBalance(
           schoolId,
           academicYear,
-          item.ledgerId,
-          entryDate,
+          ledgerId,
+          newContra.entryDate,
           newContra._id,
-          item.debitAmount,
-          0
+          amounts.debitAmount, // Aggregated debit
+          0, // No credit for main ledger in Cash Deposited
+          session
         );
-        ledgerIdsToUpdate.add(item.ledgerId.toString());
+        ledgerIdsToUpdate.add(ledgerId);
+      }
 
-        // Credit the cash account
+      const cashAccountAmounts =
+        aggregateCashAccountAmounts(updatedItemDetails);
+      for (const [cashAccountId, amounts] of cashAccountAmounts) {
+        // Credit the cash account (aggregated)
         await updateOpeningClosingBalance(
           schoolId,
           academicYear,
-          item.ledgerIdOfCashAccount,
-          entryDate,
-          newContra._id,
-          0,
-          item.creditAmount
+          cashAccountId,
+          newContra.entryDate,
+          existingContra._id,
+          0, // No debit for cash account in Cash Deposited
+          amounts.creditAmount, // Aggregated credit
+          session
         );
-        ledgerIdsToUpdate.add(item.ledgerIdOfCashAccount.toString());
+        ledgerIdsToUpdate.add(cashAccountId);
       }
     } else if (contraEntryName === "Cash Withdrawn") {
       // For Cash Withdrawn: Credit main ledger, Debit cash account
-      for (const item of updatedItemDetails) {
-        // Credit the main ledger
+      const mainLedgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
+      for (const [ledgerId, amounts] of mainLedgerAmounts) {
+        // Credit the main ledger (aggregated)
         await updateOpeningClosingBalance(
           schoolId,
           academicYear,
-          item.ledgerId,
-          entryDate,
+          ledgerId,
+          newContra.entryDate,
           newContra._id,
-          0,
-          item.creditAmount
+          0, // No debit for main ledger in Cash Withdrawn
+          amounts.creditAmount, // Aggregated credit
+          session
         );
-        ledgerIdsToUpdate.add(item.ledgerId.toString());
+        ledgerIdsToUpdate.add(ledgerId);
+      }
 
-        // Debit the cash account
+      // Aggregate cash account amounts
+      const cashAccountAmounts =
+        aggregateCashAccountAmounts(updatedItemDetails);
+      for (const [cashAccountId, amounts] of cashAccountAmounts) {
+        // Debit the cash account (aggregated)
         await updateOpeningClosingBalance(
           schoolId,
           academicYear,
-          item.ledgerIdOfCashAccount,
-          entryDate,
+          cashAccountId,
+          newContra.entryDate,
           newContra._id,
-          item.debitAmount,
-          0
+          amounts.debitAmount, // Aggregated debit
+          0, // No credit for cash account in Cash Withdrawn
+          session
         );
-        ledgerIdsToUpdate.add(item.ledgerIdOfCashAccount.toString());
+        ledgerIdsToUpdate.add(cashAccountId);
       }
     } else if (contraEntryName === "Bank Transfer") {
       // For Bank Transfer: Process each item normally
-      for (const item of updatedItemDetails) {
+      const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
+      for (const [ledgerId, amounts] of ledgerAmounts) {
         await updateOpeningClosingBalance(
           schoolId,
           academicYear,
-          item.ledgerId,
-          entryDate,
+          ledgerId,
+          newContra.entryDate,
           newContra._id,
-          item.debitAmount,
-          item.creditAmount
+          amounts.debitAmount, // Aggregated debit
+          amounts.creditAmount, // Aggregated credit
+          session
         );
-        ledgerIdsToUpdate.add(item.ledgerId.toString());
+        ledgerIdsToUpdate.add(ledgerId.toString());
       }
     }
 

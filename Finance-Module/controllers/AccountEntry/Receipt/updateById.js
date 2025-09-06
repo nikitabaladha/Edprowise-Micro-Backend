@@ -322,6 +322,23 @@ async function findTDSorTCSLedger(schoolId, academicYear, TDSorTCS) {
   return tdsTcsLedger;
 }
 
+function aggregateAmountsByLedger(itemDetails) {
+  const ledgerMap = new Map();
+
+  itemDetails.forEach((item) => {
+    const ledgerId = item.ledgerId.toString();
+    const amount = parseFloat(item.amount) || 0;
+
+    if (ledgerMap.has(ledgerId)) {
+      ledgerMap.set(ledgerId, ledgerMap.get(ledgerId) + amount);
+    } else {
+      ledgerMap.set(ledgerId, amount);
+    }
+  });
+
+  return ledgerMap;
+}
+
 async function updateById(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -454,18 +471,22 @@ async function updateById(req, res) {
     // Store all ledger IDs that need to be updated
     const ledgerIdsToUpdate = new Set();
 
+    // 1. Item Ledgers (Credit) - Aggregate amounts by ledgerId
+    const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
+
     // 1. Item Ledgers (Credit)
-    for (const item of updatedItemDetails) {
+
+    for (const [ledgerId, amount] of ledgerAmounts) {
       await updateOpeningClosingBalance(
         schoolId,
         academicYear,
-        item.ledgerId,
+        ledgerId,
         entryDate,
         existingReceipt._id,
-        0, // debit
-        item.amount // credit
+        0,
+        amount
       );
-      ledgerIdsToUpdate.add(item.ledgerId.toString());
+      ledgerIdsToUpdate.add(ledgerId);
     }
 
     // 2. TDS/TCS Ledger

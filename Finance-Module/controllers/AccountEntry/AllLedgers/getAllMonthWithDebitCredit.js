@@ -173,6 +173,7 @@ async function getAllBySchoolId(req, res) {
           amountBeforeGST: item.amountBeforeGST || 0,
           GSTAmount: item.GSTAmount || 0,
           amountAfterGST: item.amountAfterGST || 0,
+          creditAmount: item.creditAmount || 0,
 
           ledgerId: item.ledgerId || null,
           ledgerName: ledger?.ledgerName || null,
@@ -298,9 +299,13 @@ async function getAllBySchoolId(req, res) {
         schoolId: entry.schoolId,
         invoiceNumber: entry.invoiceNumber,
 
-        subTotalAmountAfterGST: entry.subTotalAmountAfterGST,
         TDSTCSRateWithAmountBeforeGST: entry.TDSTCSRateWithAmountBeforeGST || 0,
+
+        subTotalAmountAfterGST: entry.subTotalAmountAfterGST || 0,
+        subTotalOfCredit: entry.subTotalOfCredit || 0,
+
         totalAmountAfterGST: entry.totalAmountAfterGST || 0,
+        totalCreditAmount: entry.totalCreditAmount || 0,
 
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
         ledgerNameWithPaymentMode: ledgerWithPaymentMode?.ledgerName || null,
@@ -387,6 +392,8 @@ async function getAllBySchoolId(req, res) {
         // Authorised Signature
         authorisedSignatureImage:
           authorisedSignature?.authorisedSignatureImage || null,
+
+        customizeEntry: entry.customizeEntry,
       };
 
       formattedData.push(entryData);
@@ -434,7 +441,8 @@ async function getAllBySchoolId(req, res) {
 
         itemsWithLedgerNames.push({
           itemName: item.itemName,
-          amount: item.amount || 0,
+          debitAmount: item.debitAmount || null,
+          amount: item.amount,
 
           ledgerId: item.ledgerId || null,
           ledgerName: ledger?.ledgerName || null,
@@ -558,8 +566,6 @@ async function getAllBySchoolId(req, res) {
         accountingEntry: "Receipt",
         _id: entry._id,
         schoolId: entry.schoolId,
-        subTotalAmount: entry.subTotalAmount || 0,
-        totalAmount: entry.totalAmount,
 
         TDSTCSRateWithAmount: entry.TDSTCSRateWithAmount || 0,
 
@@ -627,6 +633,13 @@ async function getAllBySchoolId(req, res) {
         // Authorised Signature
         authorisedSignatureImage:
           authorisedSignature?.authorisedSignatureImage || null,
+
+        customizeEntry: entry.customizeEntry,
+
+        subTotalAmount: entry.subTotalAmount || 0,
+        subTotalOfDebit: entry.subTotalOfDebit || 0,
+        totalAmount: entry.totalAmount || 0,
+        totalDebitAmount: entry.totalDebitAmount || 0,
       };
 
       formattedData.push(entryData);
@@ -860,6 +873,8 @@ async function getAllBySchoolId(req, res) {
 
         TDSorTCSOpeningBalance: TDSorTCSOpeningBalance || null,
         TDSorTCSBalanceType: TDSorTCSBalanceType || null,
+
+        customizeEntry: entry.customizeEntry,
       };
 
       formattedData.push(entryData);
@@ -948,6 +963,8 @@ async function getAllBySchoolId(req, res) {
 
         entryDate: entry.entryDate,
         academicYear: entry.academicYear,
+
+        customizeEntry: entry.customizeEntry,
       };
 
       formattedData.push(entryData);

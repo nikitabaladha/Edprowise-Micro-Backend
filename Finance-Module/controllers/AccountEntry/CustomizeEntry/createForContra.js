@@ -250,6 +250,31 @@ async function recalculateAllBalancesAfterDate(
   await record.save();
 }
 
+function aggregateAmountsByLedger(itemDetails) {
+  const ledgerMap = new Map();
+
+  itemDetails.forEach((item) => {
+    const ledgerId = item.ledgerId.toString();
+    const debitAmount = parseFloat(item.debitAmount) || 0;
+    const creditAmount = parseFloat(item.creditAmount) || 0;
+
+    if (ledgerMap.has(ledgerId)) {
+      const existing = ledgerMap.get(ledgerId);
+      ledgerMap.set(ledgerId, {
+        debitAmount: existing.debitAmount + debitAmount,
+        creditAmount: existing.creditAmount + creditAmount,
+      });
+    } else {
+      ledgerMap.set(ledgerId, {
+        debitAmount: debitAmount,
+        creditAmount: creditAmount,
+      });
+    }
+  });
+
+  return ledgerMap;
+}
+
 export async function create(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -430,17 +455,19 @@ export async function create(req, res) {
       }
     } else {
       // For Bank Transfer or empty/null contraEntryName: Process each item normally
-      for (const item of updatedItemDetails) {
+      const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
+      for (const [ledgerId, amounts] of ledgerAmounts) {
         await updateOpeningClosingBalance(
           schoolId,
           academicYear,
-          item.ledgerId,
-          entryDate,
+          ledgerId,
+          newContra.entryDate,
           newContra._id,
-          item.debitAmount,
-          item.creditAmount
+          amounts.debitAmount, // Aggregated debit
+          amounts.creditAmount, // Aggregated credit
+          session
         );
-        ledgerIdsToUpdate.add(item.ledgerId.toString());
+        ledgerIdsToUpdate.add(ledgerId.toString());
       }
     }
 

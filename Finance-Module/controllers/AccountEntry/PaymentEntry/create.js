@@ -97,7 +97,7 @@ async function updateOpeningClosingBalance(
       entryDate
     );
 
-  // --- FIX: Determine effective opening balance ---
+  // Find the latest balance before the entry date
   const previousBalanceDetails = record.balanceDetails
     .filter((detail) => new Date(detail.entryDate) <= new Date(entryDate))
     .sort((a, b) => new Date(b.entryDate) - new Date(a.entryDate));
@@ -107,7 +107,7 @@ async function updateOpeningClosingBalance(
     effectiveOpeningBalance = previousBalanceDetails[0].closingBalance;
   }
 
-  // --- Calculate closing balance ---
+  // Calculate closing balance
   let closingBalance;
   if (balanceType === "Debit") {
     closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
@@ -115,30 +115,30 @@ async function updateOpeningClosingBalance(
     closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
   }
 
-  // --- Check if exact same entry already exists ---
+  // Check if entry already exists for this payment entry
   const existingEntryIndex = record.balanceDetails.findIndex(
-    (detail) =>
-      new Date(detail.entryDate).getTime() === new Date(entryDate).getTime() &&
-      detail.entryId?.toString() === paymentEntryId.toString()
+    (detail) => detail.entryId?.toString() === paymentEntryId.toString()
   );
 
   if (existingEntryIndex !== -1) {
+    // Update existing entry
     record.balanceDetails[existingEntryIndex] = {
       entryDate,
       openingBalance: effectiveOpeningBalance,
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: paymentEntryId, // Store Payment Entry _id as entryId
+      entryId: paymentEntryId,
     };
   } else {
+    // Create new entry
     const newBalanceDetail = {
       entryDate,
       openingBalance: effectiveOpeningBalance,
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: paymentEntryId, // Store Payment Entry _id as entryId
+      entryId: paymentEntryId,
     };
 
     record.balanceDetails.push(newBalanceDetail);
@@ -183,7 +183,7 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
       : a._id.toString().localeCompare(b._id.toString());
   });
 
-  // Find the initial opening balance (from ledger or first entry)
+  // Find the initial opening balance
   let currentBalance = record.balanceDetails[0].openingBalance;
 
   for (let i = 0; i < record.balanceDetails.length; i++) {
@@ -266,6 +266,24 @@ async function recalculateAllBalancesAfterDate(
   }
 
   await record.save();
+}
+
+// Helper function to aggregate amounts by ledgerId
+function aggregateAmountsByLedger(itemDetails) {
+  const ledgerMap = new Map();
+
+  itemDetails.forEach((item) => {
+    const ledgerId = item.ledgerId.toString();
+    const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
+
+    if (ledgerMap.has(ledgerId)) {
+      ledgerMap.set(ledgerId, ledgerMap.get(ledgerId) + amountAfterGST);
+    } else {
+      ledgerMap.set(ledgerId, amountAfterGST);
+    }
+  });
+
+  return ledgerMap;
 }
 
 async function create(req, res) {
@@ -400,18 +418,20 @@ async function create(req, res) {
     // Store all ledger IDs that need to be updated
     const ledgerIdsToUpdate = new Set();
 
-    // 1. Item Ledgers (Debit)
-    for (const item of updatedItemDetails) {
+    // 1. Item Ledgers (Debit) - Aggregate amounts by ledgerId first
+    const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
+
+    for (const [ledgerId, totalAmount] of ledgerAmounts) {
       await updateOpeningClosingBalance(
         schoolId,
         academicYear,
-        item.ledgerId,
+        ledgerId,
         entryDate,
-        newPaymentEntry._id, // Pass the Payment Entry _id as entryId
-        item.amountAfterGST,
+        newPaymentEntry._id,
+        totalAmount,
         0
       );
-      ledgerIdsToUpdate.add(item.ledgerId.toString());
+      ledgerIdsToUpdate.add(ledgerId);
     }
 
     // 2. TDS/TCS Ledger
@@ -508,7 +528,7 @@ async function create(req, res) {
       academicYear,
       ledgerIdWithPaymentMode,
       entryDate,
-      newPaymentEntry._id, // Pass the Payment Entry _id as entryId
+      newPaymentEntry._id,
       0, // debit
       paymentAmount // credit
     );

@@ -251,6 +251,31 @@ async function recalculateAllBalancesAfterDate(
   await record.save();
 }
 
+function aggregateAmountsByLedger(itemDetails) {
+  const ledgerMap = new Map();
+
+  itemDetails.forEach((item) => {
+    const ledgerId = item.ledgerId.toString();
+    const debitAmount = parseFloat(item.debitAmount) || 0;
+    const amount = parseFloat(item.amount) || 0;
+
+    if (ledgerMap.has(ledgerId)) {
+      const existing = ledgerMap.get(ledgerId);
+      ledgerMap.set(ledgerId, {
+        debitAmount: existing.debitAmount + debitAmount,
+        amount: existing.amount + amount,
+      });
+    } else {
+      ledgerMap.set(ledgerId, {
+        debitAmount: debitAmount,
+        amount: amount,
+      });
+    }
+  });
+
+  return ledgerMap;
+}
+
 async function create(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -343,18 +368,22 @@ async function create(req, res) {
     // Store all ledger IDs that need to be updated
     const ledgerIdsToUpdate = new Set();
 
-    // 1. Item Ledgers (Credit)
-    for (const item of updatedItemDetails) {
+    const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
+
+    // why here is is like if i store two item.ledgerId with same ledger 68bbbe3dc65682ddb4750792
+    // at that time it stores only one it is correct but why it is not sum up
+
+    for (const [ledgerId, amounts] of ledgerAmounts) {
       await updateOpeningClosingBalance(
         schoolId,
         academicYear,
-        item.ledgerId,
+        ledgerId,
         entryDate,
         newReceipt._id,
-        item.debitAmount, // debit
-        item.amount // credit
+        amounts.debitAmount, // debit
+        amounts.amount // credit
       );
-      ledgerIdsToUpdate.add(item.ledgerId.toString());
+      ledgerIdsToUpdate.add(ledgerId);
     }
 
     // --- Recalculate all ledgers that were updated ---

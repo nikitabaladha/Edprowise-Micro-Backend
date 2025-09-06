@@ -467,7 +467,6 @@ async function getAllIncomeBookBySchoolId(req, res) {
 
     // Find Contra Entries
 
-    // Find Contra Entries
     for (const entry of contraEntries) {
       let hasIncomeHeadOfAccount = false;
       const itemsWithLedgerNames = [];

@@ -210,6 +210,23 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
   await record.save();
 }
 
+function aggregateAmountsByLedger(itemDetails) {
+  const ledgerMap = new Map();
+
+  itemDetails.forEach((item) => {
+    const ledgerId = item.ledgerId.toString();
+    const amount = parseFloat(item.amount) || 0;
+
+    if (ledgerMap.has(ledgerId)) {
+      ledgerMap.set(ledgerId, ledgerMap.get(ledgerId) + amount);
+    } else {
+      ledgerMap.set(ledgerId, amount);
+    }
+  });
+
+  return ledgerMap;
+}
+
 // NEW FUNCTION: Recalculate all balances for a ledger after a specific date
 async function recalculateAllBalancesAfterDate(
   schoolId,
@@ -380,18 +397,21 @@ async function create(req, res) {
     // Store all ledger IDs that need to be updated
     const ledgerIdsToUpdate = new Set();
 
+    // 1. Item Ledgers (Debit) - Aggregate amounts by ledgerId first
+    const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
     // 1. Item Ledgers (Credit)
-    for (const item of updatedItemDetails) {
+
+    for (const [ledgerId, amount] of ledgerAmounts) {
       await updateOpeningClosingBalance(
         schoolId,
         academicYear,
-        item.ledgerId,
+        ledgerId,
         entryDate,
-        newReceipt._id, // Pass the Receipt _id as entryId
-        0, // debit
-        item.amount // credit
+        newReceipt._id,
+        0,
+        amount
       );
-      ledgerIdsToUpdate.add(item.ledgerId.toString());
+      ledgerIdsToUpdate.add(ledgerId);
     }
 
     // 2. TDS/TCS Ledger (Debit for TDS, Credit for TCS)

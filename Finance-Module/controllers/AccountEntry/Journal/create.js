@@ -250,6 +250,31 @@ async function recalculateAllBalancesAfterDate(
   await record.save();
 }
 
+function aggregateAmountsByLedger(itemDetails) {
+  const ledgerMap = new Map();
+
+  itemDetails.forEach((item) => {
+    const ledgerId = item.ledgerId.toString();
+    const debitAmount = parseFloat(item.debitAmount) || 0;
+    const creditAmount = parseFloat(item.creditAmount) || 0;
+
+    if (ledgerMap.has(ledgerId)) {
+      const existing = ledgerMap.get(ledgerId);
+      ledgerMap.set(ledgerId, {
+        debitAmount: existing.debitAmount + debitAmount,
+        creditAmount: existing.creditAmount + creditAmount,
+      });
+    } else {
+      ledgerMap.set(ledgerId, {
+        debitAmount: debitAmount,
+        creditAmount: creditAmount,
+      });
+    }
+  });
+
+  return ledgerMap;
+}
+
 export async function create(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -350,18 +375,20 @@ export async function create(req, res) {
     // Store all ledger IDs that need to be updated
     const ledgerIdsToUpdate = new Set();
 
-    // Process each item in the journal entry
-    for (const item of updatedItemDetails) {
+    // 1. Item Ledgers - Aggregate amounts by ledgerId
+    const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
+
+    for (const [ledgerId, amounts] of ledgerAmounts) {
       await updateOpeningClosingBalance(
         schoolId,
         academicYear,
-        item.ledgerId,
+        ledgerId,
         entryDate,
         newJournal._id,
-        item.debitAmount,
-        item.creditAmount
+        amounts.debitAmount,
+        amounts.creditAmount
       );
-      ledgerIdsToUpdate.add(item.ledgerId.toString());
+      ledgerIdsToUpdate.add(ledgerId);
     }
 
     // Recalculate all ledgers that were updated
