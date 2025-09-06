@@ -454,7 +454,7 @@ export async function create(req, res) {
           academicYear,
           cashAccountId,
           newContra.entryDate,
-          existingContra._id,
+          newContra._id,
           0, // No debit for cash account in Cash Deposited
           amounts.creditAmount, // Aggregated credit
           session
