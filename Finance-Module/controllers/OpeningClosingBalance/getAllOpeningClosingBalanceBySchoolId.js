@@ -179,7 +179,8 @@ async function getAllOpeningClosingBalanceBySchoolId(req, res) {
           );
 
           dailyBalances.push({
-            entryDate: date.toDate(),
+            entryDate: date.utc().toDate(),
+            // entryDate: moment(date).startOf("day").toDate(),
             openingBalance,
             debit: dayDebit,
             credit: dayCredit,
@@ -194,7 +195,8 @@ async function getAllOpeningClosingBalanceBySchoolId(req, res) {
             currentBalance
           );
           dailyBalances.push({
-            entryDate: date.toDate(),
+            entryDate: date.utc().toDate(),
+            // entryDate: moment(date).startOf("day").toDate(),
             openingBalance: currentBalance,
             debit: 0,
             credit: 0,
@@ -207,7 +209,8 @@ async function getAllOpeningClosingBalanceBySchoolId(req, res) {
       console.log("No transactions found, returning default balances");
       for (const date of allDates) {
         dailyBalances.push({
-          entryDate: date.toDate(),
+          entryDate: date.utc().toDate(),
+          // entryDate: moment(date).startOf("day").toDate(),
           openingBalance: currentBalance,
           debit: 0,
           credit: 0,
