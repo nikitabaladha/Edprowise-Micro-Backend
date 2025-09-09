@@ -23,7 +23,7 @@ async function getAllDateMonthDataWithDebitCredit(req, res) {
 
     // here with perticular specificDate and month i also want startDate and enddate also
     // in which start date and end date will be range like starting from 01-09-2024 to 07-09-2028
-    // etc
+    // etc so what to do
     const schoolId = req.user?.schoolId;
     const { month, academicYear, specificDate } = req.query;
 

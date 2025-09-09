@@ -1,4 +1,6 @@
 import OpeningClosingBalance from "../../models/OpeningClosingBalance.js";
+import Ledger from "../../models/Ledger.js";
+import moment from "moment";
 
 async function getAllOpeningClosingBalanceBySchoolId(req, res) {
   try {
@@ -13,80 +15,226 @@ async function getAllOpeningClosingBalanceBySchoolId(req, res) {
 
     const { ledgerId, startDate, endDate, academicYear } = req.query;
 
-    // Build the filter object
-    const filter = { schoolId };
-
-    if (academicYear) {
-      filter.academicYear = academicYear;
+    // Validate required parameters
+    if (!ledgerId || !academicYear) {
+      return res.status(400).json({
+        hasError: true,
+        message: "ledgerId and academicYear are required parameters.",
+      });
     }
 
-    if (ledgerId) {
-      filter.ledgerId = ledgerId;
+    // Get the ledger details including opening balance
+    const ledger = await Ledger.findOne({
+      schoolId,
+      _id: ledgerId,
+      academicYear,
+    });
+
+    if (!ledger) {
+      return res.status(404).json({
+        hasError: true,
+        message: "Ledger not found for the given academic year.",
+      });
     }
 
-    // Fetch records with populated ledgerId
-    const openingClosingBalances = await OpeningClosingBalance.find(filter)
-      .populate("ledgerId", "ledgerName")
-      .lean();
+    // Get the opening closing balance record
+    const openingClosingBalance = await OpeningClosingBalance.findOne({
+      schoolId,
+      ledgerId,
+      academicYear,
+    }).populate("ledgerId", "ledgerName");
 
-    // Filter balanceDetails if date range provided
-    let formattedData = openingClosingBalances;
+    // Parse date range or use academic year range
+    const academicYearStart = moment(
+      `04/01/${academicYear.split("-")[0]}`,
+      "MM/DD/YYYY"
+    );
+    const academicYearEnd = moment(
+      `03/31/${academicYear.split("-")[1]}`,
+      "MM/DD/YYYY"
+    );
 
-    if (startDate || endDate) {
-      formattedData = openingClosingBalances.map((record) => {
-        const filteredBalanceDetails = record.balanceDetails.filter(
-          (detail) => {
-            const detailDate = new Date(detail.entryDate);
-            let include = true;
+    const start = startDate ? moment(startDate) : academicYearStart;
+    const end = endDate ? moment(endDate) : academicYearEnd;
 
-            if (startDate) {
-              const start = new Date(startDate);
-              include = include && detailDate >= start;
-            }
+    // Generate all dates in the range
+    const allDates = [];
+    let currentDate = moment(start);
+    while (currentDate.isSameOrBefore(end)) {
+      allDates.push(moment(currentDate));
+      currentDate.add(1, "day");
+    }
 
-            if (endDate) {
-              const end = new Date(endDate);
-              end.setHours(23, 59, 59, 999);
-              include = include && detailDate <= end;
-            }
+    // Generate daily balances
+    const dailyBalances = [];
+    let currentBalance = ledger.openingBalance;
 
-            return include;
+    // If we have transactions, process them
+    if (
+      openingClosingBalance &&
+      openingClosingBalance.balanceDetails.length > 0
+    ) {
+      console.log(
+        "Found transactions:",
+        openingClosingBalance.balanceDetails.length
+      );
+
+      // Sort transaction details by date
+      const sortedTransactions = openingClosingBalance.balanceDetails
+        .map((detail) => ({
+          ...detail,
+          // Convert to moment object for proper date comparison
+          entryDateMoment: moment(detail.entryDate),
+          // Ensure debit and credit have proper values
+          debit: detail.debit || 0,
+          credit: detail.credit || 0,
+        }))
+        .sort((a, b) => a.entryDateMoment - b.entryDateMoment);
+
+      console.log(
+        "Sorted transactions:",
+        sortedTransactions.map((t) => ({
+          date: t.entryDateMoment.format("YYYY-MM-DD"),
+          debit: t.debit,
+          credit: t.credit,
+        }))
+      );
+
+      let transactionIndex = 0;
+
+      for (const date of allDates) {
+        const currentDateFormatted = date.format("YYYY-MM-DD");
+        console.log("Processing date:", currentDateFormatted);
+
+        // Check if we have transactions for this date
+        const transactionsForDate = [];
+
+        // Find all transactions for this specific date
+        while (transactionIndex < sortedTransactions.length) {
+          const transaction = sortedTransactions[transactionIndex];
+          const transactionDateFormatted =
+            transaction.entryDateMoment.format("YYYY-MM-DD");
+
+          console.log(
+            "Comparing with transaction:",
+            transactionDateFormatted,
+            "debit:",
+            transaction.debit,
+            "credit:",
+            transaction.credit
+          );
+
+          if (transactionDateFormatted === currentDateFormatted) {
+            console.log("MATCH FOUND for date:", currentDateFormatted);
+            transactionsForDate.push(transaction);
+            transactionIndex++;
+          } else if (transaction.entryDateMoment.isAfter(date)) {
+            // We've passed the current date, break the loop
+            console.log("Transaction is after current date, breaking");
+            break;
+          } else {
+            // Transaction is before current date, skip it
+            console.log("Transaction is before current date, skipping");
+            transactionIndex++;
           }
+        }
+
+        console.log(
+          "Transactions for date",
+          currentDateFormatted,
+          ":",
+          transactionsForDate.length
         );
 
-        return {
-          ...record,
-          balanceDetails: filteredBalanceDetails,
-        };
-      });
+        // Calculate daily totals if we have transactions
+        if (transactionsForDate.length > 0) {
+          const dayDebit = transactionsForDate.reduce(
+            (sum, t) => sum + (Number(t.debit) || 0),
+            0
+          );
+          const dayCredit = transactionsForDate.reduce(
+            (sum, t) => sum + (Number(t.credit) || 0),
+            0
+          );
+
+          const openingBalance = currentBalance;
+
+          // Calculate closing balance based on ledger type
+          if (ledger.balanceType === "Debit") {
+            currentBalance = openingBalance + dayDebit - dayCredit;
+          } else {
+            // For Credit balance type: openingBalance - debit + credit
+            currentBalance = openingBalance + dayDebit - dayCredit;
+          }
+
+          console.log(
+            "Adding transaction data for date:",
+            currentDateFormatted,
+            {
+              openingBalance,
+              debit: dayDebit,
+              credit: dayCredit,
+              closingBalance: currentBalance,
+            }
+          );
+
+          dailyBalances.push({
+            entryDate: date.utc().toDate(),
+            // entryDate: moment(date).startOf("day").toDate(),
+            openingBalance,
+            debit: dayDebit,
+            credit: dayCredit,
+            closingBalance: currentBalance,
+          });
+        } else {
+          // No transactions for this date, carry forward the balance
+          console.log(
+            "No transactions for date:",
+            currentDateFormatted,
+            "carrying forward:",
+            currentBalance
+          );
+          dailyBalances.push({
+            entryDate: date.utc().toDate(),
+            // entryDate: moment(date).startOf("day").toDate(),
+            openingBalance: currentBalance,
+            debit: 0,
+            credit: 0,
+            closingBalance: currentBalance,
+          });
+        }
+      }
+    } else {
+      // No transactions exist, return the opening balance for all dates
+      console.log("No transactions found, returning default balances");
+      for (const date of allDates) {
+        dailyBalances.push({
+          entryDate: date.utc().toDate(),
+          // entryDate: moment(date).startOf("day").toDate(),
+          openingBalance: currentBalance,
+          debit: 0,
+          credit: 0,
+          closingBalance: currentBalance,
+        });
+      }
     }
 
-    // Transform data to desired format
-    const transformedData = formattedData.map((record) => ({
-      _id: record._id,
-      schoolId: record.schoolId,
-      academicYear: record.academicYear,
-      ledgerId: record.ledgerId?._id || record.ledgerId, // keep just the ID
-      ledgerName: record.ledgerId?.ledgerName || null, // flatten ledgerName
-      balanceDetails: record.balanceDetails,
-      balanceType: record.balanceType,
-      createdAt: record.createdAt,
-      updatedAt: record.updatedAt,
-      __v: record.__v,
-    }));
-
-    if (transformedData.length === 0) {
-      return res.status(200).json({
-        hasError: false,
-        message: "No opening closing balance records found",
-        data: [],
-      });
-    }
+    console.log("Final daily balances:", dailyBalances);
 
     return res.status(200).json({
       hasError: false,
       message: "Opening Closing Balance fetched successfully",
-      data: transformedData,
+      data: [
+        {
+          _id: openingClosingBalance ? openingClosingBalance._id : null,
+          schoolId,
+          academicYear,
+          ledgerId: ledger._id,
+          ledgerName: ledger.ledgerName,
+          balanceDetails: dailyBalances,
+          balanceType: ledger.balanceType,
+        },
+      ],
     });
   } catch (error) {
     console.error("Error fetching Opening Closing Balance:", error);
