@@ -17,6 +17,14 @@ import {
   updateByIdForReceipt,
   updateByIdForContra,
   updateByIdForJournal,
+  draftForPayment,
+  draftForReceipt,
+  draftForContra,
+  draftForJournal,
+  updateDraftPayment,
+  updateDraftForReceipt,
+  updateDraftForContra,
+  updateDraftForJournal,
 } from "../controllers/AccountEntry/CustomizeEntry/index.js";
 
 router.post(
@@ -27,10 +35,24 @@ router.post(
 );
 
 router.post(
+  "/draft-customize-entry-for-payment",
+  uploadForPayment,
+  roleBasedMiddleware("School"),
+  draftForPayment
+);
+
+router.post(
   "/customize-entry-for-receipt",
   uploadForReceipt,
   roleBasedMiddleware("School"),
   createForReceipt
+);
+
+router.post(
+  "/draft-customize-entry-for-receipt",
+  uploadForReceipt,
+  roleBasedMiddleware("School"),
+  draftForReceipt
 );
 
 router.post(
@@ -41,10 +63,24 @@ router.post(
 );
 
 router.post(
+  "/draft-customize-entry-for-contra",
+  uploadForContra,
+  roleBasedMiddleware("School"),
+  draftForContra
+);
+
+router.post(
   "/customize-entry-for-journal",
   uploadForJournal,
   roleBasedMiddleware("School"),
   createForJournal
+);
+
+router.post(
+  "/draft-customize-entry-for-journal",
+  uploadForJournal,
+  roleBasedMiddleware("School"),
+  draftForJournal
 );
 
 router.get(
@@ -61,10 +97,24 @@ router.put(
 );
 
 router.put(
+  "/draft-update-customize-entry-for-payment/:id/:academicYear",
+  uploadForPayment,
+  roleBasedMiddleware("School"),
+  updateDraftPayment
+);
+
+router.put(
   "/update-customize-entry-for-receipt/:id/:academicYear",
   uploadForReceipt,
   roleBasedMiddleware("School"),
   updateByIdForReceipt
+);
+
+router.put(
+  "/draft-update-customize-entry-for-receipt/:id/:academicYear",
+  uploadForReceipt,
+  roleBasedMiddleware("School"),
+  updateDraftForReceipt
 );
 
 router.put(
@@ -75,10 +125,24 @@ router.put(
 );
 
 router.put(
+  "/draft-update-customize-entry-for-contra/:id/:academicYear",
+  uploadForContra,
+  roleBasedMiddleware("School"),
+  updateDraftForContra
+);
+
+router.put(
   "/update-customize-entry-for-journal/:id/:academicYear",
   uploadForJournal,
   roleBasedMiddleware("School"),
   updateByIdForJournal
+);
+
+router.put(
+  "/draft-update-customize-entry-for-journal/:id/:academicYear",
+  uploadForJournal,
+  roleBasedMiddleware("School"),
+  updateDraftForJournal
 );
 
 export default router;
