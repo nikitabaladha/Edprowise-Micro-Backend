@@ -22,7 +22,6 @@ async function generateTransactionNumber() {
   return transactionNumber;
 }
 
-// Helper function to aggregate amounts by ledgerId
 function aggregateAmountsByLedger(itemDetails) {
   const ledgerMap = new Map();
 
