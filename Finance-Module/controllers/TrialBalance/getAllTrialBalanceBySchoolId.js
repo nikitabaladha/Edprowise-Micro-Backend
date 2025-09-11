@@ -153,7 +153,6 @@ async function getTrialBalanceBySchoolId(req, res) {
         // Calculate closing balance
         const closingBalance = currentBalance;
 
-        // i also want headOfaccountName,gropledgerName,BSandPLLedgerNAme also
         return {
           ledgerId: ledger._id,
           ledgerName: ledger.ledgerName,
@@ -169,9 +168,18 @@ async function getTrialBalanceBySchoolId(req, res) {
       })
     );
 
-    // Sort by ledger name for better readability
-    trialBalanceData.sort((a, b) => a.ledgerName.localeCompare(b.ledgerName));
+    const filteredTrialBalanceData = trialBalanceData.filter((ledger) => {
+      return !(
+        ledger.openingBalance === 0 &&
+        ledger.debit === 0 &&
+        ledger.credit === 0 &&
+        ledger.closingBalance === 0
+      );
+    });
 
+    filteredTrialBalanceData.sort((a, b) =>
+      a.ledgerName.localeCompare(b.ledgerName)
+    );
     return res.status(200).json({
       hasError: false,
       message: "Trial Balance fetched successfully",
@@ -181,7 +189,7 @@ async function getTrialBalanceBySchoolId(req, res) {
           end: end.format("YYYY-MM-DD"),
         },
         academicYear,
-        trialBalance: trialBalanceData,
+        trialBalance: filteredTrialBalanceData,
       },
     });
   } catch (error) {
