@@ -6,7 +6,7 @@ async function generateJournalVoucherNumber(schoolId, academicYear) {
   return `JVN/${academicYear}/${nextNumber}`;
 }
 
-export async function draft(req, res) {
+export async function draftForJournal(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
@@ -24,6 +24,7 @@ export async function draft(req, res) {
       itemDetails,
       status,
       academicYear,
+      customizeEntry,
     } = req.body;
 
     const JournalVoucherNumber = await generateJournalVoucherNumber(
@@ -75,6 +76,7 @@ export async function draft(req, res) {
       documentImage: documentImageFullPath,
       status,
       academicYear,
+      customizeEntry,
     });
 
     await newJournal.save();
@@ -93,4 +95,4 @@ export async function draft(req, res) {
   }
 }
 
-export default draft;
+export default draftForJournal;

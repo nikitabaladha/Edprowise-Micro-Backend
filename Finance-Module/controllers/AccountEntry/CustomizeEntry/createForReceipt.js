@@ -333,6 +333,7 @@ async function create(req, res) {
 
     const updatedItemDetails = itemDetails.map((item) => ({
       ...item,
+      debitAmount: parseFloat(item.debitAmount) || 0,
       amount: parseFloat(item.amount) || 0,
     }));
 
@@ -369,9 +370,6 @@ async function create(req, res) {
     const ledgerIdsToUpdate = new Set();
 
     const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
-
-    // why here is is like if i store two item.ledgerId with same ledger 68bbbe3dc65682ddb4750792
-    // at that time it stores only one it is correct but why it is not sum up
 
     for (const [ledgerId, amounts] of ledgerAmounts) {
       await updateOpeningClosingBalance(

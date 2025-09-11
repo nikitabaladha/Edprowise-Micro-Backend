@@ -1,18 +1,40 @@
-import PaymentEntry from "../../models/PaymentEntry.js";
-import Receipt from "../../models/Receipt.js";
-import Journal from "../../models/Journal.js";
-import Contra from "../../models/Contra.js";
-
-import BSPLLedger from "../../models/BSPLLedger.js";
-import HeadOfAccount from "../../models/HeadOfAccount.js";
-import Ledger from "../../models/Ledger.js";
-import GroupLedger from "../../models/GroupLedger.js";
 import mongoose from "mongoose";
 
-async function getAllBySchoolId(req, res) {
+import PaymentEntry from "../../../models/PaymentEntry.js";
+import Receipt from "../../../models/Receipt.js";
+import Contra from "../../../models/Contra.js";
+import Journal from "../../../models/Journal.js";
+
+import BSPLLedger from "../../../models/BSPLLedger.js";
+import HeadOfAccount from "../../../models/HeadOfAccount.js";
+import Ledger from "../../../models/Ledger.js";
+import GroupLedger from "../../../models/GroupLedger.js";
+
+import Vendor from "../../../models/Vendor.js";
+import TDSTCSRateChart from "../../../models/TDSTCSRateChart.js";
+import AuthorisedSignature from "../../../models/AuthorisedSignature.js";
+
+async function getAllDateMonthDataWithDebitCredit(req, res) {
   try {
+    console.log(
+      "Test endpoint hit with query==============================:",
+      req.query
+    );
+
+    // here with perticular specificDate and month i also want startDate and enddate also
+    // in which start date and end date will be range like starting from 01-09-2024 to 07-09-2028
+    // etc so what to do
     const schoolId = req.user?.schoolId;
-    const { academicYear } = req.params;
+    const { month, academicYear, specificDate } = req.query;
+
+    console.log("Received parameters===========================:", {
+      month,
+      academicYear,
+      specificDate,
+    });
+
+    // see if month: 'September 2025' then from all entries you need to find entryDate
+    // starting from 01-09-2025 till all dates like  30-09-2025
 
     if (!schoolId) {
       return res.status(401).json({
@@ -21,43 +43,138 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    const paymentEntries = await PaymentEntry.find({
+    const authorisedSignature = await AuthorisedSignature.findOne({
       schoolId,
       academicYear,
-      status: "Posted",
     })
-      .sort({ createdAt: -1 })
+      .select("authorisedSignatureImage")
       .lean();
 
-    const receiptEntries = await Receipt.find({
+    const baseQuery = {
       schoolId,
-      academicYear,
       status: "Posted",
-    })
-      .sort({ createdAt: -1 })
-      .lean();
+    };
 
-    const JournalEntries = await Journal.find({
-      schoolId,
-      academicYear,
-      status: "Posted",
-    })
-      .sort({ createdAt: -1 })
-      .lean();
+    // Handle specific date filter (highest priority)
+    // if (specificDate) {
+    //   const specificDateObj = new Date(specificDate);
+    //   specificDateObj.setHours(0, 0, 0, 0);
+    //   const endOfSpecificDate = new Date(specificDate);
+    //   endOfSpecificDate.setHours(23, 59, 59, 999);
 
-    const contraEntries = await Contra.find({
-      schoolId,
-      academicYear,
-      status: "Posted",
-    })
-      .sort({ createdAt: -1 })
-      .lean();
+    //   baseQuery.entryDate = {
+    //     $gte: specificDateObj,
+    //     $lte: endOfSpecificDate,
+    //   };
+    // }
+
+    // Handle specific date filter (highest priority)
+    if (specificDate) {
+      // Parse the specific date string (YYYY-MM-DD format)
+      const specificDateObj = new Date(specificDate);
+
+      // Set to start of day in UTC
+      const startOfDay = new Date(specificDateObj);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+
+      // Set to end of day in UTC
+      const endOfDay = new Date(specificDateObj);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+
+      console.log(
+        "Date range for specific date filter==============================:"
+      );
+      console.log(
+        "Start of day (UTC============================):",
+        startOfDay.toISOString()
+      );
+      console.log(
+        "End of day (UTC===========================):",
+        endOfDay.toISOString()
+      );
+
+      baseQuery.entryDate = {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      };
+    }
+    // Handle month filter (second priority)
+    else if (month) {
+      // Parse month string like "January 2025" or "September 2025"
+      const [monthName, year] = month.split(" ");
+
+      const monthNames = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+
+      const monthIndex = monthNames.findIndex(
+        (m) => m.toLowerCase() === monthName.toLowerCase()
+      );
+
+      if (monthIndex === -1) {
+        return res.status(400).json({
+          hasError: true,
+          message: "Invalid month name provided.",
+        });
+      }
+
+      // Calculate start and end dates for the specific month
+      const startOfMonth = new Date(year, monthIndex, 1);
+      const endOfMonth = new Date(year, monthIndex + 1, 0);
+
+      startOfMonth.setHours(0, 0, 0, 0);
+      endOfMonth.setHours(23, 59, 59, 999);
+
+      baseQuery.entryDate = {
+        $gte: startOfMonth,
+        $lte: endOfMonth,
+      };
+    }
+    // Default to academic year if no date filters provided
+    else {
+      baseQuery.academicYear = academicYear;
+    }
+
+    // Rest of your code remains exactly the same...
+    const [paymentEntries, receiptEntries, contraEntries, journalEntries] =
+      await Promise.all([
+        PaymentEntry.find(baseQuery).sort({ createdAt: -1 }).lean(),
+        Receipt.find(baseQuery).sort({ createdAt: -1 }).lean(),
+        Contra.find(baseQuery).sort({ createdAt: -1 }).lean(),
+        Journal.find(baseQuery).sort({ createdAt: -1 }).lean(),
+      ]);
+
+    const allEntries = [
+      ...paymentEntries,
+      ...receiptEntries,
+      ...contraEntries,
+      ...journalEntries,
+    ];
 
     const formattedData = [];
+    const months = [];
 
     // Find Payment Entries
 
     for (const entry of paymentEntries) {
+      const vendor = entry.vendorCode
+        ? await Vendor.findOne({
+            vendorCode: entry.vendorCode,
+            schoolId,
+          }).lean()
+        : null;
+
       const itemsWithLedgerNames = [];
 
       for (const item of entry.itemDetails) {
@@ -68,7 +185,7 @@ async function getAllBySchoolId(req, res) {
             schoolId,
           })
             .select(
-              "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
+              "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance balanceType"
             )
             .lean();
         }
@@ -100,10 +217,12 @@ async function getAllBySchoolId(req, res) {
           amountBeforeGST: item.amountBeforeGST || 0,
           GSTAmount: item.GSTAmount || 0,
           amountAfterGST: item.amountAfterGST || 0,
+          creditAmount: item.creditAmount || 0,
 
           ledgerId: item.ledgerId || null,
           ledgerName: ledger?.ledgerName || null,
-          openingBalance: ledger?.openingBalance || null,
+          openingBalance: ledger?.openingBalance || 0,
+          balanceType: ledger?.balanceType || null,
 
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
@@ -116,12 +235,19 @@ async function getAllBySchoolId(req, res) {
         });
       }
 
+      // Fetch TDS/TCS Rate Chart
+      const tdsTcsRateChart =
+        entry.TDSTCSRateChartId &&
+        mongoose.Types.ObjectId.isValid(entry.TDSTCSRateChartId)
+          ? await TDSTCSRateChart.findById(entry.TDSTCSRateChartId).lean()
+          : null;
+
       const ledgerWithPaymentMode =
         entry.ledgerIdWithPaymentMode &&
         mongoose.Types.ObjectId.isValid(entry.ledgerIdWithPaymentMode)
           ? await Ledger.findById(entry.ledgerIdWithPaymentMode)
               .select(
-                "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
+                "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance balanceType"
               )
               .lean()
           : null;
@@ -158,6 +284,7 @@ async function getAllBySchoolId(req, res) {
       let TDSorTCSHeadOfAccountName = null;
       let TDSorTCSBSPLLedgerName = null;
       let TDSorTCSOpeningBalance = null;
+      let TDSorTCSBalanceType = null;
 
       if (entry.TDSorTCS) {
         // 1. Find GroupLedger by name
@@ -176,12 +303,15 @@ async function getAllBySchoolId(req, res) {
             schoolId,
             groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName headOfAccountId bSPLLedgerId openingBalance")
+            .select(
+              "ledgerName headOfAccountId bSPLLedgerId openingBalance balanceType"
+            )
             .lean();
 
           if (tdsOrTcsLedger) {
             TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
-            TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || null;
+            TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || 0;
+            TDSorTCSBalanceType = tdsOrTcsLedger.balanceType || null;
 
             // Get headOfAccountName
             const headOfAccount = tdsOrTcsLedger.headOfAccountId
@@ -211,13 +341,18 @@ async function getAllBySchoolId(req, res) {
         accountingEntry: "Payment",
         _id: entry._id,
         schoolId: entry.schoolId,
-        subTotalAmountAfterGST: entry.subTotalAmountAfterGST,
+        invoiceNumber: entry.invoiceNumber,
+
         TDSTCSRateWithAmountBeforeGST: entry.TDSTCSRateWithAmountBeforeGST || 0,
+
+        subTotalAmountAfterGST: entry.subTotalAmountAfterGST || 0,
+        subTotalOfCredit: entry.subTotalOfCredit || 0,
+
         totalAmountAfterGST: entry.totalAmountAfterGST || 0,
+        totalCreditAmount: entry.totalCreditAmount || 0,
+
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
         ledgerNameWithPaymentMode: ledgerWithPaymentMode?.ledgerName || null,
-        openingBalanceWithPaymentMode:
-          ledgerWithPaymentMode?.openingBalance || null,
 
         groupLedgerIdWithPaymentMode:
           ledgerWithPaymentMode?.groupLedgerId || null,
@@ -234,6 +369,10 @@ async function getAllBySchoolId(req, res) {
         bSPLLedgerNameWithPaymentMode:
           bsplLedgerWithPaymentMode?.bSPLLedgerName || null,
 
+        openingBalanceWithPaymentMode:
+          ledgerWithPaymentMode?.openingBalance || 0,
+        balanceTypeWithPaymentMode: ledgerWithPaymentMode?.balanceType || null,
+
         TDSorTCS: entry.TDSorTCS || null,
 
         createdAt: entry.createdAt,
@@ -243,16 +382,68 @@ async function getAllBySchoolId(req, res) {
         TDSorTCSLedgerName,
         TDSorTCSHeadOfAccountName,
         TDSorTCSBSPLLedgerName,
-        TDSorTCSOpeningBalance: TDSorTCSOpeningBalance || null,
+        TDSorTCSOpeningBalance: TDSorTCSOpeningBalance || 0,
+        TDSorTCSBalanceType: TDSorTCSBalanceType || null,
 
         // Item details
         itemDetails: itemsWithLedgerNames,
+
+        entryDate: entry.entryDate,
+        academicYear: entry.academicYear,
+
+        invoiceDate: entry.invoiceDate,
+        narration: entry.narration,
+        chequeNumber: entry.chequeNumber || null,
+        transactionNumber: entry.transactionNumber || null,
+        paymentVoucherNumber: entry.paymentVoucherNumber || null,
+
+        vendorCode: entry.vendorCode,
+        vendorId: entry.vendorId,
+        entryDate: entry.entryDate,
+        invoiceDate: entry.invoiceDate,
+        invoiceNumber: entry.invoiceNumber,
+        poNumber: entry.poNumber,
+        dueDate: entry.dueDate,
+        paymentMode: entry.paymentMode,
+
+        TDSTCSRateChartId: entry.TDSTCSRateChartId,
+        TDSTCSRate: entry.TDSTCSRate,
+        totalAmountBeforeGST: entry.totalAmountBeforeGST,
+        totalGSTAmount: entry.totalGSTAmount,
+        totalAmountAfterGST: entry.totalAmountAfterGST,
+        invoiceImage: entry.invoiceImage,
+        chequeImage: entry.chequeImage || null,
+        status: entry.status || null,
+
+        // Vendor fields
+        nameOfVendor: vendor?.nameOfVendor || null,
+        email: vendor?.email || null,
+        contactNumber: vendor?.contactNumber || null,
+        gstNumber: vendor?.gstNumber || null,
+        panNumber: vendor?.panNumber || null,
+        address: vendor?.address || null,
+        state: vendor?.state || null,
+        nameOfAccountHolder: vendor?.nameOfAccountHolder || null,
+        nameOfBank: vendor?.nameOfBank || null,
+        ifscCode: vendor?.ifscCode || null,
+        accountNumber: vendor?.accountNumber || null,
+        accountType: vendor?.accountType || null,
+
+        // TDS/TCS Rate Chart fields
+        natureOfTransaction: tdsTcsRateChart?.natureOfTransaction || null,
+        rate: tdsTcsRateChart?.rate || null,
+
+        // Authorised Signature
+        authorisedSignatureImage:
+          authorisedSignature?.authorisedSignatureImage || null,
+
+        customizeEntry: entry.customizeEntry,
       };
 
       formattedData.push(entryData);
     }
 
-    // Find Receipt Entries
+    // For Receipt Entries // Find Receipt Entries
 
     for (const entry of receiptEntries) {
       const itemsWithLedgerNames = [];
@@ -265,7 +456,7 @@ async function getAllBySchoolId(req, res) {
             schoolId,
           })
             .select(
-              "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
+              "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance balanceType"
             )
             .lean();
         }
@@ -294,11 +485,11 @@ async function getAllBySchoolId(req, res) {
 
         itemsWithLedgerNames.push({
           itemName: item.itemName,
-          amount: item.amount || 0,
+          debitAmount: item.debitAmount || null,
+          amount: item.amount,
 
           ledgerId: item.ledgerId || null,
           ledgerName: ledger?.ledgerName || null,
-          openingBalance: ledger?.openingBalance || null,
 
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
@@ -308,15 +499,25 @@ async function getAllBySchoolId(req, res) {
 
           bSPLLedgerId: ledger?.bSPLLedgerId || null,
           bSPLLedgerName: bsplLedger?.bSPLLedgerName || null,
+
+          openingBalance: ledger?.openingBalance || 0,
+          balanceType: ledger?.balanceType || null,
         });
       }
+
+      // Fetch TDS/TCS Rate Chart
+      const tdsTcsRateChart =
+        entry.TDSTCSRateChartId &&
+        mongoose.Types.ObjectId.isValid(entry.TDSTCSRateChartId)
+          ? await TDSTCSRateChart.findById(entry.TDSTCSRateChartId).lean()
+          : null;
 
       const ledgerWithPaymentMode =
         entry.ledgerIdWithPaymentMode &&
         mongoose.Types.ObjectId.isValid(entry.ledgerIdWithPaymentMode)
           ? await Ledger.findById(entry.ledgerIdWithPaymentMode)
               .select(
-                "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
+                "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance balanceType"
               )
               .lean()
           : null;
@@ -353,6 +554,7 @@ async function getAllBySchoolId(req, res) {
       let TDSorTCSHeadOfAccountName = null;
       let TDSorTCSBSPLLedgerName = null;
       let TDSorTCSOpeningBalance = null;
+      let TDSorTCSBalanceType = null;
 
       if (entry.TDSorTCS) {
         // 1. Find GroupLedger by name
@@ -371,12 +573,15 @@ async function getAllBySchoolId(req, res) {
             schoolId,
             groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName headOfAccountId bSPLLedgerId openingBalance")
+            .select(
+              "ledgerName headOfAccountId bSPLLedgerId openingBalance balanceType"
+            )
             .lean();
 
           if (tdsOrTcsLedger) {
             TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
             TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || null;
+            TDSorTCSBalanceType = tdsOrTcsLedger.balanceType || null;
 
             const headOfAccount = tdsOrTcsLedger.headOfAccountId
               ? await HeadOfAccount.findOne({
@@ -401,19 +606,15 @@ async function getAllBySchoolId(req, res) {
       }
 
       const entryData = {
-        // PaymentEntry fields
+        // Receipt fields
         accountingEntry: "Receipt",
         _id: entry._id,
         schoolId: entry.schoolId,
-        subTotalAmount: entry.subTotalAmount || 0,
-        totalAmount: entry.totalAmount,
 
         TDSTCSRateWithAmount: entry.TDSTCSRateWithAmount || 0,
 
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
         ledgerNameWithPaymentMode: ledgerWithPaymentMode?.ledgerName || null,
-        openingBalanceWithPaymentMode:
-          ledgerWithPaymentMode?.openingBalance || null,
 
         groupLedgerIdWithPaymentMode:
           ledgerWithPaymentMode?.groupLedgerId || null,
@@ -430,6 +631,10 @@ async function getAllBySchoolId(req, res) {
         bSPLLedgerNameWithPaymentMode:
           bsplLedgerWithPaymentMode?.bSPLLedgerName || null,
 
+        openingBalanceWithPaymentMode:
+          ledgerWithPaymentMode?.openingBalance || null,
+        balanceTypeWithPaymentMode: ledgerWithPaymentMode?.balanceType || null,
+
         TDSorTCS: entry.TDSorTCS || null,
 
         createdAt: entry.createdAt,
@@ -439,88 +644,46 @@ async function getAllBySchoolId(req, res) {
         TDSorTCSLedgerName,
         TDSorTCSHeadOfAccountName,
         TDSorTCSBSPLLedgerName,
-        TDSorTCSOpeningBalance: TDSorTCSOpeningBalance || null,
+        TDSorTCSOpeningBalance: TDSorTCSOpeningBalance || 0,
+        TDSorTCSBalance: TDSorTCSBalanceType || null,
 
         // Item details
         itemDetails: itemsWithLedgerNames,
-      };
 
-      formattedData.push(entryData);
-    }
+        entryDate: entry.entryDate,
+        academicYear: entry.academicYear,
 
-    // Find Journal Entries
+        receiptDate: entry.receiptDate,
+        narration: entry.narration,
+        chequeNumber: entry.chequeNumber || null,
+        transactionNumber: entry.transactionNumber || null,
 
-    for (const entry of JournalEntries) {
-      const itemsWithLedgerNames = [];
+        receiptVoucherNumber: entry.receiptVoucherNumber || null,
 
-      for (const item of entry.itemDetails) {
-        let ledger = null;
-        if (item.ledgerId && mongoose.Types.ObjectId.isValid(item.ledgerId)) {
-          ledger = await Ledger.findOne({
-            _id: item.ledgerId,
-            schoolId,
-          })
-            .select(
-              "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
-            )
-            .lean();
-        }
+        // ==============
 
-        let groupLedger = null;
-        if (ledger?.groupLedgerId) {
-          groupLedger = await GroupLedger.findOne({
-            _id: ledger.groupLedgerId,
-            schoolId,
-          })
-            .select("groupLedgerName")
-            .lean();
-        }
+        paymentMode: entry.paymentMode,
+        TDSorTCS: entry.TDSorTCS || null,
+        TDSTCSRateChartId: entry.TDSTCSRateChartId,
+        TDSTCSRate: entry.TDSTCSRate,
+        receiptImage: entry.receiptImage,
+        chequeImageForReceipt: entry.chequeImageForReceipt || null,
+        status: entry.status || null,
 
-        const headOfAccount = ledger?.headOfAccountId
-          ? await HeadOfAccount.findOne({ _id: ledger.headOfAccountId })
-              .select("headOfAccountName")
-              .lean()
-          : null;
+        // TDS/TCS Rate Chart fields
+        natureOfTransaction: tdsTcsRateChart?.natureOfTransaction || null,
+        rate: tdsTcsRateChart?.rate || null,
 
-        const bsplLedger = ledger?.bSPLLedgerId
-          ? await BSPLLedger.findOne({ _id: ledger.bSPLLedgerId })
-              .select("bSPLLedgerName")
-              .lean()
-          : null;
+        // Authorised Signature
+        authorisedSignatureImage:
+          authorisedSignature?.authorisedSignatureImage || null,
 
-        itemsWithLedgerNames.push({
-          description: item.description,
-          debitAmount: item.debitAmount || 0,
-          creditAmount: item.creditAmount || 0,
+        customizeEntry: entry.customizeEntry,
 
-          ledgerId: item.ledgerId || null,
-          ledgerName: ledger?.ledgerName || null,
-          openingBalance: ledger?.openingBalance || null,
-
-          groupLedgerId: ledger?.groupLedgerId || null,
-          groupLedgerName: groupLedger?.groupLedgerName || null,
-
-          headOfAccountId: ledger?.headOfAccountId || null,
-          headOfAccountName: headOfAccount?.headOfAccountName || null,
-
-          bSPLLedgerId: ledger?.bSPLLedgerId || null,
-          bSPLLedgerName: bsplLedger?.bSPLLedgerName || null,
-        });
-      }
-
-      const entryData = {
-        accountingEntry: "Journal",
-        _id: entry._id,
-        schoolId: entry.schoolId,
+        subTotalAmount: entry.subTotalAmount || 0,
         subTotalOfDebit: entry.subTotalOfDebit || 0,
-        totalAmountOfDebit: entry.totalAmountOfDebit || 0,
-        totalAmountOfCredit: entry.totalAmountOfCredit || 0,
-        journalVoucherNumber: entry.journalVoucherNumber || null,
-        createdAt: entry.createdAt,
-        updatedAt: entry.updatedAt,
-
-        // Item details
-        itemDetails: itemsWithLedgerNames,
+        totalAmount: entry.totalAmount || 0,
+        totalDebitAmount: entry.totalDebitAmount || 0,
       };
 
       formattedData.push(entryData);
@@ -550,7 +713,7 @@ async function getAllBySchoolId(req, res) {
         schoolId,
       })
         .select(
-          "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance"
+          "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance balanceType"
         )
         .lean();
 
@@ -589,7 +752,6 @@ async function getAllBySchoolId(req, res) {
       ledgers.forEach((ledger) => {
         ledgerMap[ledger._id.toString()] = {
           ledgerName: ledger.ledgerName,
-          openingBalance: ledger.openingBalance,
           groupLedgerId: ledger.groupLedgerId?.toString(),
           headOfAccountName: ledger.headOfAccountId
             ? headOfAccountMap[ledger.headOfAccountId.toString()]
@@ -597,6 +759,9 @@ async function getAllBySchoolId(req, res) {
           bSPLLedgerName: ledger.bSPLLedgerId
             ? bsplLedgerMap[ledger.bSPLLedgerId.toString()]
             : null,
+
+          openingBalance: ledger.openingBalance,
+          balanceType: ledger.balanceType,
         };
       });
 
@@ -627,8 +792,6 @@ async function getAllBySchoolId(req, res) {
         itemsWithLedgerNames.push({
           ledgerId: item.ledgerId || null,
           ledgerName: ledgerInfo.ledgerName || null,
-          openingBalance: ledgerInfo.openingBalance || null,
-          openingBalanceOfCashAccount: cashLedgerInfo.openingBalance || null,
 
           groupLedgerId: ledgerInfo.groupLedgerId || null,
           groupLedgerName: ledgerInfo.groupLedgerId
@@ -652,6 +815,12 @@ async function getAllBySchoolId(req, res) {
             cashLedgerInfo.headOfAccountName || null,
           bSPLLedgerNameOfCashAccount: cashLedgerInfo.bSPLLedgerName || null,
 
+          openingBalance: ledgerInfo.openingBalance || null,
+          balanceType: ledgerInfo.balanceType || null,
+
+          openingBalanceOfCashAccount: cashLedgerInfo.openingBalance || null,
+          balanceTypeOfCashAccount: cashLedgerInfo.balanceType || null,
+
           debitAmount: item.debitAmount || 0,
           creditAmount: item.creditAmount || 0,
         });
@@ -663,6 +832,7 @@ async function getAllBySchoolId(req, res) {
       let TDSorTCSHeadOfAccountName = null;
       let TDSorTCSBSPLLedgerName = null;
       let TDSorTCSOpeningBalance = null;
+      let TDSorTCSBalanceType = null;
 
       if (entry.TDSorTCS) {
         const tdsOrTcsGroupLedger = await GroupLedger.findOne({
@@ -679,12 +849,15 @@ async function getAllBySchoolId(req, res) {
             schoolId,
             groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName headOfAccountId bSPLLedgerId openingBalance")
+            .select(
+              "ledgerName headOfAccountId bSPLLedgerId openingBalance balanceType"
+            )
             .lean();
 
           if (tdsOrTcsLedger) {
             TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
             TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || null;
+            TDSorTCSBalanceType = tdsOrTcsLedger.balanceType || null;
 
             // Get headOfAccountName
             const headOfAccount = tdsOrTcsLedger.headOfAccountId
@@ -713,23 +886,129 @@ async function getAllBySchoolId(req, res) {
         accountingEntry: "Contra",
         _id: entry._id,
         schoolId: entry.schoolId,
+        entryDate: entry.entryDate,
+        dateOfCashDepositedWithdrawlDate:
+          entry.dateOfCashDepositedWithdrawlDate,
         contraEntryName: entry.contraEntryName,
+        narration: entry.narration,
+        chequeNumber: entry.chequeNumber || null,
+        chequeImageForContra: entry.chequeImageForContra || null,
+        contraVoucherNumber: entry.contraVoucherNumber || null,
+
         subTotalOfDebit: entry.subTotalOfDebit || 0,
         subTotalOfCredit: entry.subTotalOfCredit || 0,
         totalAmountOfCredit: entry.totalAmountOfCredit || 0,
         totalAmountOfDebit: entry.totalAmountOfDebit || 0,
         TDSTCSRateAmount: entry.TDSTCSRateAmount || 0,
-        contraVoucherNumber: entry.contraVoucherNumber || null,
         TDSorTCS: entry.TDSorTCS || null,
+
         status: entry.status,
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
-        TDSorTCSGroupLedgerName,
-        TDSorTCSLedgerName,
+        itemDetails: itemsWithLedgerNames,
+
+        entryDate: entry.entryDate,
+        academicYear: entry.academicYear,
+
         TDSorTCSHeadOfAccountName,
         TDSorTCSBSPLLedgerName,
+        TDSorTCSGroupLedgerName,
+        TDSorTCSLedgerName,
+
         TDSorTCSOpeningBalance: TDSorTCSOpeningBalance || null,
+        TDSorTCSBalanceType: TDSorTCSBalanceType || null,
+
+        customizeEntry: entry.customizeEntry,
+      };
+
+      formattedData.push(entryData);
+    }
+
+    // Find Journal Entries
+
+    for (const entry of journalEntries) {
+      const itemsWithLedgerNames = [];
+
+      for (const item of entry.itemDetails) {
+        let ledger = null;
+        if (item.ledgerId && mongoose.Types.ObjectId.isValid(item.ledgerId)) {
+          ledger = await Ledger.findOne({
+            _id: item.ledgerId,
+            schoolId,
+          })
+            .select(
+              "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance balanceType"
+            )
+            .lean();
+        }
+
+        let groupLedger = null;
+        if (ledger?.groupLedgerId) {
+          groupLedger = await GroupLedger.findOne({
+            _id: ledger.groupLedgerId,
+            schoolId,
+          })
+            .select("groupLedgerName")
+            .lean();
+        }
+
+        const headOfAccount = ledger?.headOfAccountId
+          ? await HeadOfAccount.findOne({ _id: ledger.headOfAccountId })
+              .select("headOfAccountName")
+              .lean()
+          : null;
+
+        const bsplLedger = ledger?.bSPLLedgerId
+          ? await BSPLLedger.findOne({ _id: ledger.bSPLLedgerId })
+              .select("bSPLLedgerName")
+              .lean()
+          : null;
+
+        itemsWithLedgerNames.push({
+          description: item.description,
+          debitAmount: item.debitAmount || 0,
+          creditAmount: item.creditAmount || 0,
+
+          ledgerId: item.ledgerId || null,
+          ledgerName: ledger?.ledgerName || null,
+
+          groupLedgerId: ledger?.groupLedgerId || null,
+          groupLedgerName: groupLedger?.groupLedgerName || null,
+
+          headOfAccountId: ledger?.headOfAccountId || null,
+          headOfAccountName: headOfAccount?.headOfAccountName || null,
+
+          bSPLLedgerId: ledger?.bSPLLedgerId || null,
+          bSPLLedgerName: bsplLedger?.bSPLLedgerName || null,
+
+          openingBalance: ledger?.openingBalance || null,
+          balanceType: ledger?.balanceType || null,
+        });
+      }
+
+      const entryData = {
+        accountingEntry: "Journal",
+        _id: entry._id,
+        schoolId: entry.schoolId,
+        entryDate: entry.entryDate,
+        documentDate: entry.documentDate,
+        journalVoucherNumber: entry.journalVoucherNumber || null,
+        narration: entry.narration,
+
+        subTotalOfDebit: entry.subTotalOfDebit || 0,
+        totalAmountOfDebit: entry.totalAmountOfDebit || 0,
+        totalAmountOfCredit: entry.totalAmountOfCredit || 0,
+
+        createdAt: entry.createdAt,
+        updatedAt: entry.updatedAt,
+
+        // Item details
         itemDetails: itemsWithLedgerNames,
+
+        entryDate: entry.entryDate,
+        academicYear: entry.academicYear,
+
+        customizeEntry: entry.customizeEntry,
       };
 
       formattedData.push(entryData);
@@ -737,7 +1016,7 @@ async function getAllBySchoolId(req, res) {
 
     return res.status(200).json({
       hasError: false,
-      message: "Entries fetched successfully",
+      message: "Entries fetched successfully with vendor and ledger info.",
       data: formattedData,
     });
   } catch (error) {
@@ -749,4 +1028,4 @@ async function getAllBySchoolId(req, res) {
   }
 }
 
-export default getAllBySchoolId;
+export default getAllDateMonthDataWithDebitCredit;
