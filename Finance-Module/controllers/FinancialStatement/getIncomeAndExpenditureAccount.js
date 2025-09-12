@@ -1,0 +1,257 @@
+import OpeningClosingBalance from "../../models/OpeningClosingBalance.js";
+import Ledger from "../../models/Ledger.js";
+import BSPLLedger from "../../models/BSPLLedger.js";
+import HeadOfAccount from "../../models/HeadOfAccount.js";
+import moment from "moment";
+
+async function getIncomeAndExpenditureAccount(req, res) {
+  try {
+    const schoolId = req.user?.schoolId;
+
+    if (!schoolId) {
+      return res.status(401).json({
+        hasError: true,
+        message: "Access denied: School ID not found in user context.",
+      });
+    }
+
+    const { startDate, endDate, academicYear } = req.query;
+
+    // Validate required parameters
+    if (!academicYear) {
+      return res.status(400).json({
+        hasError: true,
+        message: "academicYear is a required parameter.",
+      });
+    }
+
+    // Parse date range or use academic year range
+    const academicYearStart = moment(
+      `04/01/${academicYear.split("-")[0]}`,
+      "MM/DD/YYYY"
+    ).startOf("day");
+    const academicYearEnd = moment(
+      `03/31/${academicYear.split("-")[1]}`,
+      "MM/DD/YYYY"
+    ).endOf("day");
+
+    // Normalize query range
+    const start = startDate
+      ? moment(startDate).startOf("day")
+      : academicYearStart.clone();
+    const end = endDate
+      ? moment(endDate).endOf("day")
+      : academicYearEnd.clone();
+
+    // Validate date range
+    if (end.isBefore(start)) {
+      return res.status(400).json({
+        hasError: true,
+        message: "End date cannot be before start date.",
+      });
+    }
+
+    // Step 1: Find HeadOfAccount IDs for "Income" and "Expenses"
+    const incomeHead = await HeadOfAccount.findOne({
+      schoolId,
+      academicYear,
+      headOfAccountName: "Income",
+    });
+
+    const expensesHead = await HeadOfAccount.findOne({
+      schoolId,
+      academicYear,
+      headOfAccountName: "Expenses",
+    });
+
+    if (!incomeHead && !expensesHead) {
+      return res.status(200).json({
+        hasError: false,
+        message: "No Income or Expenses head accounts found",
+        data: {
+          income: [],
+          expenses: [],
+        },
+      });
+    }
+
+    // Step 2: Find all ledgers under Income and Expenses heads with proper population
+    const ledgerQuery = {
+      schoolId,
+      academicYear,
+      $or: [],
+    };
+
+    if (incomeHead) {
+      ledgerQuery.$or.push({ headOfAccountId: incomeHead._id });
+    }
+    if (expensesHead) {
+      ledgerQuery.$or.push({ headOfAccountId: expensesHead._id });
+    }
+
+    const ledgers = await Ledger.find(ledgerQuery)
+      .populate({
+        path: "bSPLLedgerId",
+        select: "bSPLLedgerName", // Only populate the name field
+      })
+      .populate("headOfAccountId");
+
+    if (ledgers.length === 0) {
+      return res.status(200).json({
+        hasError: false,
+        message: "No ledgers found for Income or Expenses heads",
+        data: {
+          income: [],
+          expenses: [],
+        },
+      });
+    }
+
+    // Step 3: Get all ledger IDs
+    const ledgerIds = ledgers.map((ledger) => ledger._id);
+
+    // Step 4: Find OpeningClosingBalance records for these ledgers
+    const balanceRecords = await OpeningClosingBalance.find({
+      schoolId,
+      academicYear,
+      ledgerId: { $in: ledgerIds },
+    }).populate("ledgerId");
+
+    // Step 5: Calculate closing balances for each ledger within date range
+    const ledgerBalances = {};
+
+    for (const record of balanceRecords) {
+      const ledgerId = record.ledgerId._id.toString();
+
+      // Find the latest balance detail within the date range
+      const relevantDetails = record.balanceDetails
+        .filter((detail) => {
+          const detailDate = moment(detail.entryDate);
+          return detailDate.isBetween(start, end, null, "[]"); // inclusive
+        })
+        .sort(
+          (a, b) =>
+            moment(b.entryDate).valueOf() - moment(a.entryDate).valueOf()
+        );
+
+      if (relevantDetails.length > 0) {
+        const latestDetail = relevantDetails[0];
+        ledgerBalances[ledgerId] = latestDetail.closingBalance;
+      } else {
+        // If no entries in date range, use the last balance before the range
+        const previousDetails = record.balanceDetails
+          .filter((detail) => moment(detail.entryDate).isBefore(start))
+          .sort(
+            (a, b) =>
+              moment(b.entryDate).valueOf() - moment(a.entryDate).valueOf()
+          );
+
+        if (previousDetails.length > 0) {
+          ledgerBalances[ledgerId] = previousDetails[0].closingBalance;
+        } else {
+          // If no entries at all, use opening balance from ledger
+          const ledger = ledgers.find((l) => l._id.toString() === ledgerId);
+          ledgerBalances[ledgerId] = ledger?.openingBalance || 0;
+        }
+      }
+    }
+
+    // Step 6: Get all BSPL Ledger names in bulk for better performance
+    const bspLedgerIds = [
+      ...new Set(
+        ledgers.map((ledger) => ledger.bSPLLedgerId?._id).filter((id) => id)
+      ),
+    ];
+    const bspLedgers = await BSPLLedger.find({
+      _id: { $in: bspLedgerIds },
+    }).select("_id bSPLLedgerName");
+
+    // Create a map for quick lookup
+    const bspLedgerMap = {};
+    bspLedgers.forEach((ledger) => {
+      bspLedgerMap[ledger._id.toString()] = ledger.bSPLLedgerName;
+    });
+
+    // Step 7: Group by HeadOfAccount and BSPLLedger
+    const result = {
+      income: [],
+      expenses: [],
+    };
+
+    const groupedData = {};
+
+    for (const ledger of ledgers) {
+      const ledgerId = ledger._id.toString();
+      const balance = ledgerBalances[ledgerId] || 0;
+      const headOfAccountName = ledger.headOfAccountId?.headOfAccountName;
+      const bspLedgerId = ledger.bSPLLedgerId?._id.toString();
+
+      // Get BSPL Ledger name from our map or use fallback
+      const bspLedgerName = bspLedgerId
+        ? bspLedgerMap[bspLedgerId] || `Ledger ${bspLedgerId}`
+        : "Uncategorized";
+
+      if (!bspLedgerId || !headOfAccountName) continue;
+
+      const key = `${headOfAccountName}_${bspLedgerId}`;
+
+      if (!groupedData[key]) {
+        groupedData[key] = {
+          headOfAccountName,
+          bSPLLedgerId: bspLedgerId,
+          bSPLLedgerName: bspLedgerName,
+          closingBalance: 0,
+        };
+      }
+
+      groupedData[key].closingBalance += balance;
+    }
+
+    // Step 8: Organize into income and expenses arrays
+    for (const key in groupedData) {
+      const item = groupedData[key];
+      if (item.headOfAccountName === "Income") {
+        result.income.push({
+          headOfAccountName: item.headOfAccountName,
+          bSPLLedgerId: item.bSPLLedgerId,
+          bSPLLedgerName: item.bSPLLedgerName,
+          closingBalance: item.closingBalance,
+        });
+      } else if (item.headOfAccountName === "Expenses") {
+        result.expenses.push({
+          headOfAccountName: item.headOfAccountName,
+          bSPLLedgerId: item.bSPLLedgerId,
+          bSPLLedgerName: item.bSPLLedgerName,
+          closingBalance: item.closingBalance,
+        });
+      }
+    }
+
+    // Sort by BSPLLedger name with safe handling
+    result.income.sort((a, b) => {
+      const nameA = a.bSPLLedgerName || "";
+      const nameB = b.bSPLLedgerName || "";
+      return nameA.localeCompare(nameB);
+    });
+
+    result.expenses.sort((a, b) => {
+      const nameA = a.bSPLLedgerName || "";
+      const nameB = b.bSPLLedgerName || "";
+      return nameA.localeCompare(nameB);
+    });
+
+    return res.status(200).json({
+      hasError: false,
+      message: "Income And Expenditure Account fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Error fetching Income And Expenditure Account:", error);
+    return res.status(500).json({
+      hasError: true,
+      message: "Internal server error. Please try again later.",
+    });
+  }
+}
+
+export default getIncomeAndExpenditureAccount;
