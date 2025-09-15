@@ -251,20 +251,31 @@ async function getScheduleToExpenditure(req, res) {
       groupLedgers: Object.values(bspLedger.groupLedgers),
     }));
 
+    // Filter out group ledgers with zero balance
+    result.forEach((bspLedger) => {
+      bspLedger.groupLedgers = bspLedger.groupLedgers.filter(
+        (groupLedger) => groupLedger.closingBalance !== 0
+      );
+    });
+
+    // Also filter out BSPL ledgers that have no group ledgers after filtering
+    const filteredResult = result.filter(
+      (bspLedger) => bspLedger.groupLedgers.length > 0
+    );
+
     // Step 8: Sort by total balance descending (highest first)
-    result.sort((a, b) => b.totalBalance - a.totalBalance);
+    filteredResult.sort((a, b) => b.totalBalance - a.totalBalance);
 
     // Step 9: Sort group ledgers within each BSPL ledger by balance descending
-    result.forEach((bspLedger) => {
+    filteredResult.forEach((bspLedger) => {
       bspLedger.groupLedgers.sort(
         (a, b) => b.closingBalance - a.closingBalance
       );
     });
-
     return res.status(200).json({
       hasError: false,
       message: "Schedule To Expenses fetched successfully",
-      data: result,
+      data: filteredResult,
     });
   } catch (error) {
     console.error("Error fetching Schedule To Expenses:", error);

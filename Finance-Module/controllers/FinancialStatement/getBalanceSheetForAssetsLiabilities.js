@@ -250,21 +250,29 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
       for (const bspLedgerId in bspLedgers) {
         const bspLedgerData = bspLedgers[bspLedgerId];
 
-        const formattedBspLedger = {
-          bSPLLedgerId: bspLedgerData.bSPLLedgerId,
-          bSPLLedgerName: bspLedgerData.bSPLLedgerName,
-          totalBalance: bspLedgerData.totalBalance,
-          groupLedgers: Object.values(bspLedgerData.groupLedgers),
-        };
+        const filteredGroupLedgers = Object.values(
+          bspLedgerData.groupLedgers
+        ).filter((groupLedger) => groupLedger.closingBalance !== 0);
 
-        // Add to the appropriate result array
-        if (headOfAccountName === "Assets") {
-          result.assets.push(formattedBspLedger);
-        } else if (headOfAccountName === "Liabilities") {
-          result.liabilities.push(formattedBspLedger);
+        if (filteredGroupLedgers.length > 0) {
+          const formattedBspLedger = {
+            bSPLLedgerId: bspLedgerData.bSPLLedgerId,
+            bSPLLedgerName: bspLedgerData.bSPLLedgerName,
+            totalBalance: bspLedgerData.totalBalance,
+            groupLedgers: filteredGroupLedgers,
+          };
+
+          // Add to the appropriate result array
+          if (headOfAccountName === "Assets") {
+            result.assets.push(formattedBspLedger);
+          } else if (headOfAccountName === "Liabilities") {
+            result.liabilities.push(formattedBspLedger);
+          }
         }
       }
     }
+
+    // which ever group laedger has closing balance 0 dont send it if negative or positive valuw then send it
 
     // Step 8: Sort the results
     result.assets.sort((a, b) =>

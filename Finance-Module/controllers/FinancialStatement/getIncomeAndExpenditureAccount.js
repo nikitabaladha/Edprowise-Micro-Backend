@@ -288,6 +288,12 @@ async function getIncomeAndExpenditureAccount(req, res) {
       }
     }
 
+    // Filter out BSPL ledgers with zero balance (keep only positive or negative values)
+    result.income = result.income.filter((item) => item.closingBalance !== 0);
+
+    result.expenses = result.expenses.filter(
+      (item) => item.closingBalance !== 0
+    );
     // Sort by BSPLLedger name with safe handling
     result.income.sort((a, b) => {
       const nameA = a.bSPLLedgerName || "";
