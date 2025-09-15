@@ -7,6 +7,7 @@ import {
   getIncomeAndExpenditureAccount,
   getScheduleToIncome,
   getScheduleToExpenditure,
+  getBalanceSheetForAssetsLiabilities,
 } from "../controllers/FinancialStatement/index.js";
 
 router.get(
@@ -25,5 +26,11 @@ router.get(
   "/get-financial-statement-schedule-to-expenses",
   roleBasedMiddleware("School"),
   getScheduleToExpenditure
+);
+
+router.get(
+  "/get-financial-statement-balance-sheet-assets-liabilities",
+  roleBasedMiddleware("School"),
+  getBalanceSheetForAssetsLiabilities
 );
 export default router;
