@@ -9,6 +9,7 @@ import {
   getAllIncomeBookBySchoolId,
   getAllExpensesBookBySchoolId,
   getAllJournalWIthoutBankCashBySchoolId,
+  getAllPaymentWhichHasTDSBySchoolId,
 } from "../controllers/Reports/index.js";
 
 router.get(
@@ -39,6 +40,12 @@ router.get(
   "/get-all-journal-without-bank-cash-entry/:academicYear",
   roleBasedMiddleware("School"),
   getAllJournalWIthoutBankCashBySchoolId
+);
+
+router.get(
+  "/get-all-payment-with-TDS",
+  roleBasedMiddleware("School"),
+  getAllPaymentWhichHasTDSBySchoolId
 );
 
 export default router;
