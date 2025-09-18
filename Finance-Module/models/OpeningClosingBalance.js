@@ -12,7 +12,7 @@ const OpeningClosingBalanceSchema = new mongoose.Schema(
     },
     ledgerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "HeadOfAccount",
+      ref: "Ledger",
       required: true,
     },
     balanceDetails: [

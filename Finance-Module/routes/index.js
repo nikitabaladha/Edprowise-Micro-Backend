@@ -14,6 +14,7 @@ import DepreciationMasterRoutes from "./DepreciationMaster.js";
 import TrialBalanceRoutes from "./TrialBalance.js";
 import OpeningClosingBalanceRoutes from "./OpeningClosingBalance.js";
 import CustomizeEntryRoutes from "./CustomizeEntry.js";
+import FinancialStatementRoutes from "./FinancialStatement.js";
 
 export default (app) => {
   app.use("/api", ledgerRoutes);
@@ -32,4 +33,5 @@ export default (app) => {
   app.use("/api", DepreciationMasterRoutes);
   app.use("/api", TrialBalanceRoutes);
   app.use("/api", OpeningClosingBalanceRoutes);
+  app.use("/api", FinancialStatementRoutes);
 };
