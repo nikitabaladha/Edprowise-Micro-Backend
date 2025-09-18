@@ -8,6 +8,8 @@ import {
   getScheduleToIncome,
   getScheduleToExpenditure,
   getBalanceSheetForAssetsLiabilities,
+  getScheduleToLiabilities,
+  getScheduleToAssets,
 } from "../controllers/FinancialStatement/index.js";
 
 router.get(
@@ -33,4 +35,17 @@ router.get(
   roleBasedMiddleware("School"),
   getBalanceSheetForAssetsLiabilities
 );
+
+router.get(
+  "/get-financial-statement-schedule-to-liabilities",
+  roleBasedMiddleware("School"),
+  getScheduleToLiabilities
+);
+
+router.get(
+  "/get-financial-statement-schedule-to-assets",
+  roleBasedMiddleware("School"),
+  getScheduleToAssets
+);
+
 export default router;
