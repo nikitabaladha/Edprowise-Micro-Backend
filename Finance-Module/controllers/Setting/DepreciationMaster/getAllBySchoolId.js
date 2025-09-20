@@ -42,6 +42,8 @@ async function getAllBySchoolId(req, res) {
         item.groupLedgerId?.groupLedgerId ||
         item.groupLedgerId?._id ||
         "Not Found",
+      chargeDepreciation: item.chargeDepreciation,
+      entryAutomation: item.entryAutomation,
     }));
 
     return res.status(200).json({

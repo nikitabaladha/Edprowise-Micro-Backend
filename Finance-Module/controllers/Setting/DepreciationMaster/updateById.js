@@ -27,41 +27,60 @@ async function updateById(req, res) {
     }
 
     // Extract updated fields
-    const { rateAsPerIncomeTaxAct, rateAsPerICAI, ledgerId, groupLedgerId } =
-      req.body;
+    const {
+      rateAsPerIncomeTaxAct,
+      rateAsPerICAI,
+      ledgerId,
+      groupLedgerId,
+      chargeDepreciation,
+      entryAutomation,
+    } = req.body;
 
     // Find and update
-    const updatedDepreciationMaster = await DepreciationMaster.findOneAndUpdate(
-      {
-        _id: id,
-        schoolId,
-        academicYear,
-      },
-      {
-        $set: {
-          rateAsPerIncomeTaxAct,
-          rateAsPerICAI,
-          ledgerId,
-          groupLedgerId,
-        },
-      },
-      {
-        new: true, // Return the updated document
-        runValidators: true, // Ensure schema validation runs
-      }
-    );
+    const existingDepreciation = await DepreciationMaster.findOne({
+      _id: id,
+      schoolId,
+      academicYear,
+    });
 
-    if (!updatedDepreciationMaster) {
+    if (!existingDepreciation) {
       return res.status(404).json({
         hasError: true,
-        message: "Depreciation Master not found.",
+        message: "Depreciation not found.",
       });
     }
+
+    // Update fields - check if value is provided (including 0)
+    if (chargeDepreciation !== undefined) {
+      existingDepreciation.chargeDepreciation = chargeDepreciation;
+    }
+
+    if (entryAutomation !== undefined) {
+      existingDepreciation.entryAutomation = entryAutomation;
+    }
+
+    if (rateAsPerICAI !== undefined) {
+      existingDepreciation.rateAsPerICAI = rateAsPerICAI;
+    }
+
+    if (rateAsPerIncomeTaxAct !== undefined) {
+      existingDepreciation.rateAsPerIncomeTaxAct = rateAsPerIncomeTaxAct;
+    }
+
+    if (ledgerId !== undefined) {
+      existingDepreciation.ledgerId = ledgerId;
+    }
+
+    if (groupLedgerId !== undefined) {
+      existingDepreciation.groupLedgerId = groupLedgerId;
+    }
+
+    await existingDepreciation.save();
 
     return res.status(200).json({
       hasError: false,
       message: "Depreciation Master updated successfully!",
-      data: updatedDepreciationMaster,
+      data: existingDepreciation,
     });
   } catch (error) {
     if (error.code === 11000) {
@@ -81,5 +100,4 @@ async function updateById(req, res) {
     });
   }
 }
-
 export default updateById;

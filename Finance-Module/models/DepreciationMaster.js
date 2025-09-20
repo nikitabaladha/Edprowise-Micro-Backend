@@ -16,13 +16,23 @@ const DepreciationMasterSchema = new mongoose.Schema(
       ref: "Ledger",
       required: true,
     },
+    chargeDepreciation: {
+      type: Boolean,
+      default: false,
+    },
+    entryAutomation: {
+      type: Boolean,
+      default: false,
+    },
     rateAsPerIncomeTaxAct: {
       type: Number,
-      required: true,
+      default: 0,
+      required: false,
     },
     rateAsPerICAI: {
       type: Number,
-      required: true,
+      default: 0,
+      required: false,
     },
     academicYear: {
       type: String,

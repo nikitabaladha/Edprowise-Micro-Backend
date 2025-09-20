@@ -21,16 +21,28 @@ const groupLedgerId = Joi.string().required().messages({
   "string.base": "Group Ledger ID must be a string.",
 });
 
-const rateAsPerIncomeTaxAct = Joi.number().min(0).required().messages({
-  "number.base": `"Rate As Per Income Tax Act" must be a number`,
-  "number.min": `"Rate As Per Income Tax Act" cannot be negative`,
-  "any.required": `"Rate As Per Income Tax Act" is required`,
+const chargeDepreciation = Joi.boolean().required().messages({
+  "any.required": "Charge Depreciation is required.",
+  "boolean.base": "Charge Depreciation must be true or false.",
 });
 
-const rateAsPerICAI = Joi.number().min(0).required().messages({
+const entryAutomation = Joi.boolean().required().messages({
+  "any.required": "Entry Automation is required.",
+  "boolean.base": "Entry Automation must be true or false.",
+});
+
+const rateAsPerIncomeTaxAct = Joi.number()
+  .min(0)
+  .allow(null)
+  .optional()
+  .messages({
+    "number.base": `"Rate As Per Income Tax Act" must be a number`,
+    "number.min": `"Rate As Per Income Tax Act" cannot be negative`,
+  });
+
+const rateAsPerICAI = Joi.number().min(0).allow(null).optional().messages({
   "number.base": `"Rate As Per ICAI" must be a number`,
   "number.min": `"Rate As Per ICAI" cannot be negative`,
-  "any.required": `"Rate As Per ICAI" is required`,
 });
 
 const DepreciationMasterValidator = Joi.object({
@@ -38,6 +50,8 @@ const DepreciationMasterValidator = Joi.object({
   rateAsPerICAI,
   ledgerId,
   groupLedgerId,
+  chargeDepreciation,
+  entryAutomation,
   academicYear: academicYearCreate,
 });
 
@@ -46,6 +60,8 @@ const DepreciationMasterValidatorUpdate = Joi.object({
   rateAsPerICAI,
   ledgerId,
   groupLedgerId,
+  chargeDepreciation,
+  entryAutomation,
   academicYear: academicYearUpdate,
 });
 

@@ -7,6 +7,46 @@ import DepreciationMaster from "../../models/DepreciationMaster.js";
 import GroupLedger from "../../models/GroupLedger.js";
 import moment from "moment";
 
+// example:
+//        entryDate	 HeadofAccount	BS&P&LLedger	GroupLedger	        Ledger               OpeningBalance.  debit  credit  closingBalance
+//entry-1 01-04-2025	Assets	      Fixed Assets	Furniture&Fixture	  ElectricalEquipemts  1000             100    0        1100
+//entry-2 02-04-2025	Assets	      Fixed Assets	Furniture&Fixture	  ElectricalEquipemts  1100             100    0        1200
+//entry-1 01-08-2025	Assets	      Fixed Assets	Furniture&Fixture	  ElectricalEquipemts  1200             100    0        1300
+//entry-2 02-08-2025	Assets	      Fixed Assets	Furniture&Fixture	  ElectricalEquipemts  1300             100    0        1400
+
+// see here i am getting correct openingBalance, ClosingBalance, Toatl Addition, firstHalf ,second Half , openingBalanceOfDepriciation and depreciationOnAddition
+// now i want one more field totalDepriciation = openingBalanceOfDepriciation +  depreciationOnAddition
+// now i want one more field closingDepriciation = openingBalance + totalAddition -  totalDepriciation
+//
+// so how to do it...see other things are perfectly fine so no need to chnage just add this filed as i need in respnse
+
+//
+// [
+//     {
+//         "bSPLLedgerId": "6888dae7481f4c4cfb3716c3",
+//         "bSPLLedgerName": "Fixed Assets",
+//         "groupLedgers": [
+//             {
+//                 "groupLedgerId": "6888dae7481f4c4cfb3716d9",
+//                 "groupLedgerName": "Furniture & Fixture",
+//                 "rate":10,
+//                 firstHalf: debit(100+100)-credit(0+0)=200.   here in first half data must be from 01-04 to 30-09
+//                 secondHalf:debit(100+100)-credit(0+0)=200.   here in first half data must be from 01-10 to 31-03
+//                 openingBalance:1000
+//                 closingBalance:1400
+//                 "totalAddition":(100+100+100+100=400)-(0+0+0+0=0)=400
+//                 openingBalanceOfDepriciation= (10*1000)=10000/100=100
+//                 depreciationOnAddition= 100
+//                totalDepriciation= 200+100=300
+//                closingDepriciation;1000+400-300=1100
+
+//             },
+//         ]
+//     },
+// ]
+
+// tell me how to do it
+
 async function getFixedAssetsSchedule(req, res) {
   try {
     const schoolId = req.user?.schoolId;
@@ -53,6 +93,19 @@ async function getFixedAssetsSchedule(req, res) {
         message: "End date cannot be before start date.",
       });
     }
+
+    // Calculate first half and second half dates
+    const firstHalfStart = academicYearStart.clone(); // April 1
+    const firstHalfEnd = moment(
+      `09/30/${academicYear.split("-")[0]}`,
+      "MM/DD/YYYY"
+    ).endOf("day"); // September 30
+
+    const secondHalfStart = moment(
+      `10/01/${academicYear.split("-")[0]}`,
+      "MM/DD/YYYY"
+    ).startOf("day"); // October 1
+    const secondHalfEnd = academicYearEnd.clone(); // March 31
 
     // Step 1: Get the Fixed Assets BSPLLedger
     const fixedAssetsBSPL = await BSPLLedger.findOne({
@@ -131,15 +184,20 @@ async function getFixedAssetsSchedule(req, res) {
     const balancesByGroupLedger = {};
 
     groupLedgers.forEach((groupLedger) => {
+      const rate = depreciationRateMap[groupLedger._id.toString()] || 0;
       balancesByGroupLedger[groupLedger._id.toString()] = {
         groupLedgerId: groupLedger._id,
         groupLedgerName: groupLedger.groupLedgerName,
-        rate: depreciationRateMap[groupLedger._id.toString()] || 0,
+        rate: rate,
         openingBalance: 0,
         totalDebit: 0,
         totalCredit: 0,
         closingBalance: 0,
         totalAddition: 0,
+        firstHalf: 0,
+        secondHalf: 0,
+        openingBalanceOfDepreciation: 0, // Add new field
+        depreciationOnAddition: 0, // Add new field
       };
     });
 
@@ -158,6 +216,10 @@ async function getFixedAssetsSchedule(req, res) {
       let closingBalance = openingBalance;
       let totalDebit = 0;
       let totalCredit = 0;
+      let firstHalfDebit = 0;
+      let firstHalfCredit = 0;
+      let secondHalfDebit = 0;
+      let secondHalfCredit = 0;
 
       if (ocbRecord) {
         // Sort balanceDetails by entryDate to get chronological order
@@ -189,6 +251,21 @@ async function getFixedAssetsSchedule(req, res) {
           totalDebit += balanceDetail.debit || 0;
           totalCredit += balanceDetail.credit || 0;
           closingBalance = balanceDetail.closingBalance;
+
+          // Calculate first half and second half amounts
+          const entryDate = moment(balanceDetail.entryDate);
+
+          if (entryDate.isBetween(firstHalfStart, firstHalfEnd, null, "[]")) {
+            // Entry is in first half (April 1 - September 30)
+            firstHalfDebit += balanceDetail.debit || 0;
+            firstHalfCredit += balanceDetail.credit || 0;
+          } else if (
+            entryDate.isBetween(secondHalfStart, secondHalfEnd, null, "[]")
+          ) {
+            // Entry is in second half (October 1 - March 31)
+            secondHalfDebit += balanceDetail.debit || 0;
+            secondHalfCredit += balanceDetail.credit || 0;
+          }
         }
       }
 
@@ -197,16 +274,43 @@ async function getFixedAssetsSchedule(req, res) {
       balancesByGroupLedger[groupLedgerId].totalDebit += totalDebit;
       balancesByGroupLedger[groupLedgerId].totalCredit += totalCredit;
       balancesByGroupLedger[groupLedgerId].closingBalance += closingBalance;
+      balancesByGroupLedger[groupLedgerId].firstHalf +=
+        firstHalfDebit - firstHalfCredit;
+      balancesByGroupLedger[groupLedgerId].secondHalf +=
+        secondHalfDebit - secondHalfCredit;
     }
 
-    // Calculate totalAddition for each group ledger
+    // Calculate totalAddition, openingBalanceOfDepreciation, and depreciationOnAddition for each group ledger
     Object.keys(balancesByGroupLedger).forEach((key) => {
       const groupLedger = balancesByGroupLedger[key];
+      const rate = groupLedger.rate;
+
       groupLedger.totalAddition =
         groupLedger.totalDebit - groupLedger.totalCredit;
+
+      // Calculate openingBalanceOfDepreciation: (rate * openingBalance) / 100
+      groupLedger.openingBalanceOfDepreciation =
+        (rate * groupLedger.openingBalance) / 100;
+
+      // Calculate depreciationOnAddition according to the formula:
+      // ((rate * firstHalf)/100) + ((rate * secondHalf)/100)/2
+      const firstHalfDepreciation = (rate * groupLedger.firstHalf) / 100;
+      const secondHalfDepreciation = (rate * groupLedger.secondHalf) / 100;
+      groupLedger.depreciationOnAddition =
+        firstHalfDepreciation + secondHalfDepreciation / 2;
+
+      groupLedger.totalDepreciation =
+        groupLedger.openingBalanceOfDepreciation +
+        groupLedger.depreciationOnAddition;
+
+      // Calculate closingDepreciation: openingBalance + totalAddition - totalDepreciation
+      groupLedger.closingDepreciation =
+        groupLedger.openingBalance +
+        groupLedger.totalAddition -
+        groupLedger.totalDepreciation;
+
       result.groupLedgers.push(groupLedger);
     });
-
     return res.status(200).json({
       hasError: false,
       message: "Fixed Assets Schedule fetched successfully",

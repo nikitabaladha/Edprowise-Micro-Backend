@@ -32,8 +32,12 @@ async function create(req, res) {
       ledgerId,
       rateAsPerIncomeTaxAct,
       rateAsPerICAI,
+      chargeDepreciation,
+      entryAutomation,
       academicYear,
     } = req.body;
+
+    // from frontend i will send true or false for them
 
     // Create new document with all required fields
     const newDepreciationMaster = new DepreciationMaster({
@@ -42,6 +46,8 @@ async function create(req, res) {
       ledgerId,
       rateAsPerIncomeTaxAct,
       rateAsPerICAI,
+      chargeDepreciation,
+      entryAutomation,
       academicYear,
     });
 
