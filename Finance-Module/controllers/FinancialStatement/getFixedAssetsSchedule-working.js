@@ -7,6 +7,46 @@ import DepreciationMaster from "../../models/DepreciationMaster.js";
 import GroupLedger from "../../models/GroupLedger.js";
 import moment from "moment";
 
+// example:
+//        entryDate	 HeadofAccount	BS&P&LLedger	GroupLedger	        Ledger               OpeningBalance.  debit  credit  closingBalance
+//entry-1 01-04-2025	Assets	      Fixed Assets	Furniture&Fixture	  ElectricalEquipemts  1000             100    0        1100
+//entry-2 02-04-2025	Assets	      Fixed Assets	Furniture&Fixture	  ElectricalEquipemts  1100             100    0        1200
+//entry-1 01-08-2025	Assets	      Fixed Assets	Furniture&Fixture	  ElectricalEquipemts  1200             100    0        1300
+//entry-2 02-08-2025	Assets	      Fixed Assets	Furniture&Fixture	  ElectricalEquipemts  1300             100    0        1400
+
+// see here i am getting correct openingBalance, ClosingBalance, Toatl Addition, firstHalf ,second Half , openingBalanceOfDepriciation and depreciationOnAddition
+// now i want one more field totalDepriciation = openingBalanceOfDepriciation +  depreciationOnAddition
+// now i want one more field closingDepriciation = openingBalance + totalAddition -  totalDepriciation
+//
+// so how to do it...see other things are perfectly fine so no need to chnage just add this filed as i need in respnse
+
+//
+// [
+//     {
+//         "bSPLLedgerId": "6888dae7481f4c4cfb3716c3",
+//         "bSPLLedgerName": "Fixed Assets",
+//         "groupLedgers": [
+//             {
+//                 "groupLedgerId": "6888dae7481f4c4cfb3716d9",
+//                 "groupLedgerName": "Furniture & Fixture",
+//                 "rate":10,
+//                 firstHalf: debit(100+100)-credit(0+0)=200.   here in first half data must be from 01-04 to 30-09
+//                 secondHalf:debit(100+100)-credit(0+0)=200.   here in first half data must be from 01-10 to 31-03
+//                 openingBalance:1000
+//                 closingBalance:1400
+//                 "totalAddition":(100+100+100+100=400)-(0+0+0+0=0)=400
+//                 openingBalanceOfDepriciation= (10*1000)=10000/100=100
+//                 depreciationOnAddition= 100
+//                totalDepriciation= 200+100=300
+//                closingDepriciation;1000+400-300=1100
+
+//             },
+//         ]
+//     },
+// ]
+
+// tell me how to do it
+
 async function getFixedAssetsSchedule(req, res) {
   try {
     const schoolId = req.user?.schoolId;
@@ -106,20 +146,9 @@ async function getFixedAssetsSchedule(req, res) {
 
     // Create a map for easy access to depreciation rates by groupLedgerId
     const depreciationRateMap = {};
-    const chargeDepreciationMap = {};
-
     depreciationRates.forEach((dr) => {
-      // Use whichever rate is greater than 0, prefer rateAsPerIncomeTaxAct if both are > 0
-      let rate = 0;
-      if (dr.rateAsPerIncomeTaxAct > 0) {
-        rate = dr.rateAsPerIncomeTaxAct;
-      } else if (dr.rateAsPerICAI > 0) {
-        rate = dr.rateAsPerICAI;
-      }
-
-      depreciationRateMap[dr.groupLedgerId.toString()] = rate;
-      chargeDepreciationMap[dr.groupLedgerId.toString()] =
-        dr.chargeDepreciation;
+      depreciationRateMap[dr.groupLedgerId.toString()] =
+        dr.rateAsPerIncomeTaxAct;
     });
 
     // Step 4: Get all ledgers under these group ledgers
@@ -156,13 +185,10 @@ async function getFixedAssetsSchedule(req, res) {
 
     groupLedgers.forEach((groupLedger) => {
       const rate = depreciationRateMap[groupLedger._id.toString()] || 0;
-      const chargeDepreciation =
-        chargeDepreciationMap[groupLedger._id.toString()] || false;
       balancesByGroupLedger[groupLedger._id.toString()] = {
         groupLedgerId: groupLedger._id,
         groupLedgerName: groupLedger.groupLedgerName,
         rate: rate,
-        chargeDepreciation: chargeDepreciation,
         openingBalance: 0,
         totalDebit: 0,
         totalCredit: 0,
