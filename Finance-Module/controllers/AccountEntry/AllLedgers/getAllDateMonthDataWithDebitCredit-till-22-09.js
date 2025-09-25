@@ -16,8 +16,21 @@ import AuthorisedSignature from "../../../models/AuthorisedSignature.js";
 
 async function getAllDateMonthDataWithDebitCredit(req, res) {
   try {
+    console.log(
+      "Test endpoint hit with query==============================:",
+      req.query
+    );
+
     const schoolId = req.user?.schoolId;
     const { month, academicYear, specificDate, startDate, endDate } = req.query;
+
+    console.log("Received parameters===========================:", {
+      month,
+      academicYear,
+      specificDate,
+      startDate,
+      endDate,
+    });
 
     if (!schoolId) {
       return res.status(401).json({
@@ -51,6 +64,18 @@ async function getAllDateMonthDataWithDebitCredit(req, res) {
       const endOfDay = new Date(specificDateObj);
       endOfDay.setUTCHours(23, 59, 59, 999);
 
+      console.log(
+        "Date range for specific date filter==============================:"
+      );
+      console.log(
+        "Start of day (UTC============================):",
+        startOfDay.toISOString()
+      );
+      console.log(
+        "End of day (UTC===========================):",
+        endOfDay.toISOString()
+      );
+
       baseQuery.entryDate = {
         $gte: startOfDay,
         $lte: endOfDay,
@@ -62,6 +87,10 @@ async function getAllDateMonthDataWithDebitCredit(req, res) {
 
       startDateObj.setUTCHours(0, 0, 0, 0);
       endDateObj.setUTCHours(23, 59, 59, 999);
+
+      console.log("Custom date range filter:");
+      console.log("Start:", startDateObj.toISOString());
+      console.log("End:", endDateObj.toISOString());
 
       baseQuery.entryDate = {
         $gte: startDateObj,
@@ -256,52 +285,53 @@ async function getAllDateMonthDataWithDebitCredit(req, res) {
       let TDSorTCSOpeningBalance = null;
       let TDSorTCSBalanceType = null;
 
-      if (entry.TDSorTCS && entry.TDSorTCSLedgerId) {
-        // Find the TDS/TCS Ledger using the stored ID
-        const tdsOrTcsLedger = await Ledger.findOne({
-          _id: entry.TDSorTCSLedgerId,
+      if (entry.TDSorTCS) {
+        // 1. Find GroupLedger by name
+        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
           schoolId,
+          groupLedgerName: entry.TDSorTCS,
         })
-          .select(
-            "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance balanceType"
-          )
+          .select("_id groupLedgerName")
           .lean();
 
-        if (tdsOrTcsLedger) {
-          TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
-          TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || null;
-          TDSorTCSBalanceType = tdsOrTcsLedger.balanceType || null;
+        if (tdsOrTcsGroupLedger) {
+          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
 
-          // Find GroupLedger
-          const tdsOrTcsGroupLedger = await GroupLedger.findOne({
-            _id: tdsOrTcsLedger.groupLedgerId,
+          // 2. Find Ledger under that GroupLedger
+          const tdsOrTcsLedger = await Ledger.findOne({
             schoolId,
+            groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("groupLedgerName")
+            .select(
+              "ledgerName headOfAccountId bSPLLedgerId openingBalance balanceType"
+            )
             .lean();
 
-          if (tdsOrTcsGroupLedger) {
-            TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+          if (tdsOrTcsLedger) {
+            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+            TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || 0;
+            TDSorTCSBalanceType = tdsOrTcsLedger.balanceType || null;
+
+            // Get headOfAccountName
+            const headOfAccount = tdsOrTcsLedger.headOfAccountId
+              ? await HeadOfAccount.findOne({
+                  _id: tdsOrTcsLedger.headOfAccountId,
+                })
+                  .select("headOfAccountName")
+                  .lean()
+              : null;
+
+            // Get bSPLLedgerName
+            const bsplLedger = tdsOrTcsLedger.bSPLLedgerId
+              ? await BSPLLedger.findOne({ _id: tdsOrTcsLedger.bSPLLedgerId })
+                  .select("bSPLLedgerName")
+                  .lean()
+              : null;
+
+            TDSorTCSHeadOfAccountName =
+              headOfAccount?.headOfAccountName || null;
+            TDSorTCSBSPLLedgerName = bsplLedger?.bSPLLedgerName || null;
           }
-
-          // Find HeadOfAccount
-          const headOfAccount = tdsOrTcsLedger.headOfAccountId
-            ? await HeadOfAccount.findOne({
-                _id: tdsOrTcsLedger.headOfAccountId,
-              })
-                .select("headOfAccountName")
-                .lean()
-            : null;
-
-          // Find BSPLLedger
-          const bsplLedger = tdsOrTcsLedger.bSPLLedgerId
-            ? await BSPLLedger.findOne({ _id: tdsOrTcsLedger.bSPLLedgerId })
-                .select("bSPLLedgerName")
-                .lean()
-            : null;
-
-          TDSorTCSHeadOfAccountName = headOfAccount?.headOfAccountName || null;
-          TDSorTCSBSPLLedgerName = bsplLedger?.bSPLLedgerName || null;
         }
       }
 
@@ -525,54 +555,52 @@ async function getAllDateMonthDataWithDebitCredit(req, res) {
       let TDSorTCSOpeningBalance = null;
       let TDSorTCSBalanceType = null;
 
-      // Use the stored TDSorTCSLedgerId from Receipt table
-
-      if (entry.TDSorTCS && entry.TDSorTCSLedgerId) {
-        // Find the TDS/TCS Ledger using the stored ID
-        const tdsOrTcsLedger = await Ledger.findOne({
-          _id: entry.TDSorTCSLedgerId,
+      if (entry.TDSorTCS) {
+        // 1. Find GroupLedger by name
+        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
           schoolId,
+          groupLedgerName: entry.TDSorTCS,
         })
-          .select(
-            "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance balanceType"
-          )
+          .select("_id groupLedgerName")
           .lean();
 
-        if (tdsOrTcsLedger) {
-          TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
-          TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || null;
-          TDSorTCSBalanceType = tdsOrTcsLedger.balanceType || null;
+        if (tdsOrTcsGroupLedger) {
+          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
 
-          // Find GroupLedger
-          const tdsOrTcsGroupLedger = await GroupLedger.findOne({
-            _id: tdsOrTcsLedger.groupLedgerId,
+          // 2. Find Ledger under that GroupLedger
+          const tdsOrTcsLedger = await Ledger.findOne({
             schoolId,
+            groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("groupLedgerName")
+            .select(
+              "ledgerName headOfAccountId bSPLLedgerId openingBalance balanceType"
+            )
             .lean();
 
-          if (tdsOrTcsGroupLedger) {
-            TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+          if (tdsOrTcsLedger) {
+            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+            TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || null;
+            TDSorTCSBalanceType = tdsOrTcsLedger.balanceType || null;
+
+            const headOfAccount = tdsOrTcsLedger.headOfAccountId
+              ? await HeadOfAccount.findOne({
+                  _id: tdsOrTcsLedger.headOfAccountId,
+                })
+                  .select("headOfAccountName")
+                  .lean()
+              : null;
+
+            // Get bSPLLedgerName
+            const bsplLedger = tdsOrTcsLedger.bSPLLedgerId
+              ? await BSPLLedger.findOne({ _id: tdsOrTcsLedger.bSPLLedgerId })
+                  .select("bSPLLedgerName")
+                  .lean()
+              : null;
+
+            TDSorTCSHeadOfAccountName =
+              headOfAccount?.headOfAccountName || null;
+            TDSorTCSBSPLLedgerName = bsplLedger?.bSPLLedgerName || null;
           }
-
-          // Find HeadOfAccount
-          const headOfAccount = tdsOrTcsLedger.headOfAccountId
-            ? await HeadOfAccount.findOne({
-                _id: tdsOrTcsLedger.headOfAccountId,
-              })
-                .select("headOfAccountName")
-                .lean()
-            : null;
-
-          // Find BSPLLedger
-          const bsplLedger = tdsOrTcsLedger.bSPLLedgerId
-            ? await BSPLLedger.findOne({ _id: tdsOrTcsLedger.bSPLLedgerId })
-                .select("bSPLLedgerName")
-                .lean()
-            : null;
-
-          TDSorTCSHeadOfAccountName = headOfAccount?.headOfAccountName || null;
-          TDSorTCSBSPLLedgerName = bsplLedger?.bSPLLedgerName || null;
         }
       }
 
@@ -797,6 +825,7 @@ async function getAllDateMonthDataWithDebitCredit(req, res) {
         });
       }
 
+      // Handle TDS/TCS information if present
       let TDSorTCSGroupLedgerName = null;
       let TDSorTCSLedgerName = null;
       let TDSorTCSHeadOfAccountName = null;
@@ -804,54 +833,51 @@ async function getAllDateMonthDataWithDebitCredit(req, res) {
       let TDSorTCSOpeningBalance = null;
       let TDSorTCSBalanceType = null;
 
-      // Use the stored TDSorTCSLedgerId from Receipt table
-
-      if (entry.TDSorTCS && entry.TDSorTCSLedgerId) {
-        // Find the TDS/TCS Ledger using the stored ID
-        const tdsOrTcsLedger = await Ledger.findOne({
-          _id: entry.TDSorTCSLedgerId,
+      if (entry.TDSorTCS) {
+        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
           schoolId,
+          groupLedgerName: entry.TDSorTCS,
         })
-          .select(
-            "ledgerName groupLedgerId headOfAccountId bSPLLedgerId openingBalance balanceType"
-          )
+          .select("_id groupLedgerName")
           .lean();
 
-        if (tdsOrTcsLedger) {
-          TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
-          TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || null;
-          TDSorTCSBalanceType = tdsOrTcsLedger.balanceType || null;
+        if (tdsOrTcsGroupLedger) {
+          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
 
-          // Find GroupLedger
-          const tdsOrTcsGroupLedger = await GroupLedger.findOne({
-            _id: tdsOrTcsLedger.groupLedgerId,
+          const tdsOrTcsLedger = await Ledger.findOne({
             schoolId,
+            groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("groupLedgerName")
+            .select(
+              "ledgerName headOfAccountId bSPLLedgerId openingBalance balanceType"
+            )
             .lean();
 
-          if (tdsOrTcsGroupLedger) {
-            TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+          if (tdsOrTcsLedger) {
+            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+            TDSorTCSOpeningBalance = tdsOrTcsLedger.openingBalance || null;
+            TDSorTCSBalanceType = tdsOrTcsLedger.balanceType || null;
+
+            // Get headOfAccountName
+            const headOfAccount = tdsOrTcsLedger.headOfAccountId
+              ? await HeadOfAccount.findOne({
+                  _id: tdsOrTcsLedger.headOfAccountId,
+                })
+                  .select("headOfAccountName")
+                  .lean()
+              : null;
+
+            // Get bSPLLedgerName
+            const bsplLedger = tdsOrTcsLedger.bSPLLedgerId
+              ? await BSPLLedger.findOne({ _id: tdsOrTcsLedger.bSPLLedgerId })
+                  .select("bSPLLedgerName")
+                  .lean()
+              : null;
+
+            TDSorTCSHeadOfAccountName =
+              headOfAccount?.headOfAccountName || null;
+            TDSorTCSBSPLLedgerName = bsplLedger?.bSPLLedgerName || null;
           }
-
-          // Find HeadOfAccount
-          const headOfAccount = tdsOrTcsLedger.headOfAccountId
-            ? await HeadOfAccount.findOne({
-                _id: tdsOrTcsLedger.headOfAccountId,
-              })
-                .select("headOfAccountName")
-                .lean()
-            : null;
-
-          // Find BSPLLedger
-          const bsplLedger = tdsOrTcsLedger.bSPLLedgerId
-            ? await BSPLLedger.findOne({ _id: tdsOrTcsLedger.bSPLLedgerId })
-                .select("bSPLLedgerName")
-                .lean()
-            : null;
-
-          TDSorTCSHeadOfAccountName = headOfAccount?.headOfAccountName || null;
-          TDSorTCSBSPLLedgerName = bsplLedger?.bSPLLedgerName || null;
         }
       }
 

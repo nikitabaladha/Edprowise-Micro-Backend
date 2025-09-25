@@ -1,14 +1,31 @@
 import mongoose from "mongoose";
-import Contra from "../../../models/Contra.js";
-import ContraValidator from "../../../validators/ContraValidator.js";
+import moment from "moment";
+import Receipt from "../../../models/Receipt.js";
+import ReceiptValidator from "../../../validators/ReceiptValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
 
-async function generateContraVoucherNumber(schoolId, academicYear) {
-  const count = await Contra.countDocuments({ schoolId, academicYear });
+async function generateReceiptVoucherNumber(schoolId, academicYear) {
+  const count = await Receipt.countDocuments({ schoolId, academicYear });
   const nextNumber = count + 1;
-  return `CVN/${academicYear}/${nextNumber}`;
+  return `RVN/${academicYear}/${nextNumber}`;
+}
+
+async function generateTransactionNumber() {
+  const now = moment();
+  const dateTimeStr = now.format("DDMMYYYYHHmmss");
+  let baseTransactionNumber = `TRA-${dateTimeStr}`;
+  let transactionNumber = baseTransactionNumber;
+  let counter = 1;
+
+  while (await Receipt.exists({ transactionNumber })) {
+    const suffix = String(counter).padStart(2, "0");
+    transactionNumber = `${baseTransactionNumber}${suffix}`;
+    counter++;
+  }
+
+  return transactionNumber;
 }
 
 async function getOrCreateOpeningBalanceRecord(
@@ -65,7 +82,7 @@ async function updateOpeningClosingBalance(
   academicYear,
   ledgerId,
   entryDate,
-  contraId,
+  receiptId,
   debitAmount = 0,
   creditAmount = 0
 ) {
@@ -80,7 +97,7 @@ async function updateOpeningClosingBalance(
       entryDate
     );
 
-  // Determine effective opening balance
+  // --- FIX: Determine effective opening balance ---
   const previousBalanceDetails = record.balanceDetails
     .filter((detail) => new Date(detail.entryDate) <= new Date(entryDate))
     .sort((a, b) => new Date(b.entryDate) - new Date(a.entryDate));
@@ -90,7 +107,7 @@ async function updateOpeningClosingBalance(
     effectiveOpeningBalance = previousBalanceDetails[0].closingBalance;
   }
 
-  // Calculate closing balance
+  // --- Calculate closing balance ---
   let closingBalance;
   if (balanceType === "Debit") {
     closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
@@ -98,11 +115,11 @@ async function updateOpeningClosingBalance(
     closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
   }
 
-  // Check if exact same entry already exists
+  // --- Check if exact same entry already exists ---
   const existingEntryIndex = record.balanceDetails.findIndex(
     (detail) =>
       new Date(detail.entryDate).getTime() === new Date(entryDate).getTime() &&
-      detail.entryId?.toString() === contraId.toString()
+      detail.entryId?.toString() === receiptId.toString()
   );
 
   if (existingEntryIndex !== -1) {
@@ -112,7 +129,7 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: contraId,
+      entryId: receiptId, // Store Receipt _id as entryId
     };
   } else {
     const newBalanceDetail = {
@@ -121,7 +138,7 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: contraId,
+      entryId: receiptId, // Store Receipt _id as entryId
     };
 
     record.balanceDetails.push(newBalanceDetail);
@@ -193,6 +210,24 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
   await record.save();
 }
 
+function aggregateAmountsByLedger(itemDetails) {
+  const ledgerMap = new Map();
+
+  itemDetails.forEach((item) => {
+    const ledgerId = item.ledgerId.toString();
+    const amount = parseFloat(item.amount) || 0;
+
+    if (ledgerMap.has(ledgerId)) {
+      ledgerMap.set(ledgerId, ledgerMap.get(ledgerId) + amount);
+    } else {
+      ledgerMap.set(ledgerId, amount);
+    }
+  });
+
+  return ledgerMap;
+}
+
+// NEW FUNCTION: Recalculate all balances for a ledger after a specific date
 async function recalculateAllBalancesAfterDate(
   schoolId,
   academicYear,
@@ -251,59 +286,7 @@ async function recalculateAllBalancesAfterDate(
   await record.save();
 }
 
-function aggregateAmountsByLedger(itemDetails) {
-  const ledgerMap = new Map();
-
-  itemDetails.forEach((item) => {
-    const ledgerId = item.ledgerId.toString();
-    const debitAmount = parseFloat(item.debitAmount) || 0;
-    const creditAmount = parseFloat(item.creditAmount) || 0;
-
-    if (ledgerMap.has(ledgerId)) {
-      const existing = ledgerMap.get(ledgerId);
-      ledgerMap.set(ledgerId, {
-        debitAmount: existing.debitAmount + debitAmount,
-        creditAmount: existing.creditAmount + creditAmount,
-      });
-    } else {
-      ledgerMap.set(ledgerId, {
-        debitAmount: debitAmount,
-        creditAmount: creditAmount,
-      });
-    }
-  });
-
-  return ledgerMap;
-}
-
-function aggregateCashAccountAmounts(itemDetails) {
-  const cashAccountMap = new Map();
-
-  itemDetails.forEach((item) => {
-    if (item.ledgerIdOfCashAccount) {
-      const cashAccountId = item.ledgerIdOfCashAccount.toString();
-      const debitAmount = parseFloat(item.debitAmount) || 0;
-      const creditAmount = parseFloat(item.creditAmount) || 0;
-
-      if (cashAccountMap.has(cashAccountId)) {
-        const existing = cashAccountMap.get(cashAccountId);
-        cashAccountMap.set(cashAccountId, {
-          debitAmount: existing.debitAmount + debitAmount,
-          creditAmount: existing.creditAmount + creditAmount,
-        });
-      } else {
-        cashAccountMap.set(cashAccountId, {
-          debitAmount: debitAmount,
-          creditAmount: creditAmount,
-        });
-      }
-    }
-  });
-
-  return cashAccountMap;
-}
-
-export async function create(req, res) {
+async function create(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -319,7 +302,7 @@ export async function create(req, res) {
       });
     }
 
-    const { error } = ContraValidator.ContraValidator.validate(req.body);
+    const { error } = ReceiptValidator.ReceiptValidator.validate(req.body);
     if (error) {
       const errorMessages = error.details.map((err) => err.message).join(", ");
       await session.abortTransaction();
@@ -332,243 +315,211 @@ export async function create(req, res) {
 
     const {
       entryDate,
-      contraEntryName,
-      dateOfCashDepositedWithdrawlDate,
+      receiptDate,
       narration,
+      paymentMode,
       chequeNumber,
       itemDetails,
       TDSorTCS,
-      TDSTCSRateAmount,
+      TDSTCSRateChartId,
+      TDSTCSRate,
       status,
+      TDSTCSRateWithAmount,
+      ledgerIdWithPaymentMode,
       academicYear,
+      totalAmount,
     } = req.body;
 
-    const ContraVoucherNumber = await generateContraVoucherNumber(
+    const receiptVoucherNumber = await generateReceiptVoucherNumber(
       schoolId,
       academicYear
     );
 
-    const { chequeImageForContra } = req.files || {};
+    const { receiptImage, chequeImageForReceipt } = req.files || {};
 
-    let chequeImageForContraFullPath = "";
-    if (chequeImageForContra?.[0]) {
-      const basePath = chequeImageForContra[0].mimetype.startsWith("image/")
-        ? "/Images/FinanceModule/chequeImageForContra"
-        : "/Documents/FinanceModule/chequeImageForContra";
-      chequeImageForContraFullPath = `${basePath}/${chequeImageForContra[0].filename}`;
+    let receiptImageFullPath = null;
+    if (receiptImage?.[0]) {
+      const receiptImagePath = receiptImage[0].mimetype.startsWith("image/")
+        ? "/Images/FinanceModule/ReceiptImage"
+        : "/Documents/FinanceModule/ReceiptImage";
+
+      receiptImageFullPath = `${receiptImagePath}/${receiptImage[0].filename}`;
+    }
+
+    let chequeImageForReceiptFullPath = null;
+    if (chequeImageForReceipt?.[0]) {
+      const chequeImageForReceiptPath =
+        chequeImageForReceipt[0].mimetype.startsWith("image/")
+          ? "/Images/FinanceModule/chequeImageForReceipt"
+          : "/Documents/FinanceModule/chequeImageForReceipt";
+
+      chequeImageForReceiptFullPath = `${chequeImageForReceiptPath}/${chequeImageForReceipt[0].filename}`;
     }
 
     const updatedItemDetails = itemDetails.map((item) => ({
       ...item,
-      debitAmount: parseFloat(item.debitAmount) || 0,
-      creditAmount: parseFloat(item.creditAmount) || 0,
+      amount: parseFloat(item.amount) || 0,
     }));
 
-    const subTotalOfDebit = updatedItemDetails.reduce(
-      (sum, item) => sum + item.debitAmount,
+    const subTotalAmount = updatedItemDetails.reduce(
+      (sum, item) => sum + (parseFloat(item.amount) || 0),
       0
     );
 
-    const subTotalOfCredit = updatedItemDetails.reduce(
-      (sum, item) => sum + item.creditAmount,
-      0
-    );
+    const transactionNumber =
+      paymentMode === "Online" ? await generateTransactionNumber() : null;
 
-    const totalAmountOfDebit =
-      subTotalOfDebit + (parseFloat(TDSTCSRateAmount) || 0);
-    const totalAmountOfCredit = subTotalOfCredit;
-
-    if (totalAmountOfDebit !== totalAmountOfCredit) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        hasError: true,
-        message: "Total Debit and Credit amounts must be equal.",
-      });
-    }
-
-    if (["Cash Deposited", "Cash Withdrawn"].includes(contraEntryName)) {
-      const missingCashAccount = updatedItemDetails.some(
-        (item) => !item.ledgerIdOfCashAccount
-      );
-      if (missingCashAccount) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({
-          hasError: true,
-          message:
-            "ledgerIdOfCashAccount is required for Cash Deposited or Cash Withdrawn entries.",
-        });
-      }
-    }
-
-    let TDSorTCSLedgerId = null;
-
-    if (TDSorTCS && TDSTCSRateAmount > 0) {
-      // Search for "TDS on Receipts" or "TCS on Receipts" ledger
-      const ledgerNameToFind =
-        TDSorTCS === "TDS" ? "TDS on Cash Withdrawn/Deposited" : "TCS";
-
-      // Find the ledger with exact name match
-      let tdsTcsLedgerToUpdate = await Ledger.findOne({
-        schoolId,
-        academicYear,
-        ledgerName: { $regex: new RegExp(`^${ledgerNameToFind}$`, "i") },
-      });
-
-      if (!tdsTcsLedgerToUpdate) {
-        throw new Error(
-          `${ledgerNameToFind} Ledger not found for school ${schoolId} and academic year ${academicYear}`
-        );
-      }
-
-      TDSorTCSLedgerId = tdsTcsLedgerToUpdate._id.toString();
-    }
-
-    const newContra = new Contra({
+    const newReceipt = new Receipt({
       schoolId,
-      contraVoucherNumber: ContraVoucherNumber,
-      contraEntryName,
+      receiptVoucherNumber,
       entryDate,
-      dateOfCashDepositedWithdrawlDate,
+      receiptDate,
       narration,
+      paymentMode,
       chequeNumber,
+      transactionNumber,
       itemDetails: updatedItemDetails,
-      subTotalOfCredit: subTotalOfCredit,
-      subTotalOfDebit: subTotalOfDebit,
+      subTotalAmount,
       TDSorTCS,
-      TDSTCSRateAmount,
-      totalAmountOfDebit,
-      totalAmountOfCredit,
-      chequeImageForContra: chequeImageForContraFullPath,
+      TDSTCSRateChartId,
+      TDSTCSRate,
+      TDSTCSRateWithAmount,
+      totalAmount,
+      receiptImage: receiptImageFullPath,
+      chequeImageForReceipt: chequeImageForReceiptFullPath,
+      ledgerIdWithPaymentMode,
       status,
       academicYear,
-      TDSorTCSLedgerId,
     });
 
-    await newContra.save({ session });
+    await newReceipt.save({ session });
 
     // Store all ledger IDs that need to be updated
     const ledgerIdsToUpdate = new Set();
 
-    // Process based on contra entry type
-    if (contraEntryName === "Cash Deposited") {
-      const mainLedgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
-      for (const [ledgerId, amounts] of mainLedgerAmounts) {
-        // Debit the main ledger (aggregated)
-        await updateOpeningClosingBalance(
-          schoolId,
-          academicYear,
-          ledgerId,
-          newContra.entryDate,
-          newContra._id,
-          amounts.debitAmount, // Aggregated debit
-          0, // No credit for main ledger in Cash Deposited
-          session
-        );
-        ledgerIdsToUpdate.add(ledgerId);
-      }
+    // 1. Item Ledgers (Debit) - Aggregate amounts by ledgerId first
+    const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
+    // 1. Item Ledgers (Credit)
 
-      const cashAccountAmounts =
-        aggregateCashAccountAmounts(updatedItemDetails);
-      for (const [cashAccountId, amounts] of cashAccountAmounts) {
-        // Credit the cash account (aggregated)
-        await updateOpeningClosingBalance(
-          schoolId,
-          academicYear,
-          cashAccountId,
-          newContra.entryDate,
-          newContra._id,
-          0, // No debit for cash account in Cash Deposited
-          amounts.creditAmount, // Aggregated credit
-          session
-        );
-        ledgerIdsToUpdate.add(cashAccountId);
-      }
-    } else if (contraEntryName === "Cash Withdrawn") {
-      // For Cash Withdrawn: Credit main ledger, Debit cash account
-      const mainLedgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
-      for (const [ledgerId, amounts] of mainLedgerAmounts) {
-        // Credit the main ledger (aggregated)
-        await updateOpeningClosingBalance(
-          schoolId,
-          academicYear,
-          ledgerId,
-          newContra.entryDate,
-          newContra._id,
-          0, // No debit for main ledger in Cash Withdrawn
-          amounts.creditAmount, // Aggregated credit
-          session
-        );
-        ledgerIdsToUpdate.add(ledgerId);
-      }
-
-      // Aggregate cash account amounts
-      const cashAccountAmounts =
-        aggregateCashAccountAmounts(updatedItemDetails);
-      for (const [cashAccountId, amounts] of cashAccountAmounts) {
-        // Debit the cash account (aggregated)
-        await updateOpeningClosingBalance(
-          schoolId,
-          academicYear,
-          cashAccountId,
-          newContra.entryDate,
-          newContra._id,
-          amounts.debitAmount, // Aggregated debit
-          0, // No credit for cash account in Cash Withdrawn
-          session
-        );
-        ledgerIdsToUpdate.add(cashAccountId);
-      }
-    } else if (contraEntryName === "Bank Transfer") {
-      // For Bank Transfer: Process each item normally
-      const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
-      for (const [ledgerId, amounts] of ledgerAmounts) {
-        await updateOpeningClosingBalance(
-          schoolId,
-          academicYear,
-          ledgerId,
-          newContra.entryDate,
-          newContra._id,
-          amounts.debitAmount, // Aggregated debit
-          amounts.creditAmount, // Aggregated credit
-          session
-        );
-        ledgerIdsToUpdate.add(ledgerId.toString());
-      }
+    for (const [ledgerId, amount] of ledgerAmounts) {
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        ledgerId,
+        entryDate,
+        newReceipt._id,
+        0,
+        amount
+      );
+      ledgerIdsToUpdate.add(ledgerId);
     }
 
-    if (TDSorTCS && TDSTCSRateAmount > 0 && TDSorTCSLedgerId) {
+    // 2. TDS/TCS Ledger (Debit for TDS, Credit for TCS)
+    let tdsTcsLedgerId = null;
+    if (TDSorTCS && TDSTCSRateWithAmount > 0) {
+      // First try exact match (case insensitive)
+      let tdsTcsGroupLedger = await GroupLedger.findOne({
+        schoolId,
+        academicYear,
+        groupLedgerName: { $regex: new RegExp(`^${TDSorTCS}$`, "i") },
+      });
+
+      // If not found, try partial match
+      if (!tdsTcsGroupLedger) {
+        tdsTcsGroupLedger = await GroupLedger.findOne({
+          schoolId,
+          academicYear,
+          groupLedgerName: { $regex: new RegExp(TDSorTCS, "i") },
+        });
+      }
+
+      if (!tdsTcsGroupLedger) {
+        throw new Error(
+          `${TDSorTCS} GroupLedger not found for school ${schoolId} and academic year ${academicYear}`
+        );
+      }
+
+      // Find the ledger with exact match first
+      let tdsTcsLedgerToUpdate = await Ledger.findOne({
+        schoolId,
+        academicYear,
+        groupLedgerId: tdsTcsGroupLedger._id,
+        ledgerName: { $regex: new RegExp(`^${TDSorTCS}$`, "i") },
+      });
+
+      // If not found, get any ledger in this group
+      if (!tdsTcsLedgerToUpdate) {
+        tdsTcsLedgerToUpdate = await Ledger.findOne({
+          schoolId,
+          academicYear,
+          groupLedgerId: tdsTcsGroupLedger._id,
+        });
+      }
+
+      if (!tdsTcsLedgerToUpdate) {
+        throw new Error(
+          `${TDSorTCS} Ledger not found for GroupLedger ID ${tdsTcsGroupLedger._id}, school ${schoolId} and academic year ${academicYear}`
+        );
+      }
+
+      tdsTcsLedgerId = tdsTcsLedgerToUpdate._id.toString();
+
       if (TDSorTCS === "TDS") {
         // For TDS: Debit the TDS ledger
         await updateOpeningClosingBalance(
           schoolId,
           academicYear,
-          TDSorTCSLedgerId,
+          tdsTcsLedgerId,
           entryDate,
-          newContra._id,
-          Number(TDSTCSRateAmount),
-          0
+          newReceipt._id,
+          Number(TDSTCSRateWithAmount), // debit
+          0 // credit
         );
       } else if (TDSorTCS === "TCS") {
         // For TCS: Credit the TCS ledger
         await updateOpeningClosingBalance(
           schoolId,
           academicYear,
-          TDSorTCSLedgerId,
+          tdsTcsLedgerId,
           entryDate,
-          newContra._id,
-          0,
-          Number(TDSTCSRateAmount)
+          newReceipt._id,
+          0, // debit
+          Number(TDSTCSRateWithAmount) // credit
         );
       }
 
-      ledgerIdsToUpdate.add(TDSorTCSLedgerId);
+      ledgerIdsToUpdate.add(tdsTcsLedgerId);
     }
 
-    // Recalculate all ledgers that were updated
+    // 3. Payment Mode Ledger (Debit)
+
+    const tdsTcsAmount = Number(TDSTCSRateWithAmount) || 0;
+
+    let paymentAmount;
+    if (TDSorTCS === "TDS") {
+      paymentAmount = subTotalAmount - tdsTcsAmount;
+    } else if (TDSorTCS === "TCS") {
+      paymentAmount = subTotalAmount + tdsTcsAmount;
+    } else {
+      paymentAmount = subTotalAmount;
+    }
+
+    await updateOpeningClosingBalance(
+      schoolId,
+      academicYear,
+      ledgerIdWithPaymentMode,
+      entryDate,
+      newReceipt._id,
+      paymentAmount,
+      0
+    );
+    ledgerIdsToUpdate.add(ledgerIdWithPaymentMode.toString());
+
+    // --- Recalculate all ledgers that were updated ---
     for (const ledgerId of ledgerIdsToUpdate) {
       await recalculateLedgerBalances(schoolId, academicYear, ledgerId);
+
+      // Also recalculate all entries after this date to handle backdated entries
       await recalculateAllBalancesAfterDate(
         schoolId,
         academicYear,
@@ -582,8 +533,8 @@ export async function create(req, res) {
 
     return res.status(201).json({
       hasError: false,
-      message: "Contra created successfully!",
-      data: newContra,
+      message: "Receipt created successfully!",
+      data: newReceipt,
     });
   } catch (error) {
     await session.abortTransaction();
@@ -595,11 +546,11 @@ export async function create(req, res) {
         .join(", ");
       return res.status(400).json({
         hasError: true,
-        message: `Duplicate entry for ${field}. Contra already exists.`,
+        message: `Duplicate entry for ${field}. Receipt already exists.`,
       });
     }
 
-    console.error("Error creating Contra:", error);
+    console.error("Error creating Receipt:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",

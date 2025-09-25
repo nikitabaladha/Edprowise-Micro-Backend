@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import moment from "moment";
-import Receipt from "../../../models/Receipt.js";
-import ReceiptValidator from "../../../validators/ReceiptValidator.js";
+import PaymentEntry from "../../../models/PaymentEntry.js";
+import PaymentEntryValidator from "../../../validators/PaymentEntryValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
@@ -13,7 +13,7 @@ async function generateTransactionNumber() {
   let transactionNumber = baseTransactionNumber;
   let counter = 1;
 
-  while (await Receipt.exists({ transactionNumber })) {
+  while (await PaymentEntry.exists({ transactionNumber })) {
     const suffix = String(counter).padStart(2, "0");
     transactionNumber = `${baseTransactionNumber}${suffix}`;
     counter++;
@@ -27,12 +27,12 @@ function aggregateAmountsByLedger(itemDetails) {
 
   itemDetails.forEach((item) => {
     const ledgerId = item.ledgerId.toString();
-    const amount = parseFloat(item.amount) || 0;
+    const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
 
     if (ledgerMap.has(ledgerId)) {
-      ledgerMap.set(ledgerId, ledgerMap.get(ledgerId) + amount);
+      ledgerMap.set(ledgerId, ledgerMap.get(ledgerId) + amountAfterGST);
     } else {
-      ledgerMap.set(ledgerId, amount);
+      ledgerMap.set(ledgerId, amountAfterGST);
     }
   });
 
@@ -366,10 +366,10 @@ async function recalculateAllBalancesAfterDate(
   await record.save({ session });
 }
 
-async function removeReceiptEntryFromLedger(
+async function removePaymentEntryFromBalances(
   schoolId,
   academicYear,
-  receiptId,
+  paymentEntryId,
   ledgerId,
   session
 ) {
@@ -385,7 +385,7 @@ async function removeReceiptEntryFromLedger(
   // Remove the entry from balanceDetails
   const originalLength = record.balanceDetails.length;
   record.balanceDetails = record.balanceDetails.filter(
-    (detail) => detail.entryId?.toString() !== receiptId.toString()
+    (detail) => detail.entryId?.toString() !== paymentEntryId.toString()
   );
 
   if (record.balanceDetails.length === originalLength) return; // nothing removed
@@ -458,7 +458,7 @@ async function updateById(req, res) {
       });
     }
 
-    const { error } = ReceiptValidator.ReceiptValidatorUpdate.validate(
+    const { error } = PaymentValidator.PaymentValidatorUpdate.validate(
       req.body
     );
     if (error) {
@@ -487,52 +487,52 @@ async function updateById(req, res) {
       status,
     } = req.body;
 
-    const existingReceipt = await Receipt.findOne({
+    const existingPayment = await Payment.findOne({
       _id: id,
       schoolId,
       academicYear,
     }).session(session);
 
-    if (!existingReceipt) {
+    if (!existingPayment) {
       await session.abortTransaction();
       session.endSession();
       return res.status(404).json({
         hasError: true,
-        message: "Receipt not found.",
+        message: "Payment not found.",
       });
     }
 
     // --- Track old ledger IDs like Contra does ---
-    const oldItemLedgerIds = existingReceipt.itemDetails.map((item) =>
+    const oldItemLedgerIds = existingPayment.itemDetails.map((item) =>
       item.ledgerId?.toString()
     );
-    const oldTDSorTCSLedgerId = existingReceipt.TDSorTCSLedgerId?.toString();
+    const oldTDSorTCSLedgerId = existingPayment.TDSorTCSLedgerId?.toString();
     const oldPaymentModeLedgerId =
-      existingReceipt.ledgerIdWithPaymentMode?.toString();
+      existingPayment.ledgerIdWithPaymentMode?.toString();
 
     // Store old values for comparison
-    const oldEntryDate = existingReceipt.entryDate;
-    const oldItemDetails = existingReceipt.itemDetails;
-    const oldTDSorTCS = existingReceipt.TDSorTCS;
-    const oldTDSTCSRateWithAmount = existingReceipt.TDSTCSRateWithAmount;
-    const oldLedgerIdWithPaymentMode = existingReceipt.ledgerIdWithPaymentMode;
+    const oldEntryDate = existingPayment.entryDate;
+    const oldItemDetails = existingPayment.itemDetails;
+    const oldTDSorTCS = existingPayment.TDSorTCS;
+    const oldTDSTCSRateWithAmount = existingPayment.TDSTCSRateWithAmount;
+    const oldLedgerIdWithPaymentMode = existingPayment.ledgerIdWithPaymentMode;
 
     // Handle uploaded files
-    const { receiptImage, chequeImageForReceipt } = req.files || {};
+    const { receiptImage, chequeImageForPayment } = req.files || {};
 
     if (receiptImage?.[0]) {
       const receiptImagePath = receiptImage[0].mimetype.startsWith("image/")
-        ? "/Images/FinanceModule/ReceiptImage"
-        : "/Documents/FinanceModule/ReceiptImage";
-      existingReceipt.receiptImage = `${receiptImagePath}/${receiptImage[0].filename}`;
+        ? "/Images/FinanceModule/PaymentImage"
+        : "/Documents/FinanceModule/PaymentImage";
+      existingPayment.receiptImage = `${receiptImagePath}/${receiptImage[0].filename}`;
     }
 
-    if (chequeImageForReceipt?.[0]) {
-      const chequeImageForReceiptPath =
-        chequeImageForReceipt[0].mimetype.startsWith("image/")
-          ? "/Images/FinanceModule/ChequeImageForReceipt"
-          : "/Documents/FinanceModule/ChequeImageForReceipt";
-      existingReceipt.chequeImageForReceipt = `${chequeImageForReceiptPath}/${chequeImageForReceipt[0].filename}`;
+    if (chequeImageForPayment?.[0]) {
+      const chequeImageForPaymentPath =
+        chequeImageForPayment[0].mimetype.startsWith("image/")
+          ? "/Images/FinanceModule/ChequeImageForPayment"
+          : "/Documents/FinanceModule/ChequeImageForPayment";
+      existingPayment.chequeImageForPayment = `${chequeImageForPaymentPath}/${chequeImageForPayment[0].filename}`;
     }
 
     // Recalculate item details amounts
@@ -549,23 +549,23 @@ async function updateById(req, res) {
     const parsedTDSTCSRateWithAmount = parseFloat(TDSTCSRateWithAmount) || 0;
 
     // Update fields
-    existingReceipt.entryDate = entryDate;
-    existingReceipt.receiptDate = receiptDate;
-    existingReceipt.narration = narration;
-    existingReceipt.paymentMode = paymentMode;
-    existingReceipt.chequeNumber = chequeNumber;
-    existingReceipt.itemDetails = updatedItemDetails;
-    existingReceipt.TDSorTCS = TDSorTCS;
-    existingReceipt.TDSTCSRateChartId = TDSTCSRateChartId;
-    existingReceipt.TDSTCSRate = TDSTCSRate;
-    existingReceipt.TDSTCSRateWithAmount = parsedTDSTCSRateWithAmount;
-    existingReceipt.subTotalAmount = subTotalAmount;
-    existingReceipt.totalAmount = totalAmount;
-    existingReceipt.ledgerIdWithPaymentMode = ledgerIdWithPaymentMode;
-    existingReceipt.status = status;
+    existingPayment.entryDate = entryDate;
+    existingPayment.receiptDate = receiptDate;
+    existingPayment.narration = narration;
+    existingPayment.paymentMode = paymentMode;
+    existingPayment.chequeNumber = chequeNumber;
+    existingPayment.itemDetails = updatedItemDetails;
+    existingPayment.TDSorTCS = TDSorTCS;
+    existingPayment.TDSTCSRateChartId = TDSTCSRateChartId;
+    existingPayment.TDSTCSRate = TDSTCSRate;
+    existingPayment.TDSTCSRateWithAmount = parsedTDSTCSRateWithAmount;
+    existingPayment.subTotalAmount = subTotalAmount;
+    existingPayment.totalAmount = totalAmount;
+    existingPayment.ledgerIdWithPaymentMode = ledgerIdWithPaymentMode;
+    existingPayment.status = status;
 
-    if (paymentMode === "Online" && !existingReceipt.transactionNumber) {
-      existingReceipt.transactionNumber = await generateTransactionNumber();
+    if (paymentMode === "Online" && !existingPayment.transactionNumber) {
+      existingPayment.transactionNumber = await generateTransactionNumber();
     }
 
     // --- Step A: Reset old balances to zero first (like Contra does) ---
@@ -585,7 +585,7 @@ async function updateById(req, res) {
       await record.save({ session });
     }
 
-    await existingReceipt.save({ session });
+    await existingPayment.save({ session });
 
     // --- Step B: Remove old entries if ledgers changed or removed (like Contra) ---
 
@@ -599,7 +599,7 @@ async function updateById(req, res) {
     let newTDSorTCSLedgerId = null;
     if (TDSorTCS && parsedTDSTCSRateWithAmount > 0) {
       const ledgerNameToFind =
-        TDSorTCS === "TDS" ? "TDS on Receipts" : "TCS on Receipts";
+        TDSorTCS === "TDS" ? "TDS on Payments" : "TCS on Payments";
       let tdsTcsLedger = await Ledger.findOne({
         schoolId,
         academicYear,
@@ -608,17 +608,17 @@ async function updateById(req, res) {
 
       if (tdsTcsLedger) {
         newTDSorTCSLedgerId = tdsTcsLedger._id.toString();
-        existingReceipt.TDSorTCSLedgerId = newTDSorTCSLedgerId;
+        existingPayment.TDSorTCSLedgerId = newTDSorTCSLedgerId;
       }
     } else {
-      existingReceipt.TDSorTCSLedgerId = null;
+      existingPayment.TDSorTCSLedgerId = null;
     }
-    await existingReceipt.save({ session });
+    await existingPayment.save({ session });
 
     // Remove entries from old ledgers that are no longer used
     for (const oldLedgerId of oldItemLedgerIds) {
       if (oldLedgerId && !newItemLedgerIds.includes(oldLedgerId)) {
-        await removeReceiptEntryFromLedger(
+        await removePaymentEntryFromLedger(
           schoolId,
           academicYear,
           id,
@@ -630,7 +630,7 @@ async function updateById(req, res) {
 
     // Remove old TDS/TCS ledger entry if removed or changed
     if (oldTDSorTCSLedgerId && oldTDSorTCSLedgerId !== newTDSorTCSLedgerId) {
-      await removeReceiptEntryFromLedger(
+      await removePaymentEntryFromLedger(
         schoolId,
         academicYear,
         id,
@@ -644,7 +644,7 @@ async function updateById(req, res) {
       oldPaymentModeLedgerId &&
       oldPaymentModeLedgerId !== newPaymentModeLedgerId
     ) {
-      await removeReceiptEntryFromLedger(
+      await removePaymentEntryFromLedger(
         schoolId,
         academicYear,
         id,
@@ -665,7 +665,7 @@ async function updateById(req, res) {
         academicYear,
         ledgerId,
         entryDate,
-        existingReceipt._id,
+        existingPayment._id,
         0, // debit
         amount, // credit,
         session
@@ -684,7 +684,7 @@ async function updateById(req, res) {
           academicYear,
           newTDSorTCSLedgerId,
           entryDate,
-          existingReceipt._id,
+          existingPayment._id,
           tdsTcsAmount, // debit
           0, // credit
           session
@@ -696,7 +696,7 @@ async function updateById(req, res) {
           academicYear,
           newTDSorTCSLedgerId,
           entryDate,
-          existingReceipt._id,
+          existingPayment._id,
           0, // debit
           tdsTcsAmount, // credit
           session
@@ -720,7 +720,7 @@ async function updateById(req, res) {
       academicYear,
       ledgerIdWithPaymentMode,
       entryDate,
-      existingReceipt._id,
+      existingPayment._id,
       paymentAmount, // debit
       0, // credit
       session
@@ -748,8 +748,8 @@ async function updateById(req, res) {
 
     return res.status(200).json({
       hasError: false,
-      message: "Receipt updated successfully!",
-      data: existingReceipt,
+      message: "Payment updated successfully!",
+      data: existingPayment,
     });
   } catch (error) {
     if (session.inTransaction()) {
@@ -762,11 +762,11 @@ async function updateById(req, res) {
         .join(", ");
       return res.status(400).json({
         hasError: true,
-        message: `Duplicate entry for ${field}. Receipt already exists.`,
+        message: `Duplicate entry for ${field}. Payment already exists.`,
       });
     }
 
-    console.error("Error updating Receipt Entry:", error);
+    console.error("Error updating Payment Entry:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",

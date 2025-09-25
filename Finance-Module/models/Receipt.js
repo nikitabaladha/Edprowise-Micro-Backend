@@ -56,6 +56,9 @@ const ReceiptSchema = new mongoose.Schema(
 
       enum: ["TDS", "TCS"],
     },
+    TDSorTCSLedgerId: {
+      type: String,
+    },
     TDSTCSRateChartId: { type: String },
     TDSTCSRate: { type: Number },
     TDSTCSRateWithAmount: {

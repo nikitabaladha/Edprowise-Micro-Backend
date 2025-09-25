@@ -1,6 +1,5 @@
 import PaymentEntry from "../../../models/PaymentEntry.js";
 import Ledger from "../../../models/Ledger.js";
-import GroupLedger from "../../../models/GroupLedger.js";
 
 async function getById(req, res) {
   try {
@@ -27,7 +26,8 @@ async function getById(req, res) {
       });
     }
 
-    if (!["TDS", "TCS"].includes(paymentEntry.TDSorTCS)) {
+    // Check if TDS/TCS is linked
+    if (!paymentEntry.TDSorTCS || !paymentEntry.TDSorTCSLedgerId) {
       return res.status(200).json({
         hasError: false,
         message: "No TDS or TCS linked to this PaymentEntry.",
@@ -35,32 +35,27 @@ async function getById(req, res) {
       });
     }
 
-    const groupLedger = await GroupLedger.findOne({
+    // Directly fetch the ledger by ID
+    const ledger = await Ledger.findOne({
+      _id: paymentEntry.TDSorTCSLedgerId,
       schoolId,
       academicYear,
-      groupLedgerName: paymentEntry.TDSorTCS,
-    });
+    }).select("_id ledgerName");
 
-    if (!groupLedger) {
+    if (!ledger) {
       return res.status(404).json({
         hasError: true,
-        message: `No GroupLedger found for ${paymentEntry.TDSorTCS}.`,
+        message: "Ledger not found for the given TDS/TCSLedgerId.",
       });
     }
 
-    const ledgers = await Ledger.find({
-      schoolId,
-      academicYear,
-      groupLedgerId: groupLedger._id,
-    }).select("_id ledgerName");
-
     return res.status(200).json({
       hasError: false,
-      message: "Ledgers fetched successfully!",
-      data: ledgers,
+      message: "Ledger fetched successfully!",
+      data: ledger,
     });
   } catch (error) {
-    console.error("Error fetching Ledgers:", error);
+    console.error("Error fetching Ledger:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",

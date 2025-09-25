@@ -133,28 +133,26 @@ async function getAllContraBySchoolId(req, res) {
       let TDSorTCSGroupLedgerName = null;
       let TDSorTCSLedgerName = null;
 
-      if (entry.TDSorTCS && entry.TDSorTCSLedgerId) {
-        // 1. Find the TDS/TCS Ledger using the stored TDSorTCSLedgerId
-        const tdsOrTcsLedger = await Ledger.findOne({
-          _id: entry.TDSorTCSLedgerId,
+      if (entry.TDSorTCS) {
+        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
           schoolId,
+          groupLedgerName: entry.TDSorTCS,
         })
-          .select("ledgerName groupLedgerId")
+          .select("_id groupLedgerName")
           .lean();
 
-        if (tdsOrTcsLedger) {
-          TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+        if (tdsOrTcsGroupLedger) {
+          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
 
-          // 2. Find the GroupLedger connected to this ledger
-          const tdsOrTcsGroupLedger = await GroupLedger.findOne({
-            _id: tdsOrTcsLedger.groupLedgerId,
+          const tdsOrTcsLedger = await Ledger.findOne({
             schoolId,
+            groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("groupLedgerName")
+            .select("ledgerName")
             .lean();
 
-          if (tdsOrTcsGroupLedger) {
-            TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+          if (tdsOrTcsLedger) {
+            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
           }
         }
       }

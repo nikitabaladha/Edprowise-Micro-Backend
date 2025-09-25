@@ -1,5 +1,6 @@
-import Receipt from "../../../models/Receipt.js";
+import Contra from "../../../models/Contra.js";
 import Ledger from "../../../models/Ledger.js";
+import GroupLedger from "../../../models/GroupLedger.js";
 
 async function getById(req, res) {
   try {
@@ -13,49 +14,53 @@ async function getById(req, res) {
       });
     }
 
-    const receipt = await Receipt.findOne({
+    const contra = await Contra.findOne({
       _id: id,
       schoolId,
       academicYear,
     });
 
-    if (!receipt) {
+    if (!contra) {
       return res.status(404).json({
         hasError: true,
-        message: "Receipt not found.",
+        message: "Contra not found.",
       });
     }
 
-    // Check if TDS/TCS is linked
-    if (!receipt.TDSorTCS || !receipt.TDSorTCSLedgerId) {
+    if (!["TDS", "TCS"].includes(contra.TDSorTCS)) {
       return res.status(200).json({
         hasError: false,
-        message: "No TDS or TCS linked to this Receipt.",
+        message: "No TDS or TCS linked to this Contra.",
         data: [],
       });
     }
 
-    // Directly fetch the ledger by ID
-    const ledger = await Ledger.findOne({
-      _id: receipt.TDSorTCSLedgerId,
+    const groupLedger = await GroupLedger.findOne({
       schoolId,
       academicYear,
-    }).select("_id ledgerName");
+      groupLedgerName: contra.TDSorTCS,
+    });
 
-    if (!ledger) {
+    if (!groupLedger) {
       return res.status(404).json({
         hasError: true,
-        message: "Ledger not found for the given TDS/TCSLedgerId.",
+        message: `No GroupLedger found for ${contra.TDSorTCS}.`,
       });
     }
 
+    const ledgers = await Ledger.find({
+      schoolId,
+      academicYear,
+      groupLedgerId: groupLedger._id,
+    }).select("_id ledgerName");
+
     return res.status(200).json({
       hasError: false,
-      message: "Ledger fetched successfully!",
-      data: ledger,
+      message: "Ledgers fetched successfully!",
+      data: ledgers,
     });
   } catch (error) {
-    console.error("Error fetching Ledger:", error);
+    console.error("Error fetching Ledgers:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",

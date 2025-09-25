@@ -1,6 +1,7 @@
 import moment from "moment";
 
 import Receipt from "../../../models/Receipt.js";
+import Ledger from "../../../models/Ledger.js";
 
 async function generateReceiptVoucherNumber(schoolId, academicYear) {
   const count = await Receipt.countDocuments({ schoolId, academicYear });
@@ -98,6 +99,17 @@ async function draft(req, res) {
     const transactionNumber =
       paymentMode === "Online" ? await generateTransactionNumber() : null;
 
+    // Automatically find TDS ledger if TDS is selected
+    let TDSorTCSLedgerId = null;
+
+    if (TDSorTCS === "TDS") {
+      const tdsLedger = await Ledger.findOne({
+        schoolId,
+        academicYear,
+        ledgerName: "TDS on Receipts",
+      });
+      if (tdsLedger) TDSorTCSLedgerId = tdsLedger._id;
+    }
     const newReceipt = new Receipt({
       schoolId,
       academicYear,
@@ -119,6 +131,7 @@ async function draft(req, res) {
       chequeImage: chequeImageFullPath,
       ledgerIdWithPaymentMode,
       status,
+      TDSorTCSLedgerId,
     });
 
     await newReceipt.save();

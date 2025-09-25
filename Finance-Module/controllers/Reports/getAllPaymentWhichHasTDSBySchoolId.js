@@ -4,7 +4,7 @@ import Ledger from "../../models/Ledger.js";
 import TDSTCSRateChart from "../../models/TDSTCSRateChart.js";
 import AuthorisedSignature from "../../models/AuthorisedSignature.js";
 import mongoose from "mongoose";
-import moment from "moment"; // Don't forget to import moment
+import moment from "moment";
 
 async function getAllPaymentWhichHasTDSBySchoolId(req, res) {
   try {

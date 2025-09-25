@@ -49,6 +49,9 @@ const ContraSchema = new mongoose.Schema(
       type: String,
       enum: ["TDS", "TCS", ""],
     },
+    TDSorTCSLedgerId: {
+      type: String,
+    },
     TDSTCSRateAmount: {
       type: Number,
     },

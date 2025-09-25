@@ -402,29 +402,6 @@ export async function create(req, res) {
       }
     }
 
-    let TDSorTCSLedgerId = null;
-
-    if (TDSorTCS && TDSTCSRateAmount > 0) {
-      // Search for "TDS on Receipts" or "TCS on Receipts" ledger
-      const ledgerNameToFind =
-        TDSorTCS === "TDS" ? "TDS on Cash Withdrawn/Deposited" : "TCS";
-
-      // Find the ledger with exact name match
-      let tdsTcsLedgerToUpdate = await Ledger.findOne({
-        schoolId,
-        academicYear,
-        ledgerName: { $regex: new RegExp(`^${ledgerNameToFind}$`, "i") },
-      });
-
-      if (!tdsTcsLedgerToUpdate) {
-        throw new Error(
-          `${ledgerNameToFind} Ledger not found for school ${schoolId} and academic year ${academicYear}`
-        );
-      }
-
-      TDSorTCSLedgerId = tdsTcsLedgerToUpdate._id.toString();
-    }
-
     const newContra = new Contra({
       schoolId,
       contraVoucherNumber: ContraVoucherNumber,
@@ -443,7 +420,6 @@ export async function create(req, res) {
       chequeImageForContra: chequeImageForContraFullPath,
       status,
       academicYear,
-      TDSorTCSLedgerId,
     });
 
     await newContra.save({ session });
@@ -538,13 +514,60 @@ export async function create(req, res) {
       }
     }
 
-    if (TDSorTCS && TDSTCSRateAmount > 0 && TDSorTCSLedgerId) {
+    // Process TDS/TCS if applicable
+    let tdsTcsLedgerId = null;
+    if (TDSorTCS && TDSTCSRateAmount > 0) {
+      // Find TDS/TCS group ledger
+      let tdsTcsGroupLedger = await GroupLedger.findOne({
+        schoolId,
+        academicYear,
+        groupLedgerName: { $regex: new RegExp(`^${TDSorTCS}$`, "i") },
+      });
+
+      if (!tdsTcsGroupLedger) {
+        tdsTcsGroupLedger = await GroupLedger.findOne({
+          schoolId,
+          academicYear,
+          groupLedgerName: { $regex: new RegExp(TDSorTCS, "i") },
+        });
+      }
+
+      if (!tdsTcsGroupLedger) {
+        throw new Error(
+          `${TDSorTCS} GroupLedger not found for school ${schoolId} and academic year ${academicYear}`
+        );
+      }
+
+      // Find TDS/TCS ledger
+      let tdsTcsLedgerToUpdate = await Ledger.findOne({
+        schoolId,
+        academicYear,
+        groupLedgerId: tdsTcsGroupLedger._id,
+        ledgerName: { $regex: new RegExp(`^${TDSorTCS}$`, "i") },
+      });
+
+      if (!tdsTcsLedgerToUpdate) {
+        tdsTcsLedgerToUpdate = await Ledger.findOne({
+          schoolId,
+          academicYear,
+          groupLedgerId: tdsTcsGroupLedger._id,
+        });
+      }
+
+      if (!tdsTcsLedgerToUpdate) {
+        throw new Error(
+          `${TDSorTCS} Ledger not found for GroupLedger ID ${tdsTcsGroupLedger._id}, school ${schoolId} and academic year ${academicYear}`
+        );
+      }
+
+      tdsTcsLedgerId = tdsTcsLedgerToUpdate._id.toString();
+
       if (TDSorTCS === "TDS") {
         // For TDS: Debit the TDS ledger
         await updateOpeningClosingBalance(
           schoolId,
           academicYear,
-          TDSorTCSLedgerId,
+          tdsTcsLedgerId,
           entryDate,
           newContra._id,
           Number(TDSTCSRateAmount),
@@ -555,7 +578,7 @@ export async function create(req, res) {
         await updateOpeningClosingBalance(
           schoolId,
           academicYear,
-          TDSorTCSLedgerId,
+          tdsTcsLedgerId,
           entryDate,
           newContra._id,
           0,
@@ -563,7 +586,7 @@ export async function create(req, res) {
         );
       }
 
-      ledgerIdsToUpdate.add(TDSorTCSLedgerId);
+      ledgerIdsToUpdate.add(tdsTcsLedgerId);
     }
 
     // Recalculate all ledgers that were updated
