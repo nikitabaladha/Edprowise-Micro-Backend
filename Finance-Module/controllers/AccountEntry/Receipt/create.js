@@ -6,6 +6,11 @@ import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
 
+function toTwoDecimals(value) {
+  if (value === null || value === undefined || isNaN(value)) return 0;
+  return Math.round(Number(value) * 100) / 100;
+}
+
 async function generateReceiptVoucherNumber(schoolId, academicYear) {
   const count = await Receipt.countDocuments({ schoolId, academicYear });
   const nextNumber = count + 1;
@@ -86,8 +91,8 @@ async function updateOpeningClosingBalance(
   debitAmount = 0,
   creditAmount = 0
 ) {
-  debitAmount = Number(debitAmount);
-  creditAmount = Number(creditAmount);
+  debitAmount = toTwoDecimals(debitAmount);
+  creditAmount = toTwoDecimals(creditAmount);
 
   const { record, openingBalance, balanceType } =
     await getOrCreateOpeningBalanceRecord(
@@ -102,17 +107,24 @@ async function updateOpeningClosingBalance(
     .filter((detail) => new Date(detail.entryDate) <= new Date(entryDate))
     .sort((a, b) => new Date(b.entryDate) - new Date(a.entryDate));
 
-  let effectiveOpeningBalance = openingBalance;
+  let effectiveOpeningBalance = toTwoDecimals(openingBalance);
+
   if (previousBalanceDetails.length > 0) {
-    effectiveOpeningBalance = previousBalanceDetails[0].closingBalance;
+    effectiveOpeningBalance = toTwoDecimals(
+      previousBalanceDetails[0].closingBalance
+    );
   }
 
   // --- Calculate closing balance ---
   let closingBalance;
   if (balanceType === "Debit") {
-    closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
+    closingBalance = toTwoDecimals(
+      effectiveOpeningBalance + debitAmount - creditAmount
+    );
   } else {
-    closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
+    closingBalance = toTwoDecimals(
+      effectiveOpeningBalance + debitAmount - creditAmount
+    );
   }
 
   // --- Check if exact same entry already exists ---
@@ -184,7 +196,7 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
   });
 
   // Find the initial opening balance (from ledger or first entry)
-  let currentBalance = record.balanceDetails[0].openingBalance;
+  let currentBalance = toTwoDecimals(record.balanceDetails[0].openingBalance);
 
   for (let i = 0; i < record.balanceDetails.length; i++) {
     const detail = record.balanceDetails[i];
@@ -193,38 +205,27 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
       currentBalance = detail.openingBalance;
     } else {
       // Update opening balance to previous closing balance
-      detail.openingBalance = record.balanceDetails[i - 1].closingBalance;
+      detail.openingBalance = toTwoDecimals(
+        record.balanceDetails[i - 1].closingBalance
+      );
       currentBalance = detail.openingBalance;
     }
 
     // Calculate new closing balance
     if (balanceType === "Debit") {
-      detail.closingBalance = currentBalance + detail.debit - detail.credit;
+      detail.closingBalance = toTwoDecimals(
+        currentBalance + detail.debit - detail.credit
+      );
     } else {
-      detail.closingBalance = currentBalance + detail.debit - detail.credit;
+      detail.closingBalance = toTwoDecimals(
+        currentBalance + detail.debit - detail.credit
+      );
     }
 
     currentBalance = detail.closingBalance;
   }
 
   await record.save();
-}
-
-function aggregateAmountsByLedger(itemDetails) {
-  const ledgerMap = new Map();
-
-  itemDetails.forEach((item) => {
-    const ledgerId = item.ledgerId.toString();
-    const amount = parseFloat(item.amount) || 0;
-
-    if (ledgerMap.has(ledgerId)) {
-      ledgerMap.set(ledgerId, ledgerMap.get(ledgerId) + amount);
-    } else {
-      ledgerMap.set(ledgerId, amount);
-    }
-  });
-
-  return ledgerMap;
 }
 
 // NEW FUNCTION: Recalculate all balances for a ledger after a specific date
@@ -284,6 +285,23 @@ async function recalculateAllBalancesAfterDate(
   }
 
   await record.save();
+}
+
+function aggregateAmountsByLedger(itemDetails) {
+  const ledgerMap = new Map();
+
+  itemDetails.forEach((item) => {
+    const ledgerId = item.ledgerId.toString();
+    const amount = toTwoDecimals(item.amount) || 0;
+
+    if (ledgerMap.has(ledgerId)) {
+      ledgerMap.set(ledgerId, ledgerMap.get(ledgerId) + amount);
+    } else {
+      ledgerMap.set(ledgerId, amount);
+    }
+  });
+
+  return ledgerMap;
 }
 
 async function create(req, res) {
@@ -361,9 +379,11 @@ async function create(req, res) {
       amount: parseFloat(item.amount) || 0,
     }));
 
-    const subTotalAmount = updatedItemDetails.reduce(
-      (sum, item) => sum + (parseFloat(item.amount) || 0),
-      0
+    const subTotalAmount = toTwoDecimals(
+      updatedItemDetails.reduce(
+        (sum, item) => sum + (parseFloat(item.amount) || 0),
+        0
+      )
     );
 
     const transactionNumber =
@@ -474,11 +494,11 @@ async function create(req, res) {
 
     let paymentAmount;
     if (TDSorTCS === "TDS") {
-      paymentAmount = subTotalAmount - tdsTcsAmount;
+      paymentAmount = toTwoDecimals(subTotalAmount - tdsTcsAmount);
     } else if (TDSorTCS === "TCS") {
-      paymentAmount = subTotalAmount + tdsTcsAmount;
+      paymentAmount = toTwoDecimals(subTotalAmount + tdsTcsAmount);
     } else {
-      paymentAmount = subTotalAmount;
+      paymentAmount = toTwoDecimals(subTotalAmount);
     }
 
     await updateOpeningClosingBalance(

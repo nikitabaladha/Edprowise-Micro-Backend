@@ -1,5 +1,12 @@
 import mongoose from "mongoose";
 
+function toTwoDecimals(value) {
+  if (value === null || value === undefined || isNaN(value)) return 0;
+  // Convert to string → split → cut decimals → join back
+  const [intPart, decimalPart = ""] = value.toString().split(".");
+  return parseFloat(intPart + "." + decimalPart.slice(0, 2));
+}
+
 const PaymentEntrySchema = new mongoose.Schema(
   {
     schoolId: {
@@ -47,23 +54,29 @@ const PaymentEntrySchema = new mongoose.Schema(
         },
         amountBeforeGST: {
           type: Number,
+          set: toTwoDecimals,
         },
         GSTAmount: {
           type: Number,
+          set: toTwoDecimals,
         },
         amountAfterGST: {
           type: Number,
+          set: toTwoDecimals,
         },
         creditAmount: {
           type: Number,
+          set: toTwoDecimals,
         },
       },
     ],
     subTotalAmountAfterGST: {
       type: Number,
+      set: toTwoDecimals,
     },
     subTotalOfCredit: {
       type: Number,
+      set: toTwoDecimals,
     },
     TDSorTCS: {
       type: String,
@@ -77,18 +90,23 @@ const PaymentEntrySchema = new mongoose.Schema(
     TDSTCSRate: { type: Number },
     TDSTCSRateWithAmountBeforeGST: {
       type: Number,
+      set: toTwoDecimals,
     },
     totalAmountBeforeGST: {
       type: Number,
+      set: toTwoDecimals,
     },
     totalGSTAmount: {
       type: Number,
+      set: toTwoDecimals,
     },
     totalAmountAfterGST: {
       type: Number,
+      set: toTwoDecimals,
     },
     totalCreditAmount: {
       type: Number,
+      set: toTwoDecimals,
     },
     invoiceImage: {
       type: String,
