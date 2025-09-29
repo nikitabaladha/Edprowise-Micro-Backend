@@ -207,7 +207,6 @@ async function getScheduleToLiabilities(req, res) {
         }
       }
 
-      // Adjust for balance type (Credit balances are typically negative in accounting)
       const isCreditBalance = ledger.balanceType === "Credit";
       if (isCreditBalance) {
         openingBalance = -Math.abs(openingBalance);

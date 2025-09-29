@@ -1,7 +1,11 @@
+import mongoose from "mongoose";
+
 import Receipt from "../../../models/Receipt.js";
 import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
-import mongoose from "mongoose";
+
+import TDSTCSRateChart from "../../../models/TDSTCSRateChart.js";
+import AuthorisedSignature from "../../../models/AuthorisedSignature.js";
 
 async function getAllReceiptBySchoolId(req, res) {
   try {
@@ -15,6 +19,13 @@ async function getAllReceiptBySchoolId(req, res) {
         message: "Access denied: School ID not found in user context.",
       });
     }
+
+    const authorisedSignature = await AuthorisedSignature.findOne({
+      schoolId,
+      academicYear,
+    })
+      .select("authorisedSignatureImage")
+      .lean();
 
     // Create date filter object
     const dateFilter = {};
@@ -84,6 +95,13 @@ async function getAllReceiptBySchoolId(req, res) {
         });
       }
 
+      // Fetch TDS/TCS Rate Chart
+      const tdsTcsRateChart =
+        entry.TDSTCSRateChartId &&
+        mongoose.Types.ObjectId.isValid(entry.TDSTCSRateChartId)
+          ? await TDSTCSRateChart.findById(entry.TDSTCSRateChartId).lean()
+          : null;
+
       const ledgerWithPaymentMode =
         entry.ledgerIdWithPaymentMode &&
         mongoose.Types.ObjectId.isValid(entry.ledgerIdWithPaymentMode)
@@ -132,7 +150,7 @@ async function getAllReceiptBySchoolId(req, res) {
       }
 
       const entryData = {
-        // PaymentEntry fields
+        // ReceiptEntry fields
         accountingEntry: "Receipt",
         _id: entry._id,
         schoolId: entry.schoolId,
@@ -167,6 +185,18 @@ async function getAllReceiptBySchoolId(req, res) {
         subTotalOfDebit: entry.subTotalOfDebit,
         totalAmount: entry.totalAmount,
         totalDebitAmount: entry.totalDebitAmount,
+
+        // Authorised Signature
+        authorisedSignatureImage:
+          authorisedSignature?.authorisedSignatureImage || null,
+
+        paymentMode: entry.paymentMode,
+        TDSTCSRateChartId: entry.TDSTCSRateChartId,
+        TDSTCSRate: entry.TDSTCSRate,
+
+        receiptImage: entry.receiptImage,
+        chequeImageForReceipt: entry.chequeImageForReceipt || null,
+        status: entry.status || null,
       };
 
       formattedData.push(entryData);

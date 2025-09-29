@@ -1,7 +1,13 @@
+import mongoose from "mongoose";
+
 import PaymentEntry from "../../../models/PaymentEntry.js";
+
 import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
-import mongoose from "mongoose";
+
+import Vendor from "../../../models/Vendor.js";
+import TDSTCSRateChart from "../../../models/TDSTCSRateChart.js";
+import AuthorisedSignature from "../../../models/AuthorisedSignature.js";
 
 async function getAllBySchoolId(req, res) {
   try {
@@ -15,6 +21,13 @@ async function getAllBySchoolId(req, res) {
         message: "Access denied: School ID not found in user context.",
       });
     }
+
+    const authorisedSignature = await AuthorisedSignature.findOne({
+      schoolId,
+      academicYear,
+    })
+      .select("authorisedSignatureImage")
+      .lean();
 
     // Create date filter object
     const dateFilter = {};
@@ -47,6 +60,13 @@ async function getAllBySchoolId(req, res) {
 
     // Find Payment Entries
     for (const entry of paymentEntries) {
+      const vendor = entry.vendorCode
+        ? await Vendor.findOne({
+            vendorCode: entry.vendorCode,
+            schoolId,
+          }).lean()
+        : null;
+
       const itemsWithLedgerNames = [];
 
       for (const item of entry.itemDetails) {
@@ -82,6 +102,13 @@ async function getAllBySchoolId(req, res) {
           groupLedgerName: groupLedger?.groupLedgerName || null,
         });
       }
+
+      // Fetch TDS/TCS Rate Chart
+      const tdsTcsRateChart =
+        entry.TDSTCSRateChartId &&
+        mongoose.Types.ObjectId.isValid(entry.TDSTCSRateChartId)
+          ? await TDSTCSRateChart.findById(entry.TDSTCSRateChartId).lean()
+          : null;
 
       const ledgerWithPaymentMode =
         entry.ledgerIdWithPaymentMode &&
@@ -137,6 +164,8 @@ async function getAllBySchoolId(req, res) {
         schoolId: entry.schoolId,
         entryDate: entry.entryDate,
         invoiceDate: entry.invoiceDate,
+
+        invoiceNumber: entry.invoiceNumber,
         narration: entry.narration,
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
@@ -149,6 +178,7 @@ async function getAllBySchoolId(req, res) {
           groupLedgerWithPaymentMode?.groupLedgerName || null,
         paymentVoucherNumber: entry.paymentVoucherNumber || null,
         TDSorTCS: entry.TDSorTCS || null,
+        paymentMode: entry.paymentMode,
 
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
@@ -165,6 +195,42 @@ async function getAllBySchoolId(req, res) {
 
         totalAmountAfterGST: entry.totalAmountAfterGST,
         totalCreditAmount: entry.totalCreditAmount,
+
+        // Vendor fields
+        vendorCode: entry.vendorCode,
+        vendorId: entry.vendorId,
+
+        nameOfVendor: vendor?.nameOfVendor || null,
+        email: vendor?.email || null,
+        contactNumber: vendor?.contactNumber || null,
+        gstNumber: vendor?.gstNumber || null,
+        panNumber: vendor?.panNumber || null,
+        address: vendor?.address || null,
+        state: vendor?.state || null,
+        nameOfAccountHolder: vendor?.nameOfAccountHolder || null,
+        nameOfBank: vendor?.nameOfBank || null,
+        ifscCode: vendor?.ifscCode || null,
+        accountNumber: vendor?.accountNumber || null,
+        accountType: vendor?.accountType || null,
+
+        // Authorised Signature
+        authorisedSignatureImage:
+          authorisedSignature?.authorisedSignatureImage || null,
+
+        customizeEntry: entry.customizeEntry,
+
+        TDSTCSRateChartId: entry.TDSTCSRateChartId,
+        TDSTCSRate: entry.TDSTCSRate,
+        totalAmountBeforeGST: entry.totalAmountBeforeGST,
+        totalGSTAmount: entry.totalGSTAmount,
+        invoiceImage: entry.invoiceImage,
+        chequeImage: entry.chequeImage || null,
+
+        // TDS/TCS Rate Chart fields
+        natureOfTransaction: tdsTcsRateChart?.natureOfTransaction || null,
+        rate: tdsTcsRateChart?.rate || null,
+
+        status: entry.status || null,
       };
 
       formattedData.push(entryData);

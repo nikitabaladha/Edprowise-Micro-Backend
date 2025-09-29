@@ -4,8 +4,6 @@ import JournalValidator from "../../../validators/JournalValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
 
-import { hasBankOrCashLedger } from "../../CommonFunction/CommonFunction.js";
-
 function toTwoDecimals(value) {
   if (value === null || value === undefined || isNaN(value)) return 0;
   return Math.round(Number(value) * 100) / 100;
@@ -335,22 +333,6 @@ export async function create(req, res) {
       academicYear,
       customizeEntry,
     } = req.body;
-
-    const hasValidLedger = await hasBankOrCashLedger(
-      schoolId,
-      academicYear,
-      itemDetails
-    );
-
-    if (!hasValidLedger) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        hasError: true,
-        message:
-          "At least one ledger must have Group Ledger Name as 'Bank' or 'Cash'",
-      });
-    }
 
     const { documentImage } = req.files || {};
 

@@ -1,13 +1,12 @@
-import PaymentEntry from "../../../models/PaymentEntry.js";
-import Receipt from "../../../models/Receipt.js";
-import Contra from "../../../models/Contra.js";
-import Journal from "../../../models/Journal.js";
-
-import Ledger from "../../../models/Ledger.js";
-import GroupLedger from "../../../models/GroupLedger.js";
+import PaymentEntry from "../../models/PaymentEntry.js";
+import Receipt from "../../models/Receipt.js";
+import Contra from "../../models/Contra.js";
+import Journal from "../../models/Journal.js";
+import Ledger from "../../models/Ledger.js";
+import GroupLedger from "../../models/GroupLedger.js";
 import mongoose from "mongoose";
 
-async function getAllBySchoolId(req, res) {
+async function getAllBankBookBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
     const { academicYear } = req.params;
@@ -74,6 +73,7 @@ async function getAllBySchoolId(req, res) {
     const formattedData = [];
 
     // Find Payment Entries
+
     for (const entry of paymentEntries) {
       const itemsWithLedgerNames = [];
 
@@ -132,34 +132,33 @@ async function getAllBySchoolId(req, res) {
       let TDSorTCSGroupLedgerName = null;
       let TDSorTCSLedgerName = null;
 
-      if (entry.TDSorTCS) {
-        // 1. Find GroupLedger by name
-        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+      if (entry.TDSorTCS && entry.TDSorTCSLedgerId) {
+        // 1. Find the TDS/TCS Ledger using the stored TDSorTCSLedgerId
+        const tdsOrTcsLedger = await Ledger.findOne({
+          _id: entry.TDSorTCSLedgerId,
           schoolId,
-          groupLedgerName: entry.TDSorTCS,
         })
-          .select("_id groupLedgerName")
+          .select("ledgerName groupLedgerId")
           .lean();
 
-        if (tdsOrTcsGroupLedger) {
-          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+        if (tdsOrTcsLedger) {
+          TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
 
-          // 2. Find Ledger under that GroupLedger
-          const tdsOrTcsLedger = await Ledger.findOne({
+          // 2. Find the GroupLedger connected to this ledger
+          const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+            _id: tdsOrTcsLedger.groupLedgerId,
             schoolId,
-            groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName")
+            .select("groupLedgerName")
             .lean();
 
-          if (tdsOrTcsLedger) {
-            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+          if (tdsOrTcsGroupLedger) {
+            TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
           }
         }
       }
 
       const entryData = {
-        // PaymentEntry fields
         accountingEntry: "Payment",
         _id: entry._id,
         schoolId: entry.schoolId,
@@ -186,7 +185,6 @@ async function getAllBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
-
         customizeEntry: entry.customizeEntry,
 
         subTotalAmountAfterGST: entry.subTotalAmountAfterGST || null,
@@ -196,7 +194,16 @@ async function getAllBySchoolId(req, res) {
         totalCreditAmount: entry.totalCreditAmount || null,
       };
 
-      formattedData.push(entryData);
+      const hasCashInItems = itemsWithLedgerNames.some(
+        (item) => item.groupLedgerName === "Bank"
+      );
+
+      if (
+        hasCashInItems ||
+        groupLedgerWithPaymentMode?.groupLedgerName === "Bank"
+      ) {
+        formattedData.push(entryData);
+      }
     }
 
     // Find Receipt Entries
@@ -258,34 +265,34 @@ async function getAllBySchoolId(req, res) {
       let TDSorTCSGroupLedgerName = null;
       let TDSorTCSLedgerName = null;
 
-      if (entry.TDSorTCS) {
-        // 1. Find GroupLedger by name
-        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+      if (entry.TDSorTCS && entry.TDSorTCSLedgerId) {
+        // 1. Find the TDS/TCS Ledger using the stored TDSorTCSLedgerId
+        const tdsOrTcsLedger = await Ledger.findOne({
+          _id: entry.TDSorTCSLedgerId,
           schoolId,
-          groupLedgerName: entry.TDSorTCS,
         })
-          .select("_id groupLedgerName")
+          .select("ledgerName groupLedgerId")
           .lean();
 
-        if (tdsOrTcsGroupLedger) {
-          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+        if (tdsOrTcsLedger) {
+          TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
 
-          // 2. Find Ledger under that GroupLedger
-          const tdsOrTcsLedger = await Ledger.findOne({
+          // 2. Find the GroupLedger connected to this ledger
+          const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+            _id: tdsOrTcsLedger.groupLedgerId,
             schoolId,
-            groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName")
+            .select("groupLedgerName")
             .lean();
 
-          if (tdsOrTcsLedger) {
-            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+          if (tdsOrTcsGroupLedger) {
+            TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
           }
         }
       }
 
       const entryData = {
-        // PaymentEntry fields
+        // Receipt Entry fields
         accountingEntry: "Receipt",
         _id: entry._id,
         schoolId: entry.schoolId,
@@ -321,7 +328,16 @@ async function getAllBySchoolId(req, res) {
         totalDebitAmount: entry.totalDebitAmount || null,
       };
 
-      formattedData.push(entryData);
+      const hasCashInItems = itemsWithLedgerNames.some(
+        (item) => item.groupLedgerName === "Bank"
+      );
+
+      if (
+        hasCashInItems ||
+        groupLedgerWithPaymentMode?.groupLedgerName === "Bank"
+      ) {
+        formattedData.push(entryData);
+      }
     }
 
     // Find Contra Entries
@@ -329,7 +345,6 @@ async function getAllBySchoolId(req, res) {
     for (const entry of contraEntries) {
       const itemsWithLedgerNames = [];
 
-      // Collect all ledger IDs (both ledgerId and ledgerIdOfCashAccount)
       const allLedgerIds = new Set();
       entry.itemDetails.forEach((item) => {
         if (item.ledgerId && mongoose.Types.ObjectId.isValid(item.ledgerId)) {
@@ -343,7 +358,6 @@ async function getAllBySchoolId(req, res) {
         }
       });
 
-      // Fetch all required ledgers in one query
       const ledgers = await Ledger.find({
         _id: { $in: Array.from(allLedgerIds) },
         schoolId,
@@ -361,14 +375,12 @@ async function getAllBySchoolId(req, res) {
         };
       });
 
-      // Get all unique group ledger IDs
       const groupLedgerIds = new Set(
         ledgers
           .map((ledger) => ledger.groupLedgerId?.toString())
           .filter((id) => id)
       );
 
-      // Fetch all required group ledgers in one query
       const groupLedgers = await GroupLedger.find({
         _id: { $in: Array.from(groupLedgerIds) },
         schoolId,
@@ -376,14 +388,12 @@ async function getAllBySchoolId(req, res) {
         .select("groupLedgerName")
         .lean();
 
-      // Create map for group ledgers
       const groupLedgerMap = {};
       groupLedgers.forEach((groupLedger) => {
         groupLedgerMap[groupLedger._id.toString()] =
           groupLedger.groupLedgerName;
       });
 
-      // Process each item in the contra entry
       for (const item of entry.itemDetails) {
         const ledgerInfo = ledgerMap[item.ledgerId?.toString()] || {};
         const cashLedgerInfo =
@@ -409,30 +419,31 @@ async function getAllBySchoolId(req, res) {
         });
       }
 
-      // Handle TDS/TCS information if present
       let TDSorTCSGroupLedgerName = null;
       let TDSorTCSLedgerName = null;
 
-      if (entry.TDSorTCS) {
-        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+      if (entry.TDSorTCS && entry.TDSorTCSLedgerId) {
+        // 1. Find the TDS/TCS Ledger using the stored TDSorTCSLedgerId
+        const tdsOrTcsLedger = await Ledger.findOne({
+          _id: entry.TDSorTCSLedgerId,
           schoolId,
-          groupLedgerName: entry.TDSorTCS,
         })
-          .select("_id groupLedgerName")
+          .select("ledgerName groupLedgerId")
           .lean();
 
-        if (tdsOrTcsGroupLedger) {
-          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+        if (tdsOrTcsLedger) {
+          TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
 
-          const tdsOrTcsLedger = await Ledger.findOne({
+          // 2. Find the GroupLedger connected to this ledger
+          const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+            _id: tdsOrTcsLedger.groupLedgerId,
             schoolId,
-            groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName")
+            .select("groupLedgerName")
             .lean();
 
-          if (tdsOrTcsLedger) {
-            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+          if (tdsOrTcsGroupLedger) {
+            TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
           }
         }
       }
@@ -464,7 +475,15 @@ async function getAllBySchoolId(req, res) {
         customizeEntry: entry.customizeEntry,
       };
 
-      formattedData.push(entryData);
+      const hasCashInItems = itemsWithLedgerNames.some(
+        (item) =>
+          item.groupLedgerName === "Bank" ||
+          item.groupLedgerNameOfCashAccount === "Bank"
+      );
+
+      if (hasCashInItems) {
+        formattedData.push(entryData);
+      }
     }
 
     // Find Journal Entries
@@ -512,11 +531,9 @@ async function getAllBySchoolId(req, res) {
         documentDate: entry.documentDate,
         narration: entry.narration,
         subTotalOfDebit: entry.subTotalOfDebit,
-
         totalAmountOfDebit: entry.totalAmountOfDebit,
         totalAmountOfCredit: entry.totalAmountOfCredit,
         journalVoucherNumber: entry.journalVoucherNumber || null,
-
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
 
@@ -525,7 +542,13 @@ async function getAllBySchoolId(req, res) {
         customizeEntry: entry.customizeEntry,
       };
 
-      formattedData.push(entryData);
+      const hasCashInItems = itemsWithLedgerNames.some(
+        (item) => item.groupLedgerName === "Bank"
+      );
+
+      if (hasCashInItems) {
+        formattedData.push(entryData);
+      }
     }
 
     return res.status(200).json({
@@ -542,4 +565,4 @@ async function getAllBySchoolId(req, res) {
   }
 }
 
-export default getAllBySchoolId;
+export default getAllBankBookBySchoolId;

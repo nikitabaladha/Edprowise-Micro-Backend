@@ -1,9 +1,9 @@
-import Receipt from "../../../models/Receipt.js";
+import PaymentEntry from "../../../models/PaymentEntry.js";
 import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
 import mongoose from "mongoose";
 
-async function getAllReceiptBySchoolId(req, res) {
+async function getAllBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
     const { academicYear } = req.params;
@@ -35,7 +35,7 @@ async function getAllReceiptBySchoolId(req, res) {
       }
     }
 
-    const receiptEntries = await Receipt.find({
+    const paymentEntries = await PaymentEntry.find({
       schoolId,
       ...dateFilter,
       status: "Posted",
@@ -45,9 +45,8 @@ async function getAllReceiptBySchoolId(req, res) {
 
     const formattedData = [];
 
-    // Find Receipt Entries
-
-    for (const entry of receiptEntries) {
+    // Find Payment Entries
+    for (const entry of paymentEntries) {
       const itemsWithLedgerNames = [];
 
       for (const item of entry.itemDetails) {
@@ -74,11 +73,11 @@ async function getAllReceiptBySchoolId(req, res) {
         itemsWithLedgerNames.push({
           itemName: item.itemName,
           ledgerId: item.ledgerId || null,
+          amountBeforeGST: item.amountBeforeGST,
+          GSTAmount: item.GSTAmount,
+          amountAfterGST: item.amountAfterGST,
+          creditAmount: item.creditAmount || null,
           ledgerName: ledger?.ledgerName || null,
-
-          debitAmount: item.debitAmount || null,
-          amount: item.amount,
-
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
         });
@@ -105,51 +104,50 @@ async function getAllReceiptBySchoolId(req, res) {
       let TDSorTCSGroupLedgerName = null;
       let TDSorTCSLedgerName = null;
 
-      if (entry.TDSorTCS) {
-        // 1. Find GroupLedger by name
-        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+      if (entry.TDSorTCS && entry.TDSorTCSLedgerId) {
+        // 1. Find the TDS/TCS Ledger using the stored TDSorTCSLedgerId
+        const tdsOrTcsLedger = await Ledger.findOne({
+          _id: entry.TDSorTCSLedgerId,
           schoolId,
-          groupLedgerName: entry.TDSorTCS,
         })
-          .select("_id groupLedgerName")
+          .select("ledgerName groupLedgerId")
           .lean();
 
-        if (tdsOrTcsGroupLedger) {
-          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+        if (tdsOrTcsLedger) {
+          TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
 
-          // 2. Find Ledger under that GroupLedger
-          const tdsOrTcsLedger = await Ledger.findOne({
+          // 2. Find the GroupLedger connected to this ledger
+          const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+            _id: tdsOrTcsLedger.groupLedgerId,
             schoolId,
-            groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName")
+            .select("groupLedgerName")
             .lean();
 
-          if (tdsOrTcsLedger) {
-            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+          if (tdsOrTcsGroupLedger) {
+            TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
           }
         }
       }
 
       const entryData = {
         // PaymentEntry fields
-        accountingEntry: "Receipt",
+        accountingEntry: "Payment",
         _id: entry._id,
         schoolId: entry.schoolId,
         entryDate: entry.entryDate,
-        receiptDate: entry.receiptDate,
+        invoiceDate: entry.invoiceDate,
         narration: entry.narration,
         chequeNumber: entry.chequeNumber || null,
         transactionNumber: entry.transactionNumber || null,
-        TDSTCSRateWithAmount: entry.TDSTCSRateWithAmount,
-
+        TDSTCSRateWithAmountBeforeGST: entry.TDSTCSRateWithAmountBeforeGST,
         ledgerIdWithPaymentMode: entry.ledgerIdWithPaymentMode || null,
         ledgerNameWithPaymentMode: ledgerWithPaymentMode?.ledgerName || null,
         groupLedgerIdWithPaymentMode:
           ledgerWithPaymentMode?.groupLedgerId || null,
         groupLedgerNameWithPaymentMode:
           groupLedgerWithPaymentMode?.groupLedgerName || null,
-        receiptVoucherNumber: entry.receiptVoucherNumber || null,
+        paymentVoucherNumber: entry.paymentVoucherNumber || null,
         TDSorTCS: entry.TDSorTCS || null,
 
         createdAt: entry.createdAt,
@@ -160,13 +158,13 @@ async function getAllReceiptBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
-
         customizeEntry: entry.customizeEntry,
 
-        subTotalAmount: entry.subTotalAmount,
-        subTotalOfDebit: entry.subTotalOfDebit,
-        totalAmount: entry.totalAmount,
-        totalDebitAmount: entry.totalDebitAmount,
+        subTotalAmountAfterGST: entry.subTotalAmountAfterGST,
+        subTotalOfCredit: entry.subTotalOfCredit,
+
+        totalAmountAfterGST: entry.totalAmountAfterGST,
+        totalCreditAmount: entry.totalCreditAmount,
       };
 
       formattedData.push(entryData);
@@ -174,11 +172,12 @@ async function getAllReceiptBySchoolId(req, res) {
 
     return res.status(200).json({
       hasError: false,
-      message: "All Receipts fetched successfully with all info.",
+      message:
+        "Payment entries fetched successfully with vendor and ledger info.",
       data: formattedData,
     });
   } catch (error) {
-    console.error("Error fetching Receipts:", error);
+    console.error("Error fetching paymentEntries:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",
@@ -186,4 +185,4 @@ async function getAllReceiptBySchoolId(req, res) {
   }
 }
 
-export default getAllReceiptBySchoolId;
+export default getAllBySchoolId;
