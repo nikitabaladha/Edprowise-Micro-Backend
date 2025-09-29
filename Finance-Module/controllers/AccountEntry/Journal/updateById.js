@@ -94,7 +94,6 @@ async function updateOpeningClosingBalance(
   let entrySequence;
 
   if (existingEntryIndex !== -1) {
-    // ✅ PRESERVE the original sequence when updating
     const existing = record.balanceDetails[existingEntryIndex];
     entrySequence = existing.entrySequence; // Keep the original sequence
 
@@ -324,7 +323,6 @@ async function recalculateAllBalancesAfterDate(
   await record.save({ session });
 }
 
-// ✅ ADD THIS FUNCTION - Similar to receipt function
 async function removeJournalEntryFromLedger(
   schoolId,
   academicYear,
@@ -474,7 +472,6 @@ export async function updateById(req, res) {
       });
     }
 
-    // ✅ CRITICAL FIX: Track old ledger IDs like Receipt does
     const oldItemLedgerIds = existingJournal.itemDetails.map((item) =>
       item.ledgerId?.toString()
     );
@@ -531,8 +528,6 @@ export async function updateById(req, res) {
     existingJournal.status = status || existingJournal.status;
 
     await existingJournal.save({ session });
-
-    // ✅ CRITICAL FIX: Like Receipt, track ledger changes properly
 
     // Get new ledger IDs
     const newItemLedgerIds = updatedItemDetails.map((item) =>

@@ -4,6 +4,11 @@ import ContraValidator from "../../../validators/ContraValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
 
+function toTwoDecimals(value) {
+  if (value === null || value === undefined || isNaN(value)) return 0;
+  return Math.round(Number(value) * 100) / 100;
+}
+
 async function getOrCreateOpeningBalanceRecord(
   schoolId,
   academicYear,
@@ -22,7 +27,7 @@ async function getOrCreateOpeningBalanceRecord(
 
   if (ledger) {
     balanceType = ledger.balanceType;
-    openingBalance = ledger.openingBalance || 0;
+    openingBalance = toTwoDecimals(ledger.openingBalance || 0);
   }
 
   let record = await OpeningClosingBalance.findOne({
@@ -46,7 +51,7 @@ async function getOrCreateOpeningBalanceRecord(
     .sort((a, b) => new Date(b.entryDate) - new Date(a.entryDate));
 
   if (previousBalanceDetails.length > 0) {
-    openingBalance = previousBalanceDetails[0].closingBalance;
+    openingBalance = toTwoDecimals(previousBalanceDetails[0].closingBalance);
   }
 
   return { record, openingBalance, balanceType };
@@ -62,8 +67,8 @@ async function updateOpeningClosingBalance(
   creditAmount = 0,
   session = null
 ) {
-  debitAmount = Number(debitAmount);
-  creditAmount = Number(creditAmount);
+  debitAmount = toTwoDecimals(Number(debitAmount));
+  creditAmount = toTwoDecimals(Number(creditAmount));
 
   const { record, openingBalance } = await getOrCreateOpeningBalanceRecord(
     schoolId,
@@ -159,8 +164,8 @@ async function recalculateAllBalancesAfterDate(
 
   let currentBalance =
     startIndex > 0
-      ? record.balanceDetails[startIndex - 1].closingBalance
-      : record.balanceDetails[0].openingBalance;
+      ? toTwoDecimals(record.balanceDetails[startIndex - 1].closingBalance)
+      : toTwoDecimals(record.balanceDetails[0].openingBalance);
 
   for (let i = startIndex; i < record.balanceDetails.length; i++) {
     const detail = record.balanceDetails[i];
@@ -175,10 +180,12 @@ async function recalculateAllBalancesAfterDate(
 
 function aggregateAmountsByLedger(itemDetails) {
   const ledgerMap = new Map();
+
   itemDetails.forEach((item) => {
     const ledgerId = item.ledgerId.toString();
-    const debitAmount = parseFloat(item.debitAmount) || 0;
-    const creditAmount = parseFloat(item.creditAmount) || 0;
+    const debitAmount = toTwoDecimals(item.debitAmount) || 0;
+    const creditAmount = toTwoDecimals(item.creditAmount) || 0;
+
     if (ledgerMap.has(ledgerId)) {
       const existing = ledgerMap.get(ledgerId);
       ledgerMap.set(ledgerId, {
@@ -186,19 +193,25 @@ function aggregateAmountsByLedger(itemDetails) {
         creditAmount: existing.creditAmount + creditAmount,
       });
     } else {
-      ledgerMap.set(ledgerId, { debitAmount, creditAmount });
+      ledgerMap.set(ledgerId, {
+        debitAmount: debitAmount,
+        creditAmount: creditAmount,
+      });
     }
   });
+
   return ledgerMap;
 }
 
 function aggregateCashAccountAmounts(itemDetails) {
   const cashAccountMap = new Map();
+
   itemDetails.forEach((item) => {
     if (item.ledgerIdOfCashAccount) {
       const cashAccountId = item.ledgerIdOfCashAccount.toString();
-      const debitAmount = parseFloat(item.debitAmount) || 0;
-      const creditAmount = parseFloat(item.creditAmount) || 0;
+      const debitAmount = toTwoDecimals(item.debitAmount) || 0;
+      const creditAmount = toTwoDecimals(item.creditAmount) || 0;
+
       if (cashAccountMap.has(cashAccountId)) {
         const existing = cashAccountMap.get(cashAccountId);
         cashAccountMap.set(cashAccountId, {
@@ -206,10 +219,14 @@ function aggregateCashAccountAmounts(itemDetails) {
           creditAmount: existing.creditAmount + creditAmount,
         });
       } else {
-        cashAccountMap.set(cashAccountId, { debitAmount, creditAmount });
+        cashAccountMap.set(cashAccountId, {
+          debitAmount: debitAmount,
+          creditAmount: creditAmount,
+        });
       }
     }
   });
+
   return cashAccountMap;
 }
 
@@ -350,22 +367,23 @@ export const updateById = async (req, res) => {
 
     const updatedItemDetails = itemDetails.map((item) => ({
       ...item,
-      debitAmount: parseFloat(item.debitAmount) || 0,
-      creditAmount: parseFloat(item.creditAmount) || 0,
+      debitAmount: toTwoDecimals(item.debitAmount) || 0,
+      creditAmount: toTwoDecimals(item.creditAmount) || 0,
     }));
     existingContra.itemDetails = updatedItemDetails;
 
-    const subTotalOfDebit = updatedItemDetails.reduce(
-      (sum, item) => sum + item.debitAmount,
-      0
-    );
-    const subTotalOfCredit = updatedItemDetails.reduce(
-      (sum, item) => sum + item.creditAmount,
-      0
+    const subTotalOfDebit = toTwoDecimals(
+      updatedItemDetails.reduce((sum, item) => sum + item.debitAmount, 0)
     );
 
+    const subTotalOfCredit = toTwoDecimals(
+      updatedItemDetails.reduce((sum, item) => sum + item.creditAmount, 0)
+    );
+
+    const tdsTcsAmount = TDSorTCS ? toTwoDecimals(TDSTCSRateAmount) || 0 : 0;
+
     const totalAmountOfDebit =
-      subTotalOfDebit + (parseFloat(TDSTCSRateAmount) || 0);
+      subTotalOfDebit + (toTwoDecimals(TDSTCSRateAmount) || 0);
     const totalAmountOfCredit = subTotalOfCredit;
 
     if (totalAmountOfDebit !== totalAmountOfCredit) {
@@ -379,8 +397,16 @@ export const updateById = async (req, res) => {
 
     existingContra.subTotalOfDebit = subTotalOfDebit;
     existingContra.subTotalOfCredit = subTotalOfCredit;
-    existingContra.TDSorTCS = TDSorTCS || existingContra.TDSorTCS;
-    existingContra.TDSTCSRateAmount = parseFloat(TDSTCSRateAmount) || 0;
+    existingContra.TDSorTCS = TDSorTCS || "";
+    existingContra.TDSTCSRateAmount = tdsTcsAmount;
+
+    if (!TDSorTCS) {
+      existingContra.TDSorTCSLedgerId = null;
+    } else {
+      if (!existingContra.TDSorTCSLedgerId) {
+      }
+    }
+
     existingContra.totalAmountOfDebit = totalAmountOfDebit;
     existingContra.totalAmountOfCredit = totalAmountOfCredit;
     existingContra.status = status || existingContra.status;

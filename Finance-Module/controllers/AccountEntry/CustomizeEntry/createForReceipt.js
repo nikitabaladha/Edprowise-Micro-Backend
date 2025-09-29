@@ -1,9 +1,15 @@
 import mongoose from "mongoose";
-import moment from "moment";
 import Receipt from "../../../models/Receipt.js";
 import ReceiptValidator from "../../../validators/CustomizeEntryForReceiptValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
+
+import { hasBankOrCashLedger } from "../../CommonFunction/CommonFunction.js";
+
+function toTwoDecimals(value) {
+  if (value === null || value === undefined || isNaN(value)) return 0;
+  return Math.round(Number(value) * 100) / 100;
+}
 
 async function generateReceiptVoucherNumber(schoolId, academicYear) {
   const count = await Receipt.countDocuments({ schoolId, academicYear });
@@ -65,12 +71,12 @@ async function updateOpeningClosingBalance(
   academicYear,
   ledgerId,
   entryDate,
-  receiptId,
+  receiptEntryId,
   debitAmount = 0,
   creditAmount = 0
 ) {
-  debitAmount = Number(debitAmount);
-  creditAmount = Number(creditAmount);
+  debitAmount = toTwoDecimals(debitAmount);
+  creditAmount = toTwoDecimals(creditAmount);
 
   const { record, openingBalance, balanceType } =
     await getOrCreateOpeningBalanceRecord(
@@ -85,24 +91,31 @@ async function updateOpeningClosingBalance(
     .filter((detail) => new Date(detail.entryDate) <= new Date(entryDate))
     .sort((a, b) => new Date(b.entryDate) - new Date(a.entryDate));
 
-  let effectiveOpeningBalance = openingBalance;
+  let effectiveOpeningBalance = toTwoDecimals(openingBalance);
+
   if (previousBalanceDetails.length > 0) {
-    effectiveOpeningBalance = previousBalanceDetails[0].closingBalance;
+    effectiveOpeningBalance = toTwoDecimals(
+      previousBalanceDetails[0].closingBalance
+    );
   }
 
   // --- Calculate closing balance ---
   let closingBalance;
   if (balanceType === "Debit") {
-    closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
+    closingBalance = toTwoDecimals(
+      effectiveOpeningBalance + debitAmount - creditAmount
+    );
   } else {
-    closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
+    closingBalance = toTwoDecimals(
+      effectiveOpeningBalance + debitAmount - creditAmount
+    );
   }
 
   // --- Check if exact same entry already exists ---
   const existingEntryIndex = record.balanceDetails.findIndex(
     (detail) =>
       new Date(detail.entryDate).getTime() === new Date(entryDate).getTime() &&
-      detail.entryId?.toString() === receiptId.toString()
+      detail.entryId?.toString() === receiptEntryId.toString()
   );
 
   if (existingEntryIndex !== -1) {
@@ -112,7 +125,7 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: receiptId, // Store Receipt _id as entryId
+      entryId: receiptEntryId,
     };
   } else {
     const newBalanceDetail = {
@@ -121,7 +134,7 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: receiptId, // Store Receipt _id as entryId
+      entryId: receiptEntryId,
     };
 
     record.balanceDetails.push(newBalanceDetail);
@@ -167,7 +180,7 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
   });
 
   // Find the initial opening balance (from ledger or first entry)
-  let currentBalance = record.balanceDetails[0].openingBalance;
+  let currentBalance = toTwoDecimals(record.balanceDetails[0].openingBalance);
 
   for (let i = 0; i < record.balanceDetails.length; i++) {
     const detail = record.balanceDetails[i];
@@ -176,15 +189,21 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
       currentBalance = detail.openingBalance;
     } else {
       // Update opening balance to previous closing balance
-      detail.openingBalance = record.balanceDetails[i - 1].closingBalance;
+      detail.openingBalance = toTwoDecimals(
+        record.balanceDetails[i - 1].closingBalance
+      );
       currentBalance = detail.openingBalance;
     }
 
     // Calculate new closing balance
     if (balanceType === "Debit") {
-      detail.closingBalance = currentBalance + detail.debit - detail.credit;
+      detail.closingBalance = toTwoDecimals(
+        currentBalance + detail.debit - detail.credit
+      );
     } else {
-      detail.closingBalance = currentBalance + detail.debit - detail.credit;
+      detail.closingBalance = toTwoDecimals(
+        currentBalance + detail.debit - detail.credit
+      );
     }
 
     currentBalance = detail.closingBalance;
@@ -256,8 +275,8 @@ function aggregateAmountsByLedger(itemDetails) {
 
   itemDetails.forEach((item) => {
     const ledgerId = item.ledgerId.toString();
-    const debitAmount = parseFloat(item.debitAmount) || 0;
-    const amount = parseFloat(item.amount) || 0;
+    const debitAmount = toTwoDecimals(item.debitAmount) || 0;
+    const amount = toTwoDecimals(item.amount) || 0;
 
     if (ledgerMap.has(ledgerId)) {
       const existing = ledgerMap.get(ledgerId);
@@ -315,6 +334,22 @@ async function create(req, res) {
       customizeEntry,
     } = req.body;
 
+    const hasValidLedger = await hasBankOrCashLedger(
+      schoolId,
+      academicYear,
+      itemDetails
+    );
+
+    if (!hasValidLedger) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        hasError: true,
+        message:
+          "At least one ledger must have Group Ledger Name as 'Bank' or 'Cash'",
+      });
+    }
+
     const receiptVoucherNumber = await generateReceiptVoucherNumber(
       schoolId,
       academicYear
@@ -337,14 +372,18 @@ async function create(req, res) {
       amount: parseFloat(item.amount) || 0,
     }));
 
-    const subTotalAmount = updatedItemDetails.reduce(
-      (sum, item) => sum + (parseFloat(item.amount) || 0),
-      0
+    const subTotalAmount = toTwoDecimals(
+      updatedItemDetails.reduce(
+        (sum, item) => sum + (parseFloat(item.amount) || 0),
+        0
+      )
     );
 
-    const subTotalOfDebit = updatedItemDetails.reduce(
-      (sum, item) => sum + (parseFloat(item.debitAmount) || 0),
-      0
+    const subTotalOfDebit = toTwoDecimals(
+      updatedItemDetails.reduce(
+        (sum, item) => sum + (parseFloat(item.debitAmount) || 0),
+        0
+      )
     );
 
     const newReceipt = new Receipt({
