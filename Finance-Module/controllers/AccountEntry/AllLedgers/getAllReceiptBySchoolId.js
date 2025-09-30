@@ -197,6 +197,8 @@ async function getAllReceiptBySchoolId(req, res) {
         receiptImage: entry.receiptImage,
         chequeImageForReceipt: entry.chequeImageForReceipt || null,
         status: entry.status || null,
+        approvalStatus: entry.approvalStatus,
+        reasonOfDisapprove: entry.reasonOfDisapprove,
       };
 
       formattedData.push(entryData);

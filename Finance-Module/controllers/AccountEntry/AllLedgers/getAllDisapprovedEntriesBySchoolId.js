@@ -12,7 +12,7 @@ import AuthorisedSignature from "../../../models/AuthorisedSignature.js";
 
 import mongoose from "mongoose";
 
-async function getAllBySchoolId(req, res) {
+async function getAllDisapprovedEntriesBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
     const { academicYear } = req.params;
@@ -55,6 +55,7 @@ async function getAllBySchoolId(req, res) {
       schoolId,
       ...dateFilter,
       status: "Posted",
+      approvalStatus: "Disapproved",
     })
       .sort({ createdAt: -1 })
       .lean();
@@ -63,6 +64,7 @@ async function getAllBySchoolId(req, res) {
       schoolId,
       ...dateFilter,
       status: "Posted",
+      approvalStatus: "Disapproved",
     })
       .sort({ createdAt: -1 })
       .lean();
@@ -71,6 +73,7 @@ async function getAllBySchoolId(req, res) {
       schoolId,
       ...dateFilter,
       status: "Posted",
+      approvalStatus: "Disapproved",
     })
       .sort({ createdAt: -1 })
       .lean();
@@ -79,6 +82,7 @@ async function getAllBySchoolId(req, res) {
       schoolId,
       ...dateFilter,
       status: "Posted",
+      approvalStatus: "Disapproved",
     })
       .sort({ createdAt: -1 })
       .lean();
@@ -250,6 +254,8 @@ async function getAllBySchoolId(req, res) {
         invoiceNumber: entry.invoiceNumber,
         invoiceImage: entry.invoiceImage,
         chequeImage: entry.chequeImage || null,
+        approvalStatus: entry.approvalStatus,
+        reasonOfDisapprove: entry.reasonOfDisapprove,
       };
 
       formattedData.push(entryData);
@@ -396,6 +402,8 @@ async function getAllBySchoolId(req, res) {
         // Authorised Signature
         authorisedSignatureImage:
           authorisedSignature?.authorisedSignatureImage || null,
+        approvalStatus: entry.approvalStatus,
+        reasonOfDisapprove: entry.reasonOfDisapprove,
       };
 
       formattedData.push(entryData);
@@ -541,6 +549,9 @@ async function getAllBySchoolId(req, res) {
         TDSorTCSLedgerName,
         itemDetails: itemsWithLedgerNames,
         customizeEntry: entry.customizeEntry,
+
+        approvalStatus: entry.approvalStatus,
+        reasonOfDisapprove: entry.reasonOfDisapprove,
       };
 
       formattedData.push(entryData);
@@ -602,6 +613,9 @@ async function getAllBySchoolId(req, res) {
         // Item details
         itemDetails: itemsWithLedgerNames,
         customizeEntry: entry.customizeEntry,
+
+        approvalStatus: entry.approvalStatus,
+        reasonOfDisapprove: entry.reasonOfDisapprove,
       };
 
       formattedData.push(entryData);
@@ -621,4 +635,4 @@ async function getAllBySchoolId(req, res) {
   }
 }
 
-export default getAllBySchoolId;
+export default getAllDisapprovedEntriesBySchoolId;

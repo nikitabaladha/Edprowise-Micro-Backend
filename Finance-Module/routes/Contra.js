@@ -13,6 +13,7 @@ import {
   dreaftContra,
   updateDraftContraById,
   getAllLedgerByNameWithTDSorTCS,
+  updateApprovalStatusById,
 } from "../controllers/AccountEntry/Contra/index.js";
 
 router.post(
@@ -40,6 +41,12 @@ router.put(
   upload,
   roleBasedMiddleware("School"),
   updateContraById
+);
+
+router.put(
+  "/update-approval-status-for-contra/:id/:academicYear",
+  roleBasedMiddleware("School"),
+  updateApprovalStatusById
 );
 
 router.put(

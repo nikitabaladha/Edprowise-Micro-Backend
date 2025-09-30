@@ -105,6 +105,9 @@ async function getAllJournalBySchoolId(req, res) {
         // Item details
         itemDetails: itemsWithLedgerNames,
         customizeEntry: entry.customizeEntry,
+
+        approvalStatus: entry.approvalStatus,
+        reasonOfDisapprove: entry.reasonOfDisapprove,
       };
 
       formattedData.push(entryData);

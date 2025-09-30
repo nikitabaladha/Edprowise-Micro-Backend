@@ -370,7 +370,6 @@ async function getAllDateMonthDataWithDebitCredit(req, res) {
         vendorId: entry.vendorId,
         entryDate: entry.entryDate,
         invoiceDate: entry.invoiceDate,
-        invoiceNumber: entry.invoiceNumber,
         poNumber: entry.poNumber,
         dueDate: entry.dueDate,
         paymentMode: entry.paymentMode,

@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 
 function toTwoDecimals(value) {
   if (value === null || value === undefined || isNaN(value)) return 0;
-  // Convert to string → split → cut decimals → join back
   const [intPart, decimalPart = ""] = value.toString().split(".");
   return parseFloat(intPart + "." + decimalPart.slice(0, 2));
 }
@@ -119,6 +118,15 @@ const PaymentEntrySchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: ["Posted", "Draft", "Reversed", "Cancelled"],
+    },
+    approvalStatus: {
+      type: String,
+      required: true,
+      enum: ["Pending", "Approved", "Disapproved"],
+      default: "Pending",
+    },
+    reasonOfDisapprove: {
+      type: String,
     },
   },
   {

@@ -5,6 +5,7 @@ import getAllContraBySchoolId from "./getAllContraBySchoolId.js";
 import getAllJournalBySchoolId from "./getAllJournalBySchoolId.js";
 import getAllMonthWithdebitCredit from "./getAllMonthWithDebitCredit.js";
 import getAllDateMonthDataWithDebitCredit from "./getAllDateMonthDataWithDebitCredit.js";
+import getAllDisapprovedEntriesBySchoolId from "./getAllDisapprovedEntriesBySchoolId.js";
 
 export {
   getAllBySchoolId,
@@ -14,4 +15,5 @@ export {
   getAllJournalBySchoolId,
   getAllMonthWithdebitCredit,
   getAllDateMonthDataWithDebitCredit,
+  getAllDisapprovedEntriesBySchoolId,
 };

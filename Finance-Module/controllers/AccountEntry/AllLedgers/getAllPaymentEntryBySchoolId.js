@@ -231,6 +231,8 @@ async function getAllBySchoolId(req, res) {
         rate: tdsTcsRateChart?.rate || null,
 
         status: entry.status || null,
+        approvalStatus: entry.approvalStatus,
+        reasonOfDisapprove: entry.reasonOfDisapprove,
       };
 
       formattedData.push(entryData);

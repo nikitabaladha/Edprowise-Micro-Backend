@@ -99,6 +99,15 @@ const ReceiptSchema = new mongoose.Schema(
       required: true,
       enum: ["Posted", "Draft", "Reversed", "Cancelled"],
     },
+    approvalStatus: {
+      type: String,
+      required: true,
+      enum: ["Pending", "Approved", "Disapproved"],
+      default: "Pending",
+    },
+    reasonOfDisapprove: {
+      type: String,
+    },
   },
   {
     timestamps: true,
