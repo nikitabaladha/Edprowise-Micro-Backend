@@ -108,6 +108,7 @@ async function getAllJournalBySchoolId(req, res) {
 
         approvalStatus: entry.approvalStatus,
         reasonOfDisapprove: entry.reasonOfDisapprove,
+        documentImage: entry.documentImage,
       };
 
       formattedData.push(entryData);

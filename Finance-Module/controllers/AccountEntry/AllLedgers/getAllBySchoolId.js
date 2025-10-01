@@ -602,6 +602,7 @@ async function getAllBySchoolId(req, res) {
         // Item details
         itemDetails: itemsWithLedgerNames,
         customizeEntry: entry.customizeEntry,
+        documentImage: entry.documentImage,
       };
 
       formattedData.push(entryData);

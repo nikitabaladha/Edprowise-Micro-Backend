@@ -981,6 +981,7 @@ async function getAllDateMonthDataWithDebitCredit(req, res) {
         academicYear: entry.academicYear,
 
         customizeEntry: entry.customizeEntry,
+        documentImage: entry.documentImage,
       };
 
       formattedData.push(entryData);

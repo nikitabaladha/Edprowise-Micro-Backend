@@ -128,36 +128,46 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
     // Step 5: Calculate closing balances for each ledger within date range
     const ledgerBalances = {};
 
-    for (const ledger of ledgers) {
-      const ledgerId = ledger._id.toString();
+    for (const record of balanceRecords) {
+      const ledgerId = record.ledgerId._id.toString();
 
-      // Find balance record for this ledger
-      const record = balanceRecords.find(
-        (r) => r.ledgerId._id.toString() === ledgerId
-      );
+      // Group by date and get the latest entry for each date
+      const dateGroups = {};
 
-      if (record) {
-        // Group by date and get the latest entry for each date
-        const dateGroups = {};
-
-        record.balanceDetails.forEach((detail) => {
-          const detailDate = moment(detail.entryDate).format("YYYY-MM-DD");
-          if (moment(detailDate).isBetween(start, end, null, "[]")) {
-            if (!dateGroups[detailDate]) {
-              dateGroups[detailDate] = [];
-            }
-            dateGroups[detailDate].push(detail);
+      record.balanceDetails.forEach((detail) => {
+        const detailDate = moment(detail.entryDate).format("YYYY-MM-DD");
+        if (moment(detailDate).isBetween(start, end, null, "[]")) {
+          if (!dateGroups[detailDate]) {
+            dateGroups[detailDate] = [];
           }
+          dateGroups[detailDate].push(detail);
+        }
+      });
+
+      // For each date, get the latest entry
+      let latestClosingBalance = 0;
+      let hasEntriesInRange = false;
+
+      for (const date in dateGroups) {
+        const entriesForDate = dateGroups[date];
+        // Sort by creation time (using _id) to get the latest entry for this date
+        const sortedEntries = entriesForDate.sort((a, b) => {
+          const aTimestamp = new mongoose.Types.ObjectId(a._id).getTimestamp();
+          const bTimestamp = new mongoose.Types.ObjectId(b._id).getTimestamp();
+          return bTimestamp - aTimestamp;
         });
 
-        // For each date, get the latest entry
-        let latestClosingBalance = 0;
-        let hasEntriesInRange = false;
+        latestClosingBalance = sortedEntries[0].closingBalance;
+        hasEntriesInRange = true;
+      }
 
-        for (const date in dateGroups) {
-          const entriesForDate = dateGroups[date];
-          // Sort by creation time (using _id) to get the latest entry for this date
-          const sortedEntries = entriesForDate.sort((a, b) => {
+      if (hasEntriesInRange) {
+        ledgerBalances[ledgerId] = latestClosingBalance;
+      } else {
+        // If no entries in date range, use the last balance before the range
+        const previousDetails = record.balanceDetails
+          .filter((detail) => moment(detail.entryDate).isBefore(start))
+          .sort((a, b) => {
             const aTimestamp = new mongoose.Types.ObjectId(
               a._id
             ).getTimestamp();
@@ -167,36 +177,13 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
             return bTimestamp - aTimestamp;
           });
 
-          latestClosingBalance = sortedEntries[0].closingBalance;
-          hasEntriesInRange = true;
-        }
-
-        if (hasEntriesInRange) {
-          ledgerBalances[ledgerId] = latestClosingBalance;
+        if (previousDetails.length > 0) {
+          ledgerBalances[ledgerId] = previousDetails[0].closingBalance;
         } else {
-          // If no entries in date range, use the last balance before the range
-          const previousDetails = record.balanceDetails
-            .filter((detail) => moment(detail.entryDate).isBefore(start))
-            .sort((a, b) => {
-              const aTimestamp = new mongoose.Types.ObjectId(
-                a._id
-              ).getTimestamp();
-              const bTimestamp = new mongoose.Types.ObjectId(
-                b._id
-              ).getTimestamp();
-              return bTimestamp - aTimestamp;
-            });
-
-          if (previousDetails.length > 0) {
-            ledgerBalances[ledgerId] = previousDetails[0].closingBalance;
-          } else {
-            // If no entries at all in OpeningClosingBalance, use opening balance from ledger
-            ledgerBalances[ledgerId] = ledger.openingBalance || 0;
-          }
+          // If no entries at all, use opening balance from ledger
+          const ledger = ledgers.find((l) => l._id.toString() === ledgerId);
+          ledgerBalances[ledgerId] = ledger?.openingBalance || 0;
         }
-      } else {
-        // If no record in OpeningClosingBalance table, use the ledger's opening balance
-        ledgerBalances[ledgerId] = ledger.openingBalance || 0;
       }
     }
 
@@ -248,12 +235,11 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
         };
       }
 
-      // Add balance to group ledger (include ALL balances - positive, negative, zero)
+      // Add balance to group ledger
       groupedData[headOfAccountName][bspLedgerId].groupLedgers[
         groupLedgerId
       ].closingBalance += balance;
-
-      // Add balance to BSPL ledger total (include ALL balances)
+      // Add balance to BSPL ledger total
       groupedData[headOfAccountName][bspLedgerId].totalBalance += balance;
     }
 
@@ -264,16 +250,16 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
       for (const bspLedgerId in bspLedgers) {
         const bspLedgerData = bspLedgers[bspLedgerId];
 
-        // REMOVE the filter - include ALL group ledgers regardless of balance
-        const allGroupLedgers = Object.values(bspLedgerData.groupLedgers);
+        const filteredGroupLedgers = Object.values(
+          bspLedgerData.groupLedgers
+        ).filter((groupLedger) => groupLedger.closingBalance !== 0);
 
-        // Only include BSPL ledger if it has group ledgers (which it always should)
-        if (allGroupLedgers.length > 0) {
+        if (filteredGroupLedgers.length > 0) {
           const formattedBspLedger = {
             bSPLLedgerId: bspLedgerData.bSPLLedgerId,
             bSPLLedgerName: bspLedgerData.bSPLLedgerName,
             totalBalance: bspLedgerData.totalBalance,
-            groupLedgers: allGroupLedgers, // Include ALL group ledgers
+            groupLedgers: filteredGroupLedgers,
           };
 
           // Add to the appropriate result array
@@ -285,6 +271,8 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
         }
       }
     }
+
+    // which ever group laedger has closing balance 0 dont send it if negative or positive valuw then send it
 
     // Step 8: Sort the results
     result.assets.sort((a, b) =>
