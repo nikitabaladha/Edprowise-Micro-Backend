@@ -343,7 +343,6 @@ async function removeContraEntryFromLedger(
 
   // Remove the entry from balanceDetails
   const originalLength = record.balanceDetails.length;
-  s;
   record.balanceDetails = record.balanceDetails.filter(
     (detail) => detail.entryId?.toString() !== contraEntryId.toString()
   );
