@@ -3,7 +3,7 @@ import Ledger from "../../models/Ledger.js";
 import HeadOfAccount from "../../models/HeadOfAccount.js";
 import moment from "moment";
 
-async function getScheduleToAssets(req, res) {
+async function getScheduleToLiabilities(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
@@ -50,29 +50,26 @@ async function getScheduleToAssets(req, res) {
       });
     }
 
-    // Step 1: Find HeadOfAccount IDs for "Assets"
-    const assetsHead = await HeadOfAccount.findOne({
+    // Step 1: Find HeadOfAccount IDs for "Liabilities"
+    const liabilitiesHead = await HeadOfAccount.findOne({
       schoolId,
       academicYear,
-      headOfAccountName: "Assets",
+      headOfAccountName: "Liabilities",
     });
 
-    if (!assetsHead) {
+    if (!liabilitiesHead) {
       return res.status(200).json({
         hasError: false,
-        message: "No Assets head accounts found",
+        message: "No Liabilities head accounts found",
         data: [],
       });
     }
 
-    // see if there is bSPLLedgerName is Capital Fund then dont give that
-    // give me other than that
-
-    // Step 2: Find all ledgers under Assets with proper population
+    // Step 2: Find all ledgers under Liabilities with proper population
     const ledgers = await Ledger.find({
       schoolId,
       academicYear,
-      headOfAccountId: assetsHead._id,
+      headOfAccountId: liabilitiesHead._id,
     })
       .populate({
         path: "groupLedgerId",
@@ -86,24 +83,13 @@ async function getScheduleToAssets(req, res) {
     if (ledgers.length === 0) {
       return res.status(200).json({
         hasError: false,
-        message: "No ledgers found for Assets head",
+        message: "No ledgers found for Liabilities head",
         data: [],
       });
     }
 
-    // =======Here all removed Fixed Assets======
-
-    // Filter out ledgers with bSPLLedgerName "Fixed Assets"
-    const filteredLedgers = ledgers.filter(
-      (ledger) => ledger.bSPLLedgerId?.bSPLLedgerName !== "Fixed Assets"
-    );
-
-    // Step 3: Get all ledger IDs from filtered ledgers
-    const ledgerIds = filteredLedgers.map((ledger) => ledger._id);
-
     // Step 3: Get all ledger IDs
-    // =======Here all coming======
-    // const ledgerIds = ledgers.map((ledger) => ledger._id);
+    const ledgerIds = ledgers.map((ledger) => ledger._id);
 
     // Step 4: Find OpeningClosingBalance records for these ledgers
     const balanceRecords = await OpeningClosingBalance.find({
@@ -127,125 +113,7 @@ async function getScheduleToAssets(req, res) {
     // Step 5: Create a map to organize data by BSPL Ledger -> Group Ledger -> Ledger
     const bspLedgerMap = {};
 
-    // for (const ledger of ledgers) {
-    //   const bspLedgerId = ledger.bSPLLedgerId?._id.toString();
-    //   const bspLedgerName =
-    //     ledger.bSPLLedgerId?.bSPLLedgerName || "Uncategorized";
-
-    //   const groupLedgerId = ledger.groupLedgerId?._id.toString();
-    //   const groupLedgerName =
-    //     ledger.groupLedgerId?.groupLedgerName || "Uncategorized";
-
-    //   const ledgerId = ledger._id.toString();
-    //   const ledgerName = ledger.ledgerName;
-
-    //   if (!bspLedgerId || !groupLedgerId) continue;
-
-    //   // Initialize BSPL Ledger entry if it doesn't exist
-    //   if (!bspLedgerMap[bspLedgerId]) {
-    //     bspLedgerMap[bspLedgerId] = {
-    //       bSPLLedgerId: bspLedgerId,
-    //       bSPLLedgerName: bspLedgerName,
-    //       groupLedgers: {},
-    //     };
-    //   }
-
-    //   // Initialize Group Ledger entry if it doesn't exist
-    //   if (!bspLedgerMap[bspLedgerId].groupLedgers[groupLedgerId]) {
-    //     bspLedgerMap[bspLedgerId].groupLedgers[groupLedgerId] = {
-    //       groupLedgerId: groupLedgerId,
-    //       groupLedgerName: groupLedgerName,
-    //       ledgers: {},
-    //     };
-    //   }
-
-    //   // Initialize Ledger entry if it doesn't exist
-    //   if (
-    //     !bspLedgerMap[bspLedgerId].groupLedgers[groupLedgerId].ledgers[ledgerId]
-    //   ) {
-    //     bspLedgerMap[bspLedgerId].groupLedgers[groupLedgerId].ledgers[
-    //       ledgerId
-    //     ] = {
-    //       ledgerId: ledgerId,
-    //       ledgerName: ledgerName,
-    //       openingBalance: 0,
-    //       debit: 0,
-    //       credit: 0,
-    //       closingBalance: 0,
-    //     };
-    //   }
-
-    //   const balanceRecord = balanceRecordsMap[ledgerId];
-    //   let openingBalance = ledger.openingBalance || 0;
-    //   let totalDebit = 0;
-    //   let totalCredit = 0;
-
-    //   if (balanceRecord && balanceRecord.balanceDetails.length > 0) {
-    //     // Get all entries within the date range
-    //     const entriesInRange = balanceRecord.balanceDetails.filter((detail) => {
-    //       const detailDate = moment(detail.entryDate);
-    //       return detailDate.isBetween(start, end, null, "[]");
-    //     });
-
-    //     if (entriesInRange.length > 0) {
-    //       // Sort entries by date to get the correct order
-    //       entriesInRange.sort(
-    //         (a, b) => moment(a.entryDate) - moment(b.entryDate)
-    //       );
-
-    //       // Get the opening balance from the first entry in the range
-    //       openingBalance = entriesInRange[0].openingBalance || 0;
-
-    //       // Sum all debit and credit transactions within the range
-    //       entriesInRange.forEach((entry) => {
-    //         totalDebit += entry.debit || 0;
-    //         totalCredit += entry.credit || 0;
-    //       });
-    //     } else {
-    //       // No entries in range, find the latest entry before the start date
-    //       const entriesBeforeStart = balanceRecord.balanceDetails.filter(
-    //         (detail) => {
-    //           const detailDate = moment(detail.entryDate);
-    //           return detailDate.isBefore(start);
-    //         }
-    //       );
-
-    //       if (entriesBeforeStart.length > 0) {
-    //         // Get the latest entry before start date
-    //         entriesBeforeStart.sort(
-    //           (a, b) => moment(b.entryDate) - moment(a.entryDate)
-    //         );
-    //         openingBalance = entriesBeforeStart[0].closingBalance || 0;
-    //       }
-    //       // If no entries before start date, use ledger's opening balance
-    //     }
-    //   }
-
-    //   // Adjust for balance type (Credit balances are typically negative in accounting)
-    //   const isCreditBalance = ledger.balanceType === "Credit";
-    //   if (isCreditBalance) {
-    //     openingBalance = -Math.abs(openingBalance);
-    //   }
-
-    //   // Calculate closing balance
-    //   const closingBalance = openingBalance + totalDebit - totalCredit;
-
-    //   // Update ledger balances
-    //   bspLedgerMap[bspLedgerId].groupLedgers[groupLedgerId].ledgers[
-    //     ledgerId
-    //   ].openingBalance = openingBalance;
-    //   bspLedgerMap[bspLedgerId].groupLedgers[groupLedgerId].ledgers[
-    //     ledgerId
-    //   ].debit = totalDebit;
-    //   bspLedgerMap[bspLedgerId].groupLedgers[groupLedgerId].ledgers[
-    //     ledgerId
-    //   ].credit = totalCredit;
-    //   bspLedgerMap[bspLedgerId].groupLedgers[groupLedgerId].ledgers[
-    //     ledgerId
-    //   ].closingBalance = closingBalance;
-    // }
-
-    for (const ledger of filteredLedgers) {
+    for (const ledger of ledgers) {
       const bspLedgerId = ledger.bSPLLedgerId?._id.toString();
       const bspLedgerName =
         ledger.bSPLLedgerId?.bSPLLedgerName || "Uncategorized";
@@ -339,7 +207,6 @@ async function getScheduleToAssets(req, res) {
         }
       }
 
-      // Adjust for balance type (Credit balances are typically negative in accounting)
       const isCreditBalance = ledger.balanceType === "Credit";
       if (isCreditBalance) {
         openingBalance = -Math.abs(openingBalance);
@@ -378,11 +245,11 @@ async function getScheduleToAssets(req, res) {
 
     return res.status(200).json({
       hasError: false,
-      message: "Schedule To Assets fetched successfully",
+      message: "Schedule To Liabilities fetched successfully",
       data: result,
     });
   } catch (error) {
-    console.error("Error fetching Schedule To Assets:", error);
+    console.error("Error fetching Schedule To Liabilities:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",
@@ -390,4 +257,4 @@ async function getScheduleToAssets(req, res) {
   }
 }
 
-export default getScheduleToAssets;
+export default getScheduleToLiabilities;

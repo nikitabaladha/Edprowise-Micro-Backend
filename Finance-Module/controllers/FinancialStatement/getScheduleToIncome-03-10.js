@@ -1,10 +1,12 @@
 import OpeningClosingBalance from "../../models/OpeningClosingBalance.js";
 import Ledger from "../../models/Ledger.js";
+import BSPLLedger from "../../models/BSPLLedger.js";
+import GroupLedger from "../../models/GroupLedger.js";
 import HeadOfAccount from "../../models/HeadOfAccount.js";
 import moment from "moment";
 import mongoose from "mongoose";
 
-async function getScheduleToExpenditure(req, res) {
+async function getScheduleToIncome(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
@@ -51,17 +53,17 @@ async function getScheduleToExpenditure(req, res) {
       });
     }
 
-    // Step 1: Find HeadOfAccount IDs for "Expenses"
-    const expensesHead = await HeadOfAccount.findOne({
+    // Step 1: Find HeadOfAccount IDs for "Income"
+    const incomeHead = await HeadOfAccount.findOne({
       schoolId,
       academicYear,
-      headOfAccountName: "Expenses",
+      headOfAccountName: "Income",
     });
 
-    if (!expensesHead) {
+    if (!incomeHead) {
       return res.status(200).json({
         hasError: false,
-        message: "No Expenses head accounts found",
+        message: "No Income head accounts found",
         data: [],
       });
     }
@@ -70,7 +72,7 @@ async function getScheduleToExpenditure(req, res) {
     const ledgers = await Ledger.find({
       schoolId,
       academicYear,
-      headOfAccountId: expensesHead._id,
+      headOfAccountId: incomeHead._id,
     })
       .populate({
         path: "groupLedgerId",
@@ -85,7 +87,7 @@ async function getScheduleToExpenditure(req, res) {
     if (ledgers.length === 0) {
       return res.status(200).json({
         hasError: false,
-        message: "No ledgers found for Expenses head",
+        message: "No ledgers found for Income head",
         data: [],
       });
     }
@@ -102,6 +104,42 @@ async function getScheduleToExpenditure(req, res) {
 
     // Step 5: Calculate closing balances for each ledger within date range
     const ledgerBalances = {};
+
+    // for (const record of balanceRecords) {
+    //   const ledgerId = record.ledgerId._id.toString();
+
+    //   // Find the latest balance detail within the date range
+    //   const relevantDetails = record.balanceDetails
+    //     .filter((detail) => {
+    //       const detailDate = moment(detail.entryDate);
+    //       return detailDate.isBetween(start, end, null, "[]"); // inclusive
+    //     })
+    //     .sort(
+    //       (a, b) =>
+    //         moment(b.entryDate).valueOf() - moment(a.entryDate).valueOf()
+    //     );
+
+    //   if (relevantDetails.length > 0) {
+    //     const latestDetail = relevantDetails[0];
+    //     ledgerBalances[ledgerId] = latestDetail.closingBalance;
+    //   } else {
+    //     // If no entries in date range, use the last balance before the range
+    //     const previousDetails = record.balanceDetails
+    //       .filter((detail) => moment(detail.entryDate).isBefore(start))
+    //       .sort(
+    //         (a, b) =>
+    //           moment(b.entryDate).valueOf() - moment(a.entryDate).valueOf()
+    //       );
+
+    //     if (previousDetails.length > 0) {
+    //       ledgerBalances[ledgerId] = previousDetails[0].closingBalance;
+    //     } else {
+    //       // If no entries at all, use opening balance from ledger
+    //       const ledger = ledgers.find((l) => l._id.toString() === ledgerId);
+    //       ledgerBalances[ledgerId] = ledger?.openingBalance || 0;
+    //     }
+    //   }
+    // }
 
     // Step 6: Group data by BSPL Ledger and then by Group Ledger
 
@@ -213,7 +251,6 @@ async function getScheduleToExpenditure(req, res) {
       groupLedgers: Object.values(bspLedger.groupLedgers),
     }));
 
-    // Filter out group ledgers with zero balance
     result.forEach((bspLedger) => {
       bspLedger.groupLedgers = bspLedger.groupLedgers.filter(
         (groupLedger) => groupLedger.closingBalance !== 0
@@ -225,29 +262,22 @@ async function getScheduleToExpenditure(req, res) {
       (bspLedger) => bspLedger.groupLedgers.length > 0
     );
 
-    // Step 8: Sort by BSPL Ledger name alphabetically (to match getIncomeAndExpenditureAccount)
-    filteredResult.sort((a, b) => {
-      const nameA = a.bSPLLedgerName || "";
-      const nameB = b.bSPLLedgerName || "";
-      return nameA.localeCompare(nameB);
-    });
+    // Step 8: Sort by total balance descending (highest first)
+    filteredResult.sort((a, b) => b.totalBalance - a.totalBalance);
 
-    // Step 9: Sort group ledgers within each BSPL ledger alphabetically
+    // Step 9: Sort group ledgers within each BSPL ledger by balance descending
     filteredResult.forEach((bspLedger) => {
-      bspLedger.groupLedgers.sort((a, b) => {
-        const nameA = a.groupLedgerName || "";
-        const nameB = b.groupLedgerName || "";
-        return nameA.localeCompare(nameB);
-      });
+      bspLedger.groupLedgers.sort(
+        (a, b) => b.closingBalance - a.closingBalance
+      );
     });
-
     return res.status(200).json({
       hasError: false,
-      message: "Schedule To Expenses fetched successfully",
+      message: "Schedule To Income fetched successfully",
       data: filteredResult,
     });
   } catch (error) {
-    console.error("Error fetching Schedule To Expenses:", error);
+    console.error("Error fetching Schedule To Income:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",
@@ -255,4 +285,4 @@ async function getScheduleToExpenditure(req, res) {
   }
 }
 
-export default getScheduleToExpenditure;
+export default getScheduleToIncome;

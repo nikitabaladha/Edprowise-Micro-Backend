@@ -1,11 +1,12 @@
 import OpeningClosingBalance from "../../models/OpeningClosingBalance.js";
 import Ledger from "../../models/Ledger.js";
 import BSPLLedger from "../../models/BSPLLedger.js";
+import GroupLedger from "../../models/GroupLedger.js";
 import HeadOfAccount from "../../models/HeadOfAccount.js";
 import moment from "moment";
 import mongoose from "mongoose";
 
-async function getBalanceSheetForAssetsLiabilities(req, res) {
+async function getScheduleToExpenditure(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
@@ -52,45 +53,27 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
       });
     }
 
-    // Step 1: Find HeadOfAccount IDs for "Assets" and "Liabilities"
-    const assetsHead = await HeadOfAccount.findOne({
+    // Step 1: Find HeadOfAccount IDs for "Expenses"
+    const expensesHead = await HeadOfAccount.findOne({
       schoolId,
       academicYear,
-      headOfAccountName: "Assets",
+      headOfAccountName: "Expenses",
     });
 
-    const liabilitiesHead = await HeadOfAccount.findOne({
-      schoolId,
-      academicYear,
-      headOfAccountName: "Liabilities",
-    });
-
-    if (!assetsHead && !liabilitiesHead) {
+    if (!expensesHead) {
       return res.status(200).json({
         hasError: false,
-        message: "No Assets or Liabilities head accounts found",
-        data: {
-          assets: [],
-          liabilities: [],
-        },
+        message: "No Expenses head accounts found",
+        data: [],
       });
     }
 
-    // Step 2: Find all ledgers under Assets and Liabilities heads
-    const ledgerQuery = {
+    // Step 2: Find all ledgers under Income with proper population
+    const ledgers = await Ledger.find({
       schoolId,
       academicYear,
-      $or: [],
-    };
-
-    if (assetsHead) {
-      ledgerQuery.$or.push({ headOfAccountId: assetsHead._id });
-    }
-    if (liabilitiesHead) {
-      ledgerQuery.$or.push({ headOfAccountId: liabilitiesHead._id });
-    }
-
-    const ledgers = await Ledger.find(ledgerQuery)
+      headOfAccountId: expensesHead._id,
+    })
       .populate({
         path: "groupLedgerId",
         select: "groupLedgerName",
@@ -99,19 +82,13 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
         path: "bSPLLedgerId",
         select: "bSPLLedgerName",
       })
-      .populate({
-        path: "headOfAccountId",
-        select: "headOfAccountName",
-      });
+      .populate("headOfAccountId");
 
     if (ledgers.length === 0) {
       return res.status(200).json({
         hasError: false,
-        message: "No ledgers found for Assets or Liabilities heads",
-        data: {
-          assets: [],
-          liabilities: [],
-        },
+        message: "No ledgers found for Expenses head",
+        data: [],
       });
     }
 
@@ -127,6 +104,8 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
 
     // Step 5: Calculate closing balances for each ledger within date range
     const ledgerBalances = {};
+
+    // Step 6: Group data by BSPL Ledger and then by Group Ledger
 
     for (const record of balanceRecords) {
       const ledgerId = record.ledgerId._id.toString();
@@ -187,120 +166,83 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
       }
     }
 
-    // Step 6: Group data by HeadOfAccount → BSPLLedger → GroupLedger
-    const result = {
-      assets: [],
-      liabilities: [],
-    };
-
-    // Create a nested structure for grouping
-    const groupedData = {};
+    const bspLedgerMap = {};
 
     for (const ledger of ledgers) {
       const ledgerId = ledger._id.toString();
       const balance = ledgerBalances[ledgerId] || 0;
-      const headOfAccountName = ledger.headOfAccountId?.headOfAccountName;
+
       const bspLedgerId = ledger.bSPLLedgerId?._id.toString();
-      const bspLedgerName = ledger.bSPLLedgerId?.bSPLLedgerName;
+      const bspLedgerName =
+        ledger.bSPLLedgerId?.bSPLLedgerName || "Uncategorized";
+
       const groupLedgerId = ledger.groupLedgerId?._id.toString();
-      const groupLedgerName = ledger.groupLedgerId?.groupLedgerName;
+      const groupLedgerName =
+        ledger.groupLedgerId?.groupLedgerName || "Uncategorized";
 
-      if (!headOfAccountName || !bspLedgerId || !groupLedgerId) continue;
+      if (!bspLedgerId || !groupLedgerId) continue;
 
-      // Initialize head of account
-      if (!groupedData[headOfAccountName]) {
-        groupedData[headOfAccountName] = {};
-      }
-
-      // Initialize BSPL ledger
-      if (!groupedData[headOfAccountName][bspLedgerId]) {
-        groupedData[headOfAccountName][bspLedgerId] = {
+      // Create or get BSPL Ledger entry
+      if (!bspLedgerMap[bspLedgerId]) {
+        bspLedgerMap[bspLedgerId] = {
           bSPLLedgerId: bspLedgerId,
           bSPLLedgerName: bspLedgerName,
-          totalBalance: 0,
           groupLedgers: {},
+          totalBalance: 0,
         };
       }
 
-      // Initialize Group ledger
-      if (
-        !groupedData[headOfAccountName][bspLedgerId].groupLedgers[groupLedgerId]
-      ) {
-        groupedData[headOfAccountName][bspLedgerId].groupLedgers[
-          groupLedgerId
-        ] = {
+      // Create or get Group Ledger entry within BSPL Ledger
+      if (!bspLedgerMap[bspLedgerId].groupLedgers[groupLedgerId]) {
+        bspLedgerMap[bspLedgerId].groupLedgers[groupLedgerId] = {
           groupLedgerId: groupLedgerId,
           groupLedgerName: groupLedgerName,
           closingBalance: 0,
         };
       }
 
-      // Add balance to group ledger
-      groupedData[headOfAccountName][bspLedgerId].groupLedgers[
-        groupLedgerId
-      ].closingBalance += balance;
-      // Add balance to BSPL ledger total
-      groupedData[headOfAccountName][bspLedgerId].totalBalance += balance;
+      // Add balance to Group Ledger and total
+      bspLedgerMap[bspLedgerId].groupLedgers[groupLedgerId].closingBalance +=
+        balance;
+      bspLedgerMap[bspLedgerId].totalBalance += balance;
     }
 
-    // Step 7: Convert the nested structure to the desired format
-    for (const headOfAccountName in groupedData) {
-      const bspLedgers = groupedData[headOfAccountName];
+    // Step 7: Convert the map to the desired array format
+    const result = Object.values(bspLedgerMap).map((bspLedger) => ({
+      bSPLLedgerId: bspLedger.bSPLLedgerId,
+      bSPLLedgerName: bspLedger.bSPLLedgerName,
+      totalBalance: bspLedger.totalBalance,
+      groupLedgers: Object.values(bspLedger.groupLedgers),
+    }));
 
-      for (const bspLedgerId in bspLedgers) {
-        const bspLedgerData = bspLedgers[bspLedgerId];
-
-        const filteredGroupLedgers = Object.values(
-          bspLedgerData.groupLedgers
-        ).filter((groupLedger) => groupLedger.closingBalance !== 0);
-
-        if (filteredGroupLedgers.length > 0) {
-          const formattedBspLedger = {
-            bSPLLedgerId: bspLedgerData.bSPLLedgerId,
-            bSPLLedgerName: bspLedgerData.bSPLLedgerName,
-            totalBalance: bspLedgerData.totalBalance,
-            groupLedgers: filteredGroupLedgers,
-          };
-
-          // Add to the appropriate result array
-          if (headOfAccountName === "Assets") {
-            result.assets.push(formattedBspLedger);
-          } else if (headOfAccountName === "Liabilities") {
-            result.liabilities.push(formattedBspLedger);
-          }
-        }
-      }
-    }
-
-    // which ever group laedger has closing balance 0 dont send it if negative or positive valuw then send it
-
-    // Step 8: Sort the results
-    result.assets.sort((a, b) =>
-      a.bSPLLedgerName.localeCompare(b.bSPLLedgerName)
-    );
-    result.liabilities.sort((a, b) =>
-      a.bSPLLedgerName.localeCompare(b.bSPLLedgerName)
-    );
-
-    // Sort group ledgers within each BSPL ledger
-    result.assets.forEach((asset) => {
-      asset.groupLedgers.sort((a, b) =>
-        a.groupLedgerName.localeCompare(b.groupLedgerName)
-      );
-    });
-    result.liabilities.forEach((liability) => {
-      liability.groupLedgers.sort((a, b) =>
-        a.groupLedgerName.localeCompare(b.groupLedgerName)
+    // Filter out group ledgers with zero balance
+    result.forEach((bspLedger) => {
+      bspLedger.groupLedgers = bspLedger.groupLedgers.filter(
+        (groupLedger) => groupLedger.closingBalance !== 0
       );
     });
 
+    // Also filter out BSPL ledgers that have no group ledgers after filtering
+    const filteredResult = result.filter(
+      (bspLedger) => bspLedger.groupLedgers.length > 0
+    );
+
+    // Step 8: Sort by total balance descending (highest first)
+    filteredResult.sort((a, b) => b.totalBalance - a.totalBalance);
+
+    // Step 9: Sort group ledgers within each BSPL ledger by balance descending
+    filteredResult.forEach((bspLedger) => {
+      bspLedger.groupLedgers.sort(
+        (a, b) => b.closingBalance - a.closingBalance
+      );
+    });
     return res.status(200).json({
       hasError: false,
-      message: "Assets And Liabilities Account fetched successfully",
-      data: result,
+      message: "Schedule To Expenses fetched successfully",
+      data: filteredResult,
     });
   } catch (error) {
-    console.error("Error fetching Assets And Liabilities Account:", error);
+    console.error("Error fetching Schedule To Expenses:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",
@@ -308,4 +250,4 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
   }
 }
 
-export default getBalanceSheetForAssetsLiabilities;
+export default getScheduleToExpenditure;

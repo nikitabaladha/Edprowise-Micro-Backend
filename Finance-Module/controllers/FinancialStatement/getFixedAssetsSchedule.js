@@ -267,7 +267,6 @@ async function getFixedAssetsSchedule(req, res) {
         (rate * groupLedger.openingBalance) / 100;
 
       // Calculate depreciationOnAddition according to the formula:
-      // ((rate * firstHalf)/100) + ((rate * secondHalf)/100)/2
       const firstHalfDepreciation = (rate * groupLedger.firstHalf) / 100;
       const secondHalfDepreciation = (rate * groupLedger.secondHalf) / 100;
       groupLedger.depreciationOnAddition =

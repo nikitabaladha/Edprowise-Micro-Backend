@@ -1,7 +1,5 @@
 import OpeningClosingBalance from "../../models/OpeningClosingBalance.js";
 import Ledger from "../../models/Ledger.js";
-import BSPLLedger from "../../models/BSPLLedger.js";
-import GroupLedger from "../../models/GroupLedger.js";
 import HeadOfAccount from "../../models/HeadOfAccount.js";
 import moment from "moment";
 import mongoose from "mongoose";
@@ -105,42 +103,6 @@ async function getScheduleToIncome(req, res) {
     // Step 5: Calculate closing balances for each ledger within date range
     const ledgerBalances = {};
 
-    // for (const record of balanceRecords) {
-    //   const ledgerId = record.ledgerId._id.toString();
-
-    //   // Find the latest balance detail within the date range
-    //   const relevantDetails = record.balanceDetails
-    //     .filter((detail) => {
-    //       const detailDate = moment(detail.entryDate);
-    //       return detailDate.isBetween(start, end, null, "[]"); // inclusive
-    //     })
-    //     .sort(
-    //       (a, b) =>
-    //         moment(b.entryDate).valueOf() - moment(a.entryDate).valueOf()
-    //     );
-
-    //   if (relevantDetails.length > 0) {
-    //     const latestDetail = relevantDetails[0];
-    //     ledgerBalances[ledgerId] = latestDetail.closingBalance;
-    //   } else {
-    //     // If no entries in date range, use the last balance before the range
-    //     const previousDetails = record.balanceDetails
-    //       .filter((detail) => moment(detail.entryDate).isBefore(start))
-    //       .sort(
-    //         (a, b) =>
-    //           moment(b.entryDate).valueOf() - moment(a.entryDate).valueOf()
-    //       );
-
-    //     if (previousDetails.length > 0) {
-    //       ledgerBalances[ledgerId] = previousDetails[0].closingBalance;
-    //     } else {
-    //       // If no entries at all, use opening balance from ledger
-    //       const ledger = ledgers.find((l) => l._id.toString() === ledgerId);
-    //       ledgerBalances[ledgerId] = ledger?.openingBalance || 0;
-    //     }
-    //   }
-    // }
-
     // Step 6: Group data by BSPL Ledger and then by Group Ledger
 
     for (const record of balanceRecords) {
@@ -166,6 +128,7 @@ async function getScheduleToIncome(req, res) {
       for (const date in dateGroups) {
         const entriesForDate = dateGroups[date];
         // Sort by creation time (using _id) to get the latest entry for this date
+
         const sortedEntries = entriesForDate.sort((a, b) => {
           const aTimestamp = new mongoose.Types.ObjectId(a._id).getTimestamp();
           const bTimestamp = new mongoose.Types.ObjectId(b._id).getTimestamp();
@@ -262,15 +225,22 @@ async function getScheduleToIncome(req, res) {
       (bspLedger) => bspLedger.groupLedgers.length > 0
     );
 
-    // Step 8: Sort by total balance descending (highest first)
-    filteredResult.sort((a, b) => b.totalBalance - a.totalBalance);
-
-    // Step 9: Sort group ledgers within each BSPL ledger by balance descending
-    filteredResult.forEach((bspLedger) => {
-      bspLedger.groupLedgers.sort(
-        (a, b) => b.closingBalance - a.closingBalance
-      );
+    // Step 8: Sort by BSPL Ledger name alphabetically (to match getIncomeAndExpenditureAccount)
+    filteredResult.sort((a, b) => {
+      const nameA = a.bSPLLedgerName || "";
+      const nameB = b.bSPLLedgerName || "";
+      return nameA.localeCompare(nameB);
     });
+
+    // Step 9: Sort group ledgers within each BSPL ledger alphabetically
+    filteredResult.forEach((bspLedger) => {
+      bspLedger.groupLedgers.sort((a, b) => {
+        const nameA = a.groupLedgerName || "";
+        const nameB = b.groupLedgerName || "";
+        return nameA.localeCompare(nameB);
+      });
+    });
+
     return res.status(200).json({
       hasError: false,
       message: "Schedule To Income fetched successfully",
