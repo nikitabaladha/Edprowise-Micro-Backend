@@ -1,11 +1,10 @@
 import mongoose from "mongoose";
+import moment from "moment";
 import Receipt from "../../../models/Receipt.js";
-import ReceiptValidator from "../../../validators/CustomizeEntryForReceiptValidator.js";
+import ReceiptValidator from "../../../validators/ReceiptValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
-import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
-
-import { hasBankOrCashLedger } from "../../CommonFunction/CommonFunction.js";
+import GroupLedger from "../../../models/GroupLedger.js";
 
 function toTwoDecimals(value) {
   if (value === null || value === undefined || isNaN(value)) return 0;
@@ -16,6 +15,22 @@ async function generateReceiptVoucherNumber(schoolId, academicYear) {
   const count = await Receipt.countDocuments({ schoolId, academicYear });
   const nextNumber = count + 1;
   return `RVN/${academicYear}/${nextNumber}`;
+}
+
+async function generateTransactionNumber() {
+  const now = moment();
+  const dateTimeStr = now.format("DDMMYYYYHHmmss");
+  let baseTransactionNumber = `TRA-${dateTimeStr}`;
+  let transactionNumber = baseTransactionNumber;
+  let counter = 1;
+
+  while (await Receipt.exists({ transactionNumber })) {
+    const suffix = String(counter).padStart(2, "0");
+    transactionNumber = `${baseTransactionNumber}${suffix}`;
+    counter++;
+  }
+
+  return transactionNumber;
 }
 
 async function getOrCreateOpeningBalanceRecord(
@@ -72,7 +87,7 @@ async function updateOpeningClosingBalance(
   academicYear,
   ledgerId,
   entryDate,
-  receiptEntryId,
+  receiptId,
   debitAmount = 0,
   creditAmount = 0
 ) {
@@ -116,7 +131,7 @@ async function updateOpeningClosingBalance(
   const existingEntryIndex = record.balanceDetails.findIndex(
     (detail) =>
       new Date(detail.entryDate).getTime() === new Date(entryDate).getTime() &&
-      detail.entryId?.toString() === receiptEntryId.toString()
+      detail.entryId?.toString() === receiptId.toString()
   );
 
   if (existingEntryIndex !== -1) {
@@ -126,7 +141,7 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: receiptEntryId,
+      entryId: receiptId, // Store Receipt _id as entryId
     };
   } else {
     const newBalanceDetail = {
@@ -135,7 +150,7 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: receiptEntryId,
+      entryId: receiptId, // Store Receipt _id as entryId
     };
 
     record.balanceDetails.push(newBalanceDetail);
@@ -213,6 +228,7 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
   await record.save();
 }
 
+// NEW FUNCTION: Recalculate all balances for a ledger after a specific date
 async function recalculateAllBalancesAfterDate(
   schoolId,
   academicYear,
@@ -276,20 +292,12 @@ function aggregateAmountsByLedger(itemDetails) {
 
   itemDetails.forEach((item) => {
     const ledgerId = item.ledgerId.toString();
-    const debitAmount = toTwoDecimals(item.debitAmount) || 0;
     const amount = toTwoDecimals(item.amount) || 0;
 
     if (ledgerMap.has(ledgerId)) {
-      const existing = ledgerMap.get(ledgerId);
-      ledgerMap.set(ledgerId, {
-        debitAmount: existing.debitAmount + debitAmount,
-        amount: existing.amount + amount,
-      });
+      ledgerMap.set(ledgerId, ledgerMap.get(ledgerId) + amount);
     } else {
-      ledgerMap.set(ledgerId, {
-        debitAmount: debitAmount,
-        amount: amount,
-      });
+      ledgerMap.set(ledgerId, amount);
     }
   });
 
@@ -327,36 +335,25 @@ async function create(req, res) {
       entryDate,
       receiptDate,
       narration,
+      paymentMode,
+      chequeNumber,
       itemDetails,
+      TDSorTCS,
+      TDSTCSRateChartId,
+      TDSTCSRate,
       status,
+      TDSTCSRateWithAmount,
+      ledgerIdWithPaymentMode,
       academicYear,
       totalAmount,
-      totalDebitAmount,
-      customizeEntry,
     } = req.body;
-
-    const hasValidLedger = await hasBankOrCashLedger(
-      schoolId,
-      academicYear,
-      itemDetails
-    );
-
-    if (!hasValidLedger) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        hasError: true,
-        message:
-          "At least one ledger must have Group Ledger Name as 'Bank' or 'Cash'",
-      });
-    }
 
     const receiptVoucherNumber = await generateReceiptVoucherNumber(
       schoolId,
       academicYear
     );
 
-    const { receiptImage } = req.files || {};
+    const { receiptImage, chequeImageForReceipt } = req.files || {};
 
     let receiptImageFullPath = null;
     if (receiptImage?.[0]) {
@@ -367,9 +364,18 @@ async function create(req, res) {
       receiptImageFullPath = `${receiptImagePath}/${receiptImage[0].filename}`;
     }
 
+    let chequeImageForReceiptFullPath = null;
+    if (chequeImageForReceipt?.[0]) {
+      const chequeImageForReceiptPath =
+        chequeImageForReceipt[0].mimetype.startsWith("image/")
+          ? "/Images/FinanceModule/chequeImageForReceipt"
+          : "/Documents/FinanceModule/chequeImageForReceipt";
+
+      chequeImageForReceiptFullPath = `${chequeImageForReceiptPath}/${chequeImageForReceipt[0].filename}`;
+    }
+
     const updatedItemDetails = itemDetails.map((item) => ({
       ...item,
-      debitAmount: parseFloat(item.debitAmount) || 0,
       amount: parseFloat(item.amount) || 0,
     }));
 
@@ -380,12 +386,31 @@ async function create(req, res) {
       )
     );
 
-    const subTotalOfDebit = toTwoDecimals(
-      updatedItemDetails.reduce(
-        (sum, item) => sum + (parseFloat(item.debitAmount) || 0),
-        0
-      )
-    );
+    const transactionNumber =
+      paymentMode === "Online" ? await generateTransactionNumber() : null;
+
+    let TDSorTCSLedgerId = null;
+
+    if (TDSorTCS && TDSTCSRateWithAmount > 0) {
+      // Search for "TDS on Receipts" or "TCS on Receipts" ledger
+      const ledgerNameToFind =
+        TDSorTCS === "TDS" ? "TDS on Receipts" : "TCS on Receipts";
+
+      // Find the ledger with exact name match
+      let tdsTcsLedgerToUpdate = await Ledger.findOne({
+        schoolId,
+        academicYear,
+        ledgerName: { $regex: new RegExp(`^${ledgerNameToFind}$`, "i") },
+      });
+
+      if (!tdsTcsLedgerToUpdate) {
+        throw new Error(
+          `${ledgerNameToFind} Ledger not found for school ${schoolId} and academic year ${academicYear}`
+        );
+      }
+
+      TDSorTCSLedgerId = tdsTcsLedgerToUpdate._id.toString();
+    }
 
     const newReceipt = new Receipt({
       schoolId,
@@ -393,15 +418,22 @@ async function create(req, res) {
       entryDate,
       receiptDate,
       narration,
+      paymentMode,
+      chequeNumber,
+      transactionNumber,
       itemDetails: updatedItemDetails,
       subTotalAmount,
-      subTotalOfDebit,
+      TDSorTCS,
+      TDSTCSRateChartId,
+      TDSTCSRate,
+      TDSTCSRateWithAmount,
       totalAmount,
-      totalDebitAmount,
       receiptImage: receiptImageFullPath,
+      chequeImageForReceipt: chequeImageForReceiptFullPath,
+      ledgerIdWithPaymentMode,
       status,
       academicYear,
-      customizeEntry,
+      TDSorTCSLedgerId,
     });
 
     await newReceipt.save({ session });
@@ -409,20 +441,76 @@ async function create(req, res) {
     // Store all ledger IDs that need to be updated
     const ledgerIdsToUpdate = new Set();
 
+    // 1. Item Ledgers (Debit) - Aggregate amounts by ledgerId first
     const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
+    // 1. Item Ledgers (Credit)
 
-    for (const [ledgerId, amounts] of ledgerAmounts) {
+    for (const [ledgerId, amount] of ledgerAmounts) {
       await updateOpeningClosingBalance(
         schoolId,
         academicYear,
         ledgerId,
         entryDate,
         newReceipt._id,
-        amounts.debitAmount, // debit
-        amounts.amount // credit
+        0,
+        amount
       );
       ledgerIdsToUpdate.add(ledgerId);
     }
+
+    // 2. TDS/TCS Ledger (Debit for TDS, Credit for TCS)
+
+    if (TDSorTCS && TDSTCSRateWithAmount > 0 && TDSorTCSLedgerId) {
+      if (TDSorTCS === "TDS") {
+        // For TDS: Debit the TDS ledger
+        await updateOpeningClosingBalance(
+          schoolId,
+          academicYear,
+          TDSorTCSLedgerId,
+          entryDate,
+          newReceipt._id,
+          Number(TDSTCSRateWithAmount), // debit
+          0 // credit
+        );
+      } else if (TDSorTCS === "TCS") {
+        // For TCS: Credit the TCS ledger
+        await updateOpeningClosingBalance(
+          schoolId,
+          academicYear,
+          TDSorTCSLedgerId,
+          entryDate,
+          newReceipt._id,
+          0, // debit
+          Number(TDSTCSRateWithAmount) // credit
+        );
+      }
+
+      ledgerIdsToUpdate.add(TDSorTCSLedgerId);
+    }
+
+    // 3. Payment Mode Ledger (Debit)
+
+    const tdsTcsAmount = Number(TDSTCSRateWithAmount) || 0;
+
+    let paymentAmount;
+    if (TDSorTCS === "TDS") {
+      paymentAmount = toTwoDecimals(subTotalAmount - tdsTcsAmount);
+    } else if (TDSorTCS === "TCS") {
+      paymentAmount = toTwoDecimals(subTotalAmount + tdsTcsAmount);
+    } else {
+      paymentAmount = toTwoDecimals(subTotalAmount);
+    }
+
+    await updateOpeningClosingBalance(
+      schoolId,
+      academicYear,
+      ledgerIdWithPaymentMode,
+      entryDate,
+      newReceipt._id,
+      paymentAmount,
+      0
+    );
+    ledgerIdsToUpdate.add(ledgerIdWithPaymentMode.toString());
 
     // --- Recalculate all ledgers that were updated ---
     for (const ledgerId of ledgerIdsToUpdate) {
@@ -436,93 +524,6 @@ async function create(req, res) {
         entryDate
       );
     }
-
-    // ========== NEW CODE: Store data in TotalNetdeficitNetSurplus table ==========
-
-    // Get all unique ledger IDs from itemDetails
-    const uniqueLedgerIds = [
-      ...new Set(updatedItemDetails.map((item) => item.ledgerId)),
-    ];
-
-    // Find ledgers with their Head of Account information
-    const ledgers = await Ledger.find({
-      _id: { $in: uniqueLedgerIds },
-    }).populate("headOfAccountId");
-
-    // Initialize sums
-    let incomeBalance = 0;
-    let expensesBalance = 0;
-
-    // Calculate sums based on Head of Account
-    for (const item of updatedItemDetails) {
-      const ledger = ledgers.find(
-        (l) => l._id.toString() === item.ledgerId.toString()
-      );
-
-      if (ledger && ledger.headOfAccountId) {
-        const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
-        const amount = parseFloat(item.amount) || 0;
-        const debitAmount = parseFloat(item.debitAmount) || 0;
-
-        if (headOfAccountName.toLowerCase() === "income") {
-          incomeBalance += debitAmount - amount;
-        } else if (headOfAccountName.toLowerCase() === "expenses") {
-          expensesBalance += debitAmount - amount;
-        }
-      }
-    }
-
-    // Calculate total balance
-    const totalBalance = toTwoDecimals(incomeBalance - expensesBalance);
-
-    // Round to two decimals
-    incomeBalance = toTwoDecimals(incomeBalance);
-    expensesBalance = toTwoDecimals(expensesBalance);
-
-    // Find or create TotalNetdeficitNetSurplus record
-    let totalNetRecord = await TotalNetdeficitNetSurplus.findOne({
-      schoolId,
-      academicYear,
-    }).session(session);
-
-    if (!totalNetRecord) {
-      totalNetRecord = new TotalNetdeficitNetSurplus({
-        schoolId,
-        academicYear,
-        balanceDetails: [],
-      });
-    }
-
-    const existingEntryIndex = totalNetRecord.balanceDetails.findIndex(
-      (detail) => detail.entryId?.toString() === newReceipt._id.toString()
-    );
-
-    if (existingEntryIndex !== -1) {
-      totalNetRecord.balanceDetails[existingEntryIndex].incomeBalance =
-        incomeBalance;
-      totalNetRecord.balanceDetails[existingEntryIndex].expensesBalance =
-        expensesBalance;
-      totalNetRecord.balanceDetails[existingEntryIndex].totalBalance =
-        totalBalance;
-      totalNetRecord.balanceDetails[existingEntryIndex].entryDate = entryDate;
-    } else {
-      totalNetRecord.balanceDetails.push({
-        entryDate,
-        entryId: newReceipt._id,
-        incomeBalance,
-        expensesBalance,
-        totalBalance,
-      });
-    }
-
-    // Sort balanceDetails by date
-    totalNetRecord.balanceDetails.sort(
-      (a, b) => new Date(a.entryDate) - new Date(b.entryDate)
-    );
-
-    await totalNetRecord.save({ session });
-
-    // ========== END OF NEW CODE ==========
 
     await session.commitTransaction();
     session.endSession();

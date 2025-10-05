@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 import PaymentEntry from "../../../models/PaymentEntry.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
+import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
 
-// Helper function to remove payment entry from specific ledger (like your update function)
 async function removePaymentEntryFromLedger(
   schoolId,
   academicYear,
@@ -77,7 +77,6 @@ async function removePaymentEntryFromLedger(
   await record.save({ session });
 }
 
-// Recalculate ledger balances function (same as your update)
 async function recalculateLedgerBalances(
   schoolId,
   academicYear,
@@ -163,7 +162,6 @@ async function recalculateLedgerBalances(
   await record.save({ session });
 }
 
-// Recalculate balances after date function (same as your update)
 async function recalculateAllBalancesAfterDate(
   schoolId,
   academicYear,
@@ -299,6 +297,37 @@ async function cancelById(req, res) {
         session
       );
     }
+
+    // ========== NEW CODE: Remove data from TotalNetdeficitNetSurplus table ==========
+
+    // Find the TotalNetdeficitNetSurplus record
+    let totalNetRecord = await TotalNetdeficitNetSurplus.findOne({
+      schoolId,
+      academicYear,
+    }).session(session);
+
+    if (totalNetRecord) {
+      // Remove the entry for this payment
+      const originalLength = totalNetRecord.balanceDetails.length;
+      totalNetRecord.balanceDetails = totalNetRecord.balanceDetails.filter(
+        (detail) => detail.entryId?.toString() !== id.toString()
+      );
+
+      // Only save if something was actually removed
+      if (totalNetRecord.balanceDetails.length !== originalLength) {
+        // Sort balanceDetails by date
+        totalNetRecord.balanceDetails.sort(
+          (a, b) => new Date(a.entryDate) - new Date(b.entryDate)
+        );
+
+        await totalNetRecord.save({ session });
+        console.log(
+          `Removed payment entry ${id} from TotalNetdeficitNetSurplus`
+        );
+      }
+    }
+
+    // ========== END OF NEW CODE ==========
 
     await session.commitTransaction();
     session.endSession();

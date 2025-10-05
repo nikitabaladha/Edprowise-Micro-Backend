@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Receipt from "../../../models/Receipt.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
+import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
 
 async function removeReceiptFromLedger(
   schoolId,
@@ -296,6 +297,34 @@ async function cancelById(req, res) {
         session
       );
     }
+
+    // ========== NEW CODE: Remove data from TotalNetdeficitNetSurplus table ==========
+
+    // Find the TotalNetdeficitNetSurplus record
+    let totalNetRecord = await TotalNetdeficitNetSurplus.findOne({
+      schoolId,
+      academicYear,
+    }).session(session);
+
+    if (totalNetRecord) {
+      // Remove the entry for this payment
+      const originalLength = totalNetRecord.balanceDetails.length;
+      totalNetRecord.balanceDetails = totalNetRecord.balanceDetails.filter(
+        (detail) => detail.entryId?.toString() !== id.toString()
+      );
+
+      // Only save if something was actually removed
+      if (totalNetRecord.balanceDetails.length !== originalLength) {
+        // Sort balanceDetails by date
+        totalNetRecord.balanceDetails.sort(
+          (a, b) => new Date(a.entryDate) - new Date(b.entryDate)
+        );
+
+        await totalNetRecord.save({ session });
+      }
+    }
+
+    // ========== END OF NEW CODE ==========
 
     await session.commitTransaction();
     session.endSession();

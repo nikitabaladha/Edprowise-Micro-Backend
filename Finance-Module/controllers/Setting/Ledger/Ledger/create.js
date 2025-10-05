@@ -2,6 +2,7 @@ import Ledger from "../../../../models/Ledger.js";
 import HeadOfAccount from "../../../../models/HeadOfAccount.js";
 import CounterForFinaceLedger from "../../../../models/CounterForFinaceLedger.js";
 import LedgerValidator from "../../../../validators/LedgerValidator.js";
+import TotalNetdeficitNetSurplus from "../../../../models/TotalNetdeficitNetSurplus.js";
 
 async function create(req, res) {
   try {
@@ -94,6 +95,38 @@ async function create(req, res) {
     });
 
     await newLedger.save();
+
+    // ========== NEW CODE: Create TotalNetdeficitNetSurplus if ledgerName is "Net Surplus/(Deficit)" ==========
+    if (ledgerName.toLowerCase() === "net surplus/(deficit)") {
+      // Check if TotalNetdeficitNetSurplus record already exists
+      const existingTotalNetRecord = await TotalNetdeficitNetSurplus.findOne({
+        schoolId,
+        academicYear,
+      });
+
+      if (!existingTotalNetRecord) {
+        // Create new TotalNetdeficitNetSurplus record
+        const newTotalNetRecord = new TotalNetdeficitNetSurplus({
+          schoolId,
+          academicYear,
+          ledgerId: newLedger._id, // Store the ledger ID of "Net Surplus/(Deficit)"
+          balanceDetails: [], // Initialize with empty array
+        });
+
+        await newTotalNetRecord.save();
+        console.log(
+          `TotalNetdeficitNetSurplus record created for ledger: ${ledgerName}`
+        );
+      } else {
+        // Update existing record with the new ledger ID
+        existingTotalNetRecord.ledgerId = newLedger._id;
+        await existingTotalNetRecord.save();
+        console.log(
+          `TotalNetdeficitNetSurplus record updated with new ledger ID for: ${ledgerName}`
+        );
+      }
+    }
+    // ========== END OF NEW CODE ==========
 
     return res.status(201).json({
       hasError: false,

@@ -4,7 +4,7 @@ import PaymentEntry from "../../../models/PaymentEntry.js";
 import PaymentEntryValidator from "../../../validators/PaymentEntryValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
-import GroupLedger from "../../../models/GroupLedger.js";
+import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
 
 function toTwoDecimals(value) {
   if (value === null || value === undefined || isNaN(value)) return 0;
@@ -772,7 +772,98 @@ async function updateById(req, res) {
       );
     }
 
+    // ========== NEW CODE: Update data in TotalNetdeficitNetSurplus table ==========
+
+    // Get all unique ledger IDs from updatedItemDetails
+    const uniqueLedgerIds = [
+      ...new Set(updatedItemDetails.map((item) => item.ledgerId)),
+    ];
+
+    // Find ledgers with their Head of Account information
+    const ledgers = await Ledger.find({
+      _id: { $in: uniqueLedgerIds },
+    })
+      .populate("headOfAccountId")
+      .session(session);
+
+    // Initialize sums
+    let incomeBalance = 0;
+    let expensesBalance = 0;
+
+    // Calculate sums based on Head of Account
+    for (const item of updatedItemDetails) {
+      const ledger = ledgers.find(
+        (l) => l._id.toString() === item.ledgerId.toString()
+      );
+
+      if (ledger && ledger.headOfAccountId) {
+        const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
+        const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
+
+        if (headOfAccountName.toLowerCase() === "income") {
+          incomeBalance += amountAfterGST;
+        } else if (headOfAccountName.toLowerCase() === "expenses") {
+          expensesBalance += amountAfterGST;
+        }
+      }
+    }
+
+    // Calculate total balance
+    const totalBalance = toTwoDecimals(incomeBalance - expensesBalance);
+
+    // Round to two decimals
+    incomeBalance = toTwoDecimals(incomeBalance);
+    expensesBalance = toTwoDecimals(expensesBalance);
+
+    // Find or create TotalNetdeficitNetSurplus record
+    let totalNetRecord = await TotalNetdeficitNetSurplus.findOne({
+      schoolId,
+      academicYear,
+    }).session(session);
+
+    if (!totalNetRecord) {
+      totalNetRecord = new TotalNetdeficitNetSurplus({
+        schoolId,
+        academicYear,
+        balanceDetails: [],
+      });
+    }
+
+    // FIXED: Check if entry exists by entryId ONLY (not by date)
+    const existingEntryIndex = totalNetRecord.balanceDetails.findIndex(
+      (detail) => detail.entryId?.toString() === id.toString()
+    );
+
+    if (existingEntryIndex !== -1) {
+      // Update existing entry - REPLACE values
+      totalNetRecord.balanceDetails[existingEntryIndex].incomeBalance =
+        incomeBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].expensesBalance =
+        expensesBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].totalBalance =
+        totalBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].entryDate = entryDate;
+    } else {
+      // Create new entry if it doesn't exist
+      totalNetRecord.balanceDetails.push({
+        entryDate,
+        entryId: existingPaymentEntry._id,
+        incomeBalance,
+        expensesBalance,
+        totalBalance,
+      });
+    }
+
+    // Sort balanceDetails by date
+    totalNetRecord.balanceDetails.sort(
+      (a, b) => new Date(a.entryDate) - new Date(b.entryDate)
+    );
+
+    await totalNetRecord.save({ session });
+    // ========== END OF NEW CODE ==========
+
     await session.commitTransaction();
+    session.endSession();
 
     return res.status(200).json({
       hasError: false,

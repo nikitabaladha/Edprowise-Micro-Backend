@@ -1,15 +1,47 @@
 import mongoose from "mongoose";
+import moment from "moment";
 import Receipt from "../../../models/Receipt.js";
-import ReceiptValidator from "../../../validators/CustomizeEntryForReceiptValidator.js";
+import ReceiptValidator from "../../../validators/ReceiptValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
-import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
-
-import { hasBankOrCashLedger } from "../../CommonFunction/CommonFunction.js";
+import GroupLedger from "../../../models/GroupLedger.js";
 
 function toTwoDecimals(value) {
   if (value === null || value === undefined || isNaN(value)) return 0;
   return Math.round(Number(value) * 100) / 100;
+}
+
+async function generateTransactionNumber() {
+  const now = moment();
+  const dateTimeStr = now.format("DDMMYYYYHHmmss");
+  let baseTransactionNumber = `TRA-${dateTimeStr}`;
+  let transactionNumber = baseTransactionNumber;
+  let counter = 1;
+
+  while (await Receipt.exists({ transactionNumber })) {
+    const suffix = String(counter).padStart(2, "0");
+    transactionNumber = `${baseTransactionNumber}${suffix}`;
+    counter++;
+  }
+
+  return transactionNumber;
+}
+
+function aggregateAmountsByLedger(itemDetails) {
+  const ledgerMap = new Map();
+
+  itemDetails.forEach((item) => {
+    const ledgerId = item.ledgerId.toString();
+    const amount = parseFloat(item.amount) || 0;
+
+    if (ledgerMap.has(ledgerId)) {
+      ledgerMap.set(ledgerId, toTwoDecimals(ledgerMap.get(ledgerId) + amount));
+    } else {
+      ledgerMap.set(ledgerId, toTwoDecimals(amount));
+    }
+  });
+
+  return ledgerMap;
 }
 
 async function getOrCreateOpeningBalanceRecord(
@@ -49,7 +81,6 @@ async function getOrCreateOpeningBalanceRecord(
     });
   }
 
-  // Find the latest balance detail before the entry date
   const previousBalanceDetails = record.balanceDetails
     .filter((detail) => new Date(detail.entryDate) < new Date(entryDate))
     .sort((a, b) => {
@@ -72,7 +103,7 @@ async function updateOpeningClosingBalance(
   academicYear,
   ledgerId,
   entryDate,
-  receiptEntryId,
+  receiptId,
   debitAmount = 0,
   creditAmount = 0,
   session
@@ -89,29 +120,33 @@ async function updateOpeningClosingBalance(
       session
     );
 
-  // Find existing entry FIRST to preserve its sequence
+  record.balanceDetails.sort((a, b) => {
+    const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
+    if (dateDiff !== 0) return dateDiff;
+    return (a.entrySequence || 0) - (b.entrySequence || 0);
+  });
+
   const existingEntryIndex = record.balanceDetails.findIndex(
-    (detail) => detail.entryId?.toString() === receiptEntryId.toString()
+    (detail) => detail.entryId?.toString() === receiptId.toString()
   );
 
   let entrySequence;
 
   if (existingEntryIndex !== -1) {
     const existing = record.balanceDetails[existingEntryIndex];
-    entrySequence = existing.entrySequence; // Keep the original sequence
+    entrySequence = existing.entrySequence;
 
-    // Calculate opening balance based on position in the sequence
     let effectiveOpeningBalance = openingBalance;
 
     if (existingEntryIndex > 0) {
-      // Use previous entry's closing balance
       effectiveOpeningBalance = toTwoDecimals(
         record.balanceDetails[existingEntryIndex - 1].closingBalance
       );
     } else {
-      // First entry - find last balance before this date
-      const entriesBeforeDate = record.balanceDetails.filter(
-        (detail) => new Date(detail.entryDate) < new Date(entryDate)
+      const entriesBeforeDate = toTwoDecimals(
+        record.balanceDetails.filter(
+          (detail) => new Date(detail.entryDate) < new Date(entryDate)
+        )
       );
 
       if (entriesBeforeDate.length > 0) {
@@ -132,14 +167,12 @@ async function updateOpeningClosingBalance(
       effectiveOpeningBalance + debitAmount - creditAmount
     );
 
-    // Update the existing entry IN PLACE
     existing.debit = debitAmount;
     existing.credit = creditAmount;
     existing.entryDate = entryDate;
     existing.openingBalance = effectiveOpeningBalance;
     existing.closingBalance = closingBalance;
   } else {
-    // New entry - find correct sequence (same as before)
     const sameDayEntries = record.balanceDetails.filter(
       (d) =>
         new Date(d.entryDate).toDateString() ===
@@ -151,7 +184,6 @@ async function updateOpeningClosingBalance(
         ? Math.max(...sameDayEntries.map((d) => d.entrySequence || 0)) + 1
         : 1;
 
-    // Calculate opening balance for new entry
     let effectiveOpeningBalance = openingBalance;
     const entriesBeforeDate = record.balanceDetails.filter(
       (detail) => new Date(detail.entryDate) < new Date(entryDate)
@@ -179,13 +211,12 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: receiptEntryId,
+      entryId: receiptId,
     };
 
     record.balanceDetails.push(newBalanceDetail);
   }
 
-  // Always sort after modifications
   record.balanceDetails.sort((a, b) => {
     const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
     if (dateDiff !== 0) return dateDiff;
@@ -220,14 +251,12 @@ async function recalculateLedgerBalances(
 
   const balanceType = ledger?.balanceType || "Debit";
 
-  // Sort by date and sequence to ensure correct order
   record.balanceDetails.sort((a, b) => {
     const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
     if (dateDiff !== 0) return dateDiff;
     return (a.entrySequence || 0) - (b.entrySequence || 0);
   });
 
-  // Recalculate sequences to ensure continuity
   let currentDate = null;
   let currentSequence = 0;
 
@@ -241,17 +270,16 @@ async function recalculateLedgerBalances(
     } else {
       currentSequence++;
     }
+
     detail.entrySequence = currentSequence;
   }
 
-  // Re-sort after sequence correction
   record.balanceDetails.sort((a, b) => {
     const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
     if (dateDiff !== 0) return dateDiff;
     return (a.entrySequence || 0) - (b.entrySequence || 0);
   });
 
-  // Recalculate balances while preserving the corrected sequence
   let currentBalance = toTwoDecimals(record.balanceDetails[0].openingBalance);
 
   for (let i = 0; i < record.balanceDetails.length; i++) {
@@ -261,7 +289,16 @@ async function recalculateLedgerBalances(
       currentBalance = toTwoDecimals(detail.openingBalance);
     } else {
       const previousDetail = record.balanceDetails[i - 1];
-      detail.openingBalance = toTwoDecimals(previousDetail.closingBalance);
+
+      const currentDate = new Date(detail.entryDate).toDateString();
+      const previousDate = new Date(previousDetail.entryDate).toDateString();
+
+      if (
+        currentDate !== previousDate ||
+        detail.entrySequence - previousDetail.entrySequence === 1
+      ) {
+        detail.openingBalance = toTwoDecimals(previousDetail.closingBalance);
+      }
       currentBalance = toTwoDecimals(detail.openingBalance);
     }
 
@@ -291,7 +328,6 @@ async function recalculateAllBalancesAfterDate(
     return;
   }
 
-  // Sort by date and entrySequence
   record.balanceDetails.sort((a, b) => {
     const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
     if (dateDiff !== 0) return dateDiff;
@@ -329,11 +365,10 @@ async function recalculateAllBalancesAfterDate(
 async function removeReceiptEntryFromLedger(
   schoolId,
   academicYear,
-  receiptEntryId,
+  receiptId,
   ledgerId,
   session
 ) {
-  // Find the record
   const record = await OpeningClosingBalance.findOne({
     schoolId,
     academicYear,
@@ -342,23 +377,18 @@ async function removeReceiptEntryFromLedger(
 
   if (!record) return;
 
-  // Remove the entry from balanceDetails
   const originalLength = record.balanceDetails.length;
-  s;
   record.balanceDetails = record.balanceDetails.filter(
-    (detail) => detail.entryId?.toString() !== receiptEntryId.toString()
+    (detail) => detail.entryId?.toString() !== receiptId.toString()
   );
 
-  if (record.balanceDetails.length === originalLength) return; // nothing removed
-
-  // Sort the remaining entries by date and sequence
+  if (record.balanceDetails.length === originalLength) return;
   record.balanceDetails.sort((a, b) => {
     const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
     if (dateDiff !== 0) return dateDiff;
     return (a.entrySequence || 0) - (b.entrySequence || 0);
   });
 
-  // Recalculate sequences for same-day entries
   let currentDate = null;
   let currentSequence = 0;
 
@@ -376,18 +406,15 @@ async function removeReceiptEntryFromLedger(
     detail.entrySequence = currentSequence;
   }
 
-  // Re-sort after sequence correction
   record.balanceDetails.sort((a, b) => {
     const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
     if (dateDiff !== 0) return dateDiff;
     return (a.entrySequence || 0) - (b.entrySequence || 0);
   });
 
-  // Recalculate opening and closing balances
   for (let i = 0; i < record.balanceDetails.length; i++) {
     const detail = record.balanceDetails[i];
     if (i === 0) {
-      // First entry uses ledger opening balance
       const ledger = await Ledger.findById(ledgerId).session(session);
       detail.openingBalance = toTwoDecimals(ledger?.openingBalance || 0);
     } else {
@@ -401,31 +428,6 @@ async function removeReceiptEntryFromLedger(
   }
 
   await record.save({ session });
-}
-
-function aggregateAmountsByLedger(itemDetails) {
-  const ledgerMap = new Map();
-
-  itemDetails.forEach((item) => {
-    const ledgerId = item.ledgerId.toString();
-    const debitAmount = toTwoDecimals(item.debitAmount) || 0;
-    const amount = toTwoDecimals(item.amount) || 0;
-
-    if (ledgerMap.has(ledgerId)) {
-      const existing = ledgerMap.get(ledgerId);
-      ledgerMap.set(ledgerId, {
-        debitAmount: existing.debitAmount + debitAmount,
-        amount: existing.amount + amount,
-      });
-    } else {
-      ledgerMap.set(ledgerId, {
-        debitAmount: debitAmount,
-        amount: amount,
-      });
-    }
-  });
-
-  return ledgerMap;
 }
 
 async function updateById(req, res) {
@@ -462,27 +464,17 @@ async function updateById(req, res) {
       entryDate,
       receiptDate,
       narration,
+      paymentMode,
+      chequeNumber,
       itemDetails,
-      status,
+      TDSorTCS,
+      TDSTCSRateChartId,
+      TDSTCSRate,
+      TDSTCSRateWithAmount,
+      ledgerIdWithPaymentMode,
       totalAmount,
-      totalDebitAmount,
+      status,
     } = req.body;
-
-    const hasValidLedger = await hasBankOrCashLedger(
-      schoolId,
-      academicYear,
-      itemDetails
-    );
-
-    if (!hasValidLedger) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        hasError: true,
-        message:
-          "At least one ledger must have Group Ledger Name as 'Bank' or 'Cash'",
-      });
-    }
 
     const existingReceipt = await Receipt.findOne({
       _id: id,
@@ -499,16 +491,23 @@ async function updateById(req, res) {
       });
     }
 
+    // --- Track old ledger IDs like Contra does ---
     const oldItemLedgerIds = existingReceipt.itemDetails.map((item) =>
       item.ledgerId?.toString()
     );
+    const oldTDSorTCSLedgerId = existingReceipt.TDSorTCSLedgerId?.toString();
+    const oldPaymentModeLedgerId =
+      existingReceipt.ledgerIdWithPaymentMode?.toString();
 
     // Store old values for comparison
     const oldEntryDate = existingReceipt.entryDate;
     const oldItemDetails = existingReceipt.itemDetails;
+    const oldTDSorTCS = existingReceipt.TDSorTCS;
+    const oldTDSTCSRateWithAmount = existingReceipt.TDSTCSRateWithAmount;
+    const oldLedgerIdWithPaymentMode = existingReceipt.ledgerIdWithPaymentMode;
 
     // Handle uploaded files
-    const { receiptImage } = req.files || {};
+    const { receiptImage, chequeImageForReceipt } = req.files || {};
 
     if (receiptImage?.[0]) {
       const receiptImagePath = receiptImage[0].mimetype.startsWith("image/")
@@ -517,11 +516,18 @@ async function updateById(req, res) {
       existingReceipt.receiptImage = `${receiptImagePath}/${receiptImage[0].filename}`;
     }
 
+    if (chequeImageForReceipt?.[0]) {
+      const chequeImageForReceiptPath =
+        chequeImageForReceipt[0].mimetype.startsWith("image/")
+          ? "/Images/FinanceModule/ChequeImageForReceipt"
+          : "/Documents/FinanceModule/ChequeImageForReceipt";
+      existingReceipt.chequeImageForReceipt = `${chequeImageForReceiptPath}/${chequeImageForReceipt[0].filename}`;
+    }
+
     // Recalculate item details amounts
     const updatedItemDetails = itemDetails.map((item) => ({
       ...item,
-      amount: parseFloat(item.amount) || 0,
-      debitAmount: parseFloat(item.debitAmount) || 0,
+      amount: toTwoDecimals(parseFloat(item.amount) || 0),
     }));
 
     const subTotalAmount = toTwoDecimals(
@@ -531,33 +537,31 @@ async function updateById(req, res) {
       )
     );
 
-    const subTotalOfDebit = toTwoDecimals(
-      updatedItemDetails.reduce(
-        (sum, item) => sum + (parseFloat(item.debitAmount) || 0),
-        0
-      )
+    const parsedTDSTCSRateWithAmount = toTwoDecimals(
+      parseFloat(TDSTCSRateWithAmount) || 0
     );
 
     // Update fields
     existingReceipt.entryDate = entryDate;
     existingReceipt.receiptDate = receiptDate;
     existingReceipt.narration = narration;
+    existingReceipt.paymentMode = paymentMode;
+    existingReceipt.chequeNumber = chequeNumber;
     existingReceipt.itemDetails = updatedItemDetails;
+    existingReceipt.TDSorTCS = TDSorTCS;
+    existingReceipt.TDSTCSRateChartId = TDSTCSRateChartId;
+    existingReceipt.TDSTCSRate = TDSTCSRate;
+    existingReceipt.TDSTCSRateWithAmount = parsedTDSTCSRateWithAmount;
     existingReceipt.subTotalAmount = subTotalAmount;
-    existingReceipt.subTotalOfDebit = subTotalOfDebit;
     existingReceipt.totalAmount = totalAmount;
-    existingReceipt.totalDebitAmount = totalDebitAmount;
-
+    existingReceipt.ledgerIdWithPaymentMode = ledgerIdWithPaymentMode;
     existingReceipt.status = status;
 
-    await existingReceipt.save({ session });
+    if (paymentMode === "Online" && !existingReceipt.transactionNumber) {
+      existingReceipt.transactionNumber = await generateTransactionNumber();
+    }
 
-    // Get new ledger IDs
-    const newItemLedgerIds = updatedItemDetails.map((item) =>
-      item.ledgerId?.toString()
-    );
-
-    // --- Step A: Reset old balances to zero first (like Receipt does) ---
+    // --- Step A: Reset old balances to zero first (like Contra does) ---
     const balanceRecords = await OpeningClosingBalance.find({
       schoolId,
       academicYear,
@@ -574,6 +578,36 @@ async function updateById(req, res) {
       await record.save({ session });
     }
 
+    await existingReceipt.save({ session });
+
+    // --- Step B: Remove old entries if ledgers changed or removed (like Contra) ---
+
+    // Get new ledger IDs
+    const newItemLedgerIds = updatedItemDetails.map((item) =>
+      item.ledgerId?.toString()
+    );
+    const newPaymentModeLedgerId = ledgerIdWithPaymentMode?.toString();
+
+    // Handle TDS/TCS ledger
+    let newTDSorTCSLedgerId = null;
+    if (TDSorTCS && parsedTDSTCSRateWithAmount > 0) {
+      const ledgerNameToFind =
+        TDSorTCS === "TDS" ? "TDS on Receipts" : "TCS on Receipts";
+      let tdsTcsLedger = await Ledger.findOne({
+        schoolId,
+        academicYear,
+        ledgerName: { $regex: new RegExp(`^${ledgerNameToFind}$`, "i") },
+      }).session(session);
+
+      if (tdsTcsLedger) {
+        newTDSorTCSLedgerId = tdsTcsLedger._id.toString();
+        existingReceipt.TDSorTCSLedgerId = newTDSorTCSLedgerId;
+      }
+    } else {
+      existingReceipt.TDSorTCSLedgerId = null;
+    }
+    await existingReceipt.save({ session });
+
     // Remove entries from old ledgers that are no longer used
     for (const oldLedgerId of oldItemLedgerIds) {
       if (oldLedgerId && !newItemLedgerIds.includes(oldLedgerId)) {
@@ -587,25 +621,104 @@ async function updateById(req, res) {
       }
     }
 
+    // Remove old TDS/TCS ledger entry if removed or changed
+    if (oldTDSorTCSLedgerId && oldTDSorTCSLedgerId !== newTDSorTCSLedgerId) {
+      await removeReceiptEntryFromLedger(
+        schoolId,
+        academicYear,
+        id,
+        oldTDSorTCSLedgerId,
+        session
+      );
+    }
+
+    // Remove old payment mode ledger entry if changed
+    if (
+      oldPaymentModeLedgerId &&
+      oldPaymentModeLedgerId !== newPaymentModeLedgerId
+    ) {
+      await removeReceiptEntryFromLedger(
+        schoolId,
+        academicYear,
+        id,
+        oldPaymentModeLedgerId,
+        session
+      );
+    }
+
     // --- Step C: Apply new balances ---
     const ledgerIdsToUpdate = new Set();
 
-    // Aggregate amounts by ledgerId and update balances
+    // 1. Item Ledgers (Credit) - Aggregate amounts by ledgerId
     const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
 
-    for (const [ledgerId, amounts] of ledgerAmounts) {
+    for (const [ledgerId, amount] of ledgerAmounts) {
       await updateOpeningClosingBalance(
         schoolId,
         academicYear,
         ledgerId,
         entryDate,
         existingReceipt._id,
-        amounts.debitAmount,
-        amounts.amount,
+        0, // debit
+        amount, // credit,
         session
       );
       ledgerIdsToUpdate.add(ledgerId);
     }
+
+    // 2. TDS/TCS Ledger
+    const tdsTcsAmount = parsedTDSTCSRateWithAmount;
+
+    if (TDSorTCS && tdsTcsAmount > 0 && newTDSorTCSLedgerId) {
+      if (TDSorTCS === "TDS") {
+        // For TDS: Debit the TDS ledger
+        await updateOpeningClosingBalance(
+          schoolId,
+          academicYear,
+          newTDSorTCSLedgerId,
+          entryDate,
+          existingReceipt._id,
+          tdsTcsAmount, // debit
+          0, // credit
+          session
+        );
+      } else if (TDSorTCS === "TCS") {
+        // For TCS: Credit the TCS ledger
+        await updateOpeningClosingBalance(
+          schoolId,
+          academicYear,
+          newTDSorTCSLedgerId,
+          entryDate,
+          existingReceipt._id,
+          0, // debit
+          tdsTcsAmount, // credit
+          session
+        );
+      }
+      ledgerIdsToUpdate.add(newTDSorTCSLedgerId);
+    }
+
+    // 3. Payment Mode Ledger (Debit)
+    let paymentAmount;
+    if (TDSorTCS === "TDS") {
+      paymentAmount = toTwoDecimals(subTotalAmount - tdsTcsAmount);
+    } else if (TDSorTCS === "TCS") {
+      paymentAmount = toTwoDecimals(subTotalAmount + tdsTcsAmount);
+    } else {
+      paymentAmount = toTwoDecimals(subTotalAmount);
+    }
+
+    await updateOpeningClosingBalance(
+      schoolId,
+      academicYear,
+      ledgerIdWithPaymentMode,
+      entryDate,
+      existingReceipt._id,
+      paymentAmount, // debit
+      0, // credit
+      session
+    );
+    ledgerIdsToUpdate.add(ledgerIdWithPaymentMode.toString());
 
     // --- Step D: Recalculate all affected ledgers ---
     for (const ledgerId of ledgerIdsToUpdate) {
@@ -624,99 +737,7 @@ async function updateById(req, res) {
       );
     }
 
-    // ========== NEW CODE: Update data in TotalNetdeficitNetSurplus table ==========
-
-    // Get all unique ledger IDs from updatedItemDetails
-    const uniqueLedgerIds = [
-      ...new Set(updatedItemDetails.map((item) => item.ledgerId)),
-    ];
-
-    // Find ledgers with their Head of Account information
-    const ledgers = await Ledger.find({
-      _id: { $in: uniqueLedgerIds },
-    })
-      .populate("headOfAccountId")
-      .session(session);
-
-    // Initialize sums
-    let incomeBalance = 0;
-    let expensesBalance = 0;
-
-    // Calculate sums based on Head of Account
-    for (const item of updatedItemDetails) {
-      const ledger = ledgers.find(
-        (l) => l._id.toString() === item.ledgerId.toString()
-      );
-
-      if (ledger && ledger.headOfAccountId) {
-        const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
-        const amount = parseFloat(item.amount) || 0;
-        const debitAmount = parseFloat(item.debitAmount) || 0;
-
-        if (headOfAccountName.toLowerCase() === "income") {
-          incomeBalance += debitAmount - amount;
-        } else if (headOfAccountName.toLowerCase() === "expenses") {
-          expensesBalance += debitAmount - amount;
-        }
-      }
-    }
-
-    // Calculate total balance
-    const totalBalance = toTwoDecimals(incomeBalance - expensesBalance);
-
-    // Round to two decimals
-    incomeBalance = toTwoDecimals(incomeBalance);
-    expensesBalance = toTwoDecimals(expensesBalance);
-
-    // Find or create TotalNetdeficitNetSurplus record
-    let totalNetRecord = await TotalNetdeficitNetSurplus.findOne({
-      schoolId,
-      academicYear,
-    }).session(session);
-
-    if (!totalNetRecord) {
-      totalNetRecord = new TotalNetdeficitNetSurplus({
-        schoolId,
-        academicYear,
-        balanceDetails: [],
-      });
-    }
-
-    // FIXED: Check if entry exists by entryId ONLY (not by date)
-    const existingEntryIndex = totalNetRecord.balanceDetails.findIndex(
-      (detail) => detail.entryId?.toString() === id.toString()
-    );
-
-    if (existingEntryIndex !== -1) {
-      // Update existing entry - REPLACE values
-      totalNetRecord.balanceDetails[existingEntryIndex].incomeBalance =
-        incomeBalance;
-      totalNetRecord.balanceDetails[existingEntryIndex].expensesBalance =
-        expensesBalance;
-      totalNetRecord.balanceDetails[existingEntryIndex].totalBalance =
-        totalBalance;
-      totalNetRecord.balanceDetails[existingEntryIndex].entryDate = entryDate;
-    } else {
-      // Create new entry if it doesn't exist
-      totalNetRecord.balanceDetails.push({
-        entryDate,
-        entryId: existingReceipt._id,
-        incomeBalance,
-        expensesBalance,
-        totalBalance,
-      });
-    }
-
-    // Sort balanceDetails by date
-    totalNetRecord.balanceDetails.sort(
-      (a, b) => new Date(a.entryDate) - new Date(b.entryDate)
-    );
-
-    await totalNetRecord.save({ session });
-    // ========== END OF NEW CODE ==========
-
     await session.commitTransaction();
-    session.endSession();
 
     return res.status(200).json({
       hasError: false,
@@ -724,14 +745,27 @@ async function updateById(req, res) {
       data: existingReceipt,
     });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
+
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)
+        .map((key) => `${key}: ${error.keyValue[key]}`)
+        .join(", ");
+      return res.status(400).json({
+        hasError: true,
+        message: `Duplicate entry for ${field}. Receipt already exists.`,
+      });
+    }
 
     console.error("Error updating Receipt Entry:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",
     });
+  } finally {
+    session.endSession();
   }
 }
 

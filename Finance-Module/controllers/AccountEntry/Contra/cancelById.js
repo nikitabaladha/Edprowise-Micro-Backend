@@ -3,6 +3,7 @@ import Contra from "../../../models/Contra.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
+import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
 
 // Helper function to remove contra entry from balances
 async function removeContraEntryFromBalances(
@@ -315,6 +316,34 @@ async function cancelById(req, res) {
         TDSorTCSLedgerId, // PASS THE STORED LEDGER ID
         session
       );
+
+      // ========== NEW CODE: Remove data from TotalNetdeficitNetSurplus table ==========
+
+      // Find the TotalNetdeficitNetSurplus record
+      let totalNetRecord = await TotalNetdeficitNetSurplus.findOne({
+        schoolId,
+        academicYear,
+      }).session(session);
+
+      if (totalNetRecord) {
+        // Remove the entry for this payment
+        const originalLength = totalNetRecord.balanceDetails.length;
+        totalNetRecord.balanceDetails = totalNetRecord.balanceDetails.filter(
+          (detail) => detail.entryId?.toString() !== id.toString()
+        );
+
+        // Only save if something was actually removed
+        if (totalNetRecord.balanceDetails.length !== originalLength) {
+          // Sort balanceDetails by date
+          totalNetRecord.balanceDetails.sort(
+            (a, b) => new Date(a.entryDate) - new Date(b.entryDate)
+          );
+
+          await totalNetRecord.save({ session });
+        }
+      }
+
+      // ========== END OF NEW CODE ==========
 
       return res.status(200).json({
         hasError: false,

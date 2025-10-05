@@ -3,7 +3,7 @@ import Contra from "../../../models/Contra.js";
 import ContraValidator from "../../../validators/ContraValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
-import GroupLedger from "../../../models/GroupLedger.js";
+import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
 
 function toTwoDecimals(value) {
   if (value === null || value === undefined || isNaN(value)) return 0;

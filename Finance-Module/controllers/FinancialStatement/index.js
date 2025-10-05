@@ -5,6 +5,7 @@ import getBalanceSheetForAssetsLiabilities from "./getBalanceSheetForAssetsLiabi
 import getScheduleToLiabilities from "./getScheduleToLiabilities.js";
 import getScheduleToAssets from "./getScheduleToAssets.js";
 import getFixedAssetsSchedule from "./getFixedAssetsSchedule.js";
+import getTotalNetdeficitNetSurplus from "./getTotalNetdeficitNetSurplus.js";
 
 export {
   getIncomeAndExpenditureAccount,
@@ -14,4 +15,5 @@ export {
   getScheduleToLiabilities,
   getScheduleToAssets,
   getFixedAssetsSchedule,
+  getTotalNetdeficitNetSurplus,
 };
