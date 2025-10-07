@@ -3,7 +3,6 @@ import Contra from "../../../models/Contra.js";
 import ContraValidator from "../../../validators/ContraValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
-import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
 
 function toTwoDecimals(value) {
   if (value === null || value === undefined || isNaN(value)) return 0;
@@ -398,14 +397,32 @@ export const updateById = async (req, res) => {
 
     existingContra.subTotalOfDebit = subTotalOfDebit;
     existingContra.subTotalOfCredit = subTotalOfCredit;
+
     existingContra.TDSorTCS = TDSorTCS || "";
     existingContra.TDSTCSRateAmount = tdsTcsAmount;
 
-    if (!TDSorTCS) {
-      existingContra.TDSorTCSLedgerId = null;
-    } else {
-      if (!existingContra.TDSorTCSLedgerId) {
+    // Fix: Find and set TDS/TCS ledger ID when TDS/TCS is selected
+    if (TDSorTCS && tdsTcsAmount > 0) {
+      // Search for the appropriate TDS/TCS ledger
+      const ledgerNameToFind =
+        TDSorTCS === "TDS" ? "TDS on Cash Withdrawn/Deposited" : "TCS";
+
+      // Find the ledger with exact name match
+      let tdsTcsLedgerToUpdate = await Ledger.findOne({
+        schoolId,
+        academicYear,
+        ledgerName: { $regex: new RegExp(`^${ledgerNameToFind}$`, "i") },
+      }).session(session);
+
+      if (!tdsTcsLedgerToUpdate) {
+        throw new Error(
+          `${ledgerNameToFind} Ledger not found for school ${schoolId} and academic year ${academicYear}`
+        );
       }
+
+      existingContra.TDSorTCSLedgerId = tdsTcsLedgerToUpdate._id.toString();
+    } else {
+      existingContra.TDSorTCSLedgerId = null;
     }
 
     existingContra.totalAmountOfDebit = totalAmountOfDebit;

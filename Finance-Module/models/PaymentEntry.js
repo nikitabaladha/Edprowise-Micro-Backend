@@ -79,14 +79,16 @@ const PaymentEntrySchema = new mongoose.Schema(
     },
     TDSorTCS: {
       type: String,
-      enum: ["TDS", "TCS"],
+      enum: ["TDS", "TCS", ""],
+      required: false,
     },
 
     TDSorTCSLedgerId: {
       type: String,
+      required: false,
     },
-    TDSTCSRateChartId: { type: String },
-    TDSTCSRate: { type: Number },
+    TDSTCSRateChartId: { type: String, required: false },
+    TDSTCSRate: { type: Number, required: false },
     TDSTCSRateWithAmountBeforeGST: {
       type: Number,
       set: toTwoDecimals,
