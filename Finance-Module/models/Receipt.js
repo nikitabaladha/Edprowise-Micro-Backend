@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 
 function toTwoDecimals(value) {
   if (value === null || value === undefined || isNaN(value)) return 0;
-  // Convert to string → split → cut decimals → join back
   const [intPart, decimalPart = ""] = value.toString().split(".");
   return parseFloat(intPart + "." + decimalPart.slice(0, 2));
 }

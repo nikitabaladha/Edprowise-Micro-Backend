@@ -1,5 +1,11 @@
 import mongoose from "mongoose";
 
+function toTwoDecimals(value) {
+  if (value === null || value === undefined || isNaN(value)) return 0;
+  const [intPart, decimalPart = ""] = value.toString().split(".");
+  return parseFloat(intPart + "." + decimalPart.slice(0, 2));
+}
+
 const ContraSchema = new mongoose.Schema(
   {
     schoolId: {
@@ -33,17 +39,21 @@ const ContraSchema = new mongoose.Schema(
         },
         debitAmount: {
           type: Number,
+          set: toTwoDecimals,
         },
         creditAmount: {
           type: Number,
+          set: toTwoDecimals,
         },
       },
     ],
     subTotalOfDebit: {
       type: Number,
+      set: toTwoDecimals,
     },
     subTotalOfCredit: {
       type: Number,
+      set: toTwoDecimals,
     },
     TDSorTCS: {
       type: String,
@@ -54,12 +64,15 @@ const ContraSchema = new mongoose.Schema(
     },
     TDSTCSRateAmount: {
       type: Number,
+      set: toTwoDecimals,
     },
     totalAmountOfDebit: {
       type: Number,
+      set: toTwoDecimals,
     },
     totalAmountOfCredit: {
       type: Number,
+      set: toTwoDecimals,
     },
     narration: { type: String },
     chequeNumber: {

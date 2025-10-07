@@ -29,4 +29,13 @@ const AuditorDocumentSchema = new mongoose.Schema(
   }
 );
 
+AuditorDocumentSchema.index(
+  {
+    schoolId: 1,
+    ledgerId: 1,
+    academicYear: 1,
+  },
+  { unique: true }
+);
+
 export default mongoose.model("AuditorDocument", AuditorDocumentSchema);
