@@ -17,6 +17,11 @@ const TotalNetdeficitNetSurplusSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    ledgerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Ledger",
+      required: true,
+    },
     balanceDetails: [
       {
         entryId: { type: String },

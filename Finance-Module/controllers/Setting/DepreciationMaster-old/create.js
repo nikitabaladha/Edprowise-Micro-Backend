@@ -37,6 +37,8 @@ async function create(req, res) {
       academicYear,
     } = req.body;
 
+    // from frontend i will send true or false for them
+
     // Create new document with all required fields
     const newDepreciationMaster = new DepreciationMaster({
       schoolId,

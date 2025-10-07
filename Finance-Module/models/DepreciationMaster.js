@@ -34,6 +34,13 @@ const DepreciationMasterSchema = new mongoose.Schema(
       default: 0,
       required: false,
     },
+    frequency: {
+      type: String,
+      required: false,
+      enum: ["Monthly", ""],
+      default: "",
+    },
+
     academicYear: {
       type: String,
       required: true,
