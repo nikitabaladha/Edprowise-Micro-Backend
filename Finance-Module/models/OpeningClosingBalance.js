@@ -1,5 +1,12 @@
 import mongoose from "mongoose";
 
+function toTwoDecimals(value) {
+  if (value === null || value === undefined || isNaN(value)) return 0;
+  // Convert to string → split → cut decimals → join back
+  const [intPart, decimalPart = ""] = value.toString().split(".");
+  return parseFloat(intPart + "." + decimalPart.slice(0, 2));
+}
+
 const OpeningClosingBalanceSchema = new mongoose.Schema(
   {
     schoolId: {
@@ -22,18 +29,22 @@ const OpeningClosingBalanceSchema = new mongoose.Schema(
         openingBalance: {
           type: Number,
           default: 0,
+          set: toTwoDecimals,
         },
         debit: {
           type: Number,
           default: 0,
+          set: toTwoDecimals,
         },
         credit: {
           type: Number,
           default: 0,
+          set: toTwoDecimals,
         },
         closingBalance: {
           type: Number,
           default: 0,
+          set: toTwoDecimals,
         },
       },
     ],

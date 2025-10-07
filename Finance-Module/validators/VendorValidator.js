@@ -24,12 +24,11 @@ const email = Joi.string().email().required().messages({
 });
 
 const contactNumber = Joi.string()
-  .pattern(/^[6-9]\d{9}$/)
+  .pattern(/^[0-9]{10}$/)
   .required()
   .messages({
-    "string.pattern.base":
-      "Contact number must be a valid 10-digit Indian number.",
-    "string.empty": "Contact number is required.",
+    "string.base": "Contact number must be a string.",
+    "string.pattern.base": "Contact number must be a valid 10-digit number.",
     "any.required": "Contact number is required.",
   });
 

@@ -13,6 +13,7 @@ import {
   dreaftPaymentEntry,
   updateDraftPaymentEntryById,
   getAllLedgerByNameWithTDSorTCS,
+  updateApprovalStatusById,
 } from "../controllers/AccountEntry/PaymentEntry/index.js";
 
 router.post(
@@ -40,6 +41,12 @@ router.put(
   upload,
   roleBasedMiddleware("School"),
   updatePaymentEntryById
+);
+
+router.put(
+  "/update-approval-status-for-payment/:id/:academicYear",
+  roleBasedMiddleware("School"),
+  updateApprovalStatusById
 );
 
 router.put(

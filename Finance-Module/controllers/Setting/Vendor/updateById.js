@@ -72,7 +72,7 @@ async function updateById(req, res) {
 
       if (openingBalNum < 0) {
         newBalanceType = "Credit";
-        newOpeningBalance = Math.abs(openingBalNum);
+        newOpeningBalance = openingBalNum;
       } else {
         newBalanceType = "Debit";
         newOpeningBalance = openingBalNum;
@@ -94,8 +94,8 @@ async function updateById(req, res) {
     existingVendor.accountNumber =
       accountNumber || existingVendor.accountNumber;
     existingVendor.accountType = accountType || existingVendor.accountType;
-    existingVendor.openingBalance =
-      openingBalance || existingVendor.openingBalance;
+
+    existingVendor.openingBalance = newOpeningBalance;
     existingVendor.paymentTerms = paymentTerms || existingVendor.paymentTerms;
     existingVendor.openingBalance = newOpeningBalance;
     existingVendor.balanceType = newBalanceType;

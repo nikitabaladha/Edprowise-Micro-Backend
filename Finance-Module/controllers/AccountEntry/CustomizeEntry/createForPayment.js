@@ -3,6 +3,14 @@ import PaymentEntry from "../../../models/PaymentEntry.js";
 import PaymentEntryValidator from "../../../validators/CustomizeEntryForPaymentValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
+import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
+
+import { hasBankOrCashLedger } from "../../CommonFunction/CommonFunction.js";
+
+function toTwoDecimals(value) {
+  if (value === null || value === undefined || isNaN(value)) return 0;
+  return Math.round(Number(value) * 100) / 100;
+}
 
 async function generatePaymentVoucherNumber(schoolId, academicYear) {
   const count = await PaymentEntry.countDocuments({ schoolId, academicYear });
@@ -68,8 +76,8 @@ async function updateOpeningClosingBalance(
   debitAmount = 0,
   creditAmount = 0
 ) {
-  debitAmount = Number(debitAmount);
-  creditAmount = Number(creditAmount);
+  debitAmount = toTwoDecimals(debitAmount);
+  creditAmount = toTwoDecimals(creditAmount);
 
   const { record, openingBalance, balanceType } =
     await getOrCreateOpeningBalanceRecord(
@@ -84,17 +92,24 @@ async function updateOpeningClosingBalance(
     .filter((detail) => new Date(detail.entryDate) <= new Date(entryDate))
     .sort((a, b) => new Date(b.entryDate) - new Date(a.entryDate));
 
-  let effectiveOpeningBalance = openingBalance;
+  let effectiveOpeningBalance = toTwoDecimals(openingBalance);
+
   if (previousBalanceDetails.length > 0) {
-    effectiveOpeningBalance = previousBalanceDetails[0].closingBalance;
+    effectiveOpeningBalance = toTwoDecimals(
+      previousBalanceDetails[0].closingBalance
+    );
   }
 
   // --- Calculate closing balance ---
   let closingBalance;
   if (balanceType === "Debit") {
-    closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
+    closingBalance = toTwoDecimals(
+      effectiveOpeningBalance + debitAmount - creditAmount
+    );
   } else {
-    closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
+    closingBalance = toTwoDecimals(
+      effectiveOpeningBalance + debitAmount - creditAmount
+    );
   }
 
   // --- Check if exact same entry already exists ---
@@ -111,7 +126,7 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: paymentEntryId, // Store Payment Entry _id as entryId
+      entryId: paymentEntryId,
     };
   } else {
     const newBalanceDetail = {
@@ -120,7 +135,7 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: paymentEntryId, // Store Payment Entry _id as entryId
+      entryId: paymentEntryId,
     };
 
     record.balanceDetails.push(newBalanceDetail);
@@ -166,7 +181,7 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
   });
 
   // Find the initial opening balance (from ledger or first entry)
-  let currentBalance = record.balanceDetails[0].openingBalance;
+  let currentBalance = toTwoDecimals(record.balanceDetails[0].openingBalance);
 
   for (let i = 0; i < record.balanceDetails.length; i++) {
     const detail = record.balanceDetails[i];
@@ -175,15 +190,21 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
       currentBalance = detail.openingBalance;
     } else {
       // Update opening balance to previous closing balance
-      detail.openingBalance = record.balanceDetails[i - 1].closingBalance;
+      detail.openingBalance = toTwoDecimals(
+        record.balanceDetails[i - 1].closingBalance
+      );
       currentBalance = detail.openingBalance;
     }
 
     // Calculate new closing balance
     if (balanceType === "Debit") {
-      detail.closingBalance = currentBalance + detail.debit - detail.credit;
+      detail.closingBalance = toTwoDecimals(
+        currentBalance + detail.debit - detail.credit
+      );
     } else {
-      detail.closingBalance = currentBalance + detail.debit - detail.credit;
+      detail.closingBalance = toTwoDecimals(
+        currentBalance + detail.debit - detail.credit
+      );
     }
 
     currentBalance = detail.closingBalance;
@@ -250,14 +271,13 @@ async function recalculateAllBalancesAfterDate(
   await record.save();
 }
 
-// Helper function to aggregate amounts by ledgerId
 function aggregateAmountsByLedger(itemDetails) {
   const ledgerMap = new Map();
 
   itemDetails.forEach((item) => {
     const ledgerId = item.ledgerId.toString();
-    const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
-    const creditAmount = parseFloat(item.creditAmount) || 0;
+    const amountAfterGST = toTwoDecimals(item.amountAfterGST) || 0;
+    const creditAmount = toTwoDecimals(item.creditAmount) || 0;
 
     if (ledgerMap.has(ledgerId)) {
       const existing = ledgerMap.get(ledgerId);
@@ -276,6 +296,7 @@ function aggregateAmountsByLedger(itemDetails) {
   return ledgerMap;
 }
 
+// ====
 async function create(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -294,6 +315,7 @@ async function create(req, res) {
     const { error } = PaymentEntryValidator.PaymentEntryValidator.validate(
       req.body
     );
+
     if (error) {
       const errorMessages = error.details.map((err) => err.message).join(", ");
       await session.abortTransaction();
@@ -312,6 +334,22 @@ async function create(req, res) {
       customizeEntry,
       academicYear,
     } = req.body;
+
+    const hasValidLedger = await hasBankOrCashLedger(
+      schoolId,
+      academicYear,
+      itemDetails
+    );
+
+    if (!hasValidLedger) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        hasError: true,
+        message:
+          "At least one ledger must have Group Ledger Name as 'Bank' or 'Cash'",
+      });
+    }
 
     const paymentVoucherNumber = await generatePaymentVoucherNumber(
       schoolId,
@@ -334,14 +372,18 @@ async function create(req, res) {
       creditAmount: parseFloat(item.creditAmount) || 0,
     }));
 
-    const subTotalAmountAfterGST = updatedItemDetails.reduce(
-      (sum, item) => sum + (parseFloat(item.amountAfterGST) || 0),
-      0
+    const subTotalAmountAfterGST = toTwoDecimals(
+      updatedItemDetails.reduce(
+        (sum, item) => sum + (parseFloat(item.amountAfterGST) || 0),
+        0
+      )
     );
 
-    const subTotalOfCredit = updatedItemDetails.reduce(
-      (sum, item) => sum + (parseFloat(item.creditAmount) || 0),
-      0
+    const subTotalOfCredit = toTwoDecimals(
+      updatedItemDetails.reduce(
+        (sum, item) => sum + (parseFloat(item.creditAmount) || 0),
+        0
+      )
     );
 
     const newPaymentEntry = new PaymentEntry({
@@ -394,6 +436,93 @@ async function create(req, res) {
         entryDate
       );
     }
+
+    // ========== NEW CODE: Store data in TotalNetdeficitNetSurplus table ==========
+
+    // Get all unique ledger IDs from itemDetails
+    const uniqueLedgerIds = [
+      ...new Set(updatedItemDetails.map((item) => item.ledgerId)),
+    ];
+
+    // Find ledgers with their Head of Account information
+    const ledgers = await Ledger.find({
+      _id: { $in: uniqueLedgerIds },
+    }).populate("headOfAccountId");
+
+    // Initialize sums
+    let incomeBalance = 0;
+    let expensesBalance = 0;
+
+    // Calculate sums based on Head of Account
+    for (const item of updatedItemDetails) {
+      const ledger = ledgers.find(
+        (l) => l._id.toString() === item.ledgerId.toString()
+      );
+
+      if (ledger && ledger.headOfAccountId) {
+        const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
+        const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
+        const creditAmount = parseFloat(item.creditAmount) || 0;
+
+        if (headOfAccountName.toLowerCase() === "income") {
+          incomeBalance += amountAfterGST - creditAmount;
+        } else if (headOfAccountName.toLowerCase() === "expenses") {
+          expensesBalance += amountAfterGST - creditAmount;
+        }
+      }
+    }
+
+    // Calculate total balance
+    const totalBalance = toTwoDecimals(incomeBalance - expensesBalance);
+
+    // Round to two decimals
+    incomeBalance = toTwoDecimals(incomeBalance);
+    expensesBalance = toTwoDecimals(expensesBalance);
+
+    // Find or create TotalNetdeficitNetSurplus record
+    let totalNetRecord = await TotalNetdeficitNetSurplus.findOne({
+      schoolId,
+      academicYear,
+    }).session(session);
+
+    if (!totalNetRecord) {
+      totalNetRecord = new TotalNetdeficitNetSurplus({
+        schoolId,
+        academicYear,
+        balanceDetails: [],
+      });
+    }
+
+    const existingEntryIndex = totalNetRecord.balanceDetails.findIndex(
+      (detail) => detail.entryId?.toString() === newPaymentEntry._id.toString()
+    );
+
+    if (existingEntryIndex !== -1) {
+      totalNetRecord.balanceDetails[existingEntryIndex].incomeBalance =
+        incomeBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].expensesBalance =
+        expensesBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].totalBalance =
+        totalBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].entryDate = entryDate;
+    } else {
+      totalNetRecord.balanceDetails.push({
+        entryDate,
+        entryId: newPaymentEntry._id,
+        incomeBalance,
+        expensesBalance,
+        totalBalance,
+      });
+    }
+
+    // Sort balanceDetails by date
+    totalNetRecord.balanceDetails.sort(
+      (a, b) => new Date(a.entryDate) - new Date(b.entryDate)
+    );
+
+    await totalNetRecord.save({ session });
+
+    // ========== END OF NEW CODE ==========
 
     await session.commitTransaction();
     session.endSession();

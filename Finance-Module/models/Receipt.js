@@ -1,5 +1,11 @@
 import mongoose from "mongoose";
 
+function toTwoDecimals(value) {
+  if (value === null || value === undefined || isNaN(value)) return 0;
+  const [intPart, decimalPart = ""] = value.toString().split(".");
+  return parseFloat(intPart + "." + decimalPart.slice(0, 2));
+}
+
 const ReceiptSchema = new mongoose.Schema(
   {
     schoolId: {
@@ -39,36 +45,46 @@ const ReceiptSchema = new mongoose.Schema(
         },
         amount: {
           type: Number,
+          set: toTwoDecimals,
         },
         debitAmount: {
           type: Number,
+          set: toTwoDecimals,
         },
       },
     ],
     subTotalAmount: {
       type: Number,
+      set: toTwoDecimals,
     },
     subTotalOfDebit: {
       type: Number,
+      set: toTwoDecimals,
     },
     TDSorTCS: {
       type: String,
-
       enum: ["TDS", "TCS"],
+    },
+    TDSorTCSLedgerId: {
+      type: String,
     },
     TDSTCSRateChartId: { type: String },
     TDSTCSRate: { type: Number },
     TDSTCSRateWithAmount: {
       type: Number,
+      set: toTwoDecimals,
     },
     adjustmentValue: {
       type: Number,
+      set: toTwoDecimals,
     },
     totalAmount: {
       type: Number,
+      set: toTwoDecimals,
     },
     totalDebitAmount: {
       type: Number,
+      set: toTwoDecimals,
     },
     receiptImage: {
       type: String,
@@ -81,6 +97,15 @@ const ReceiptSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: ["Posted", "Draft", "Reversed", "Cancelled"],
+    },
+    approvalStatus: {
+      type: String,
+      required: true,
+      enum: ["Pending", "Approved", "Disapproved"],
+      default: "Pending",
+    },
+    reasonOfDisapprove: {
+      type: String,
     },
   },
   {

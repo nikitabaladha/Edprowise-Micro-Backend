@@ -11,6 +11,8 @@ import findLedgerByName from "./findLedgerByName.js";
 import getAllLedgerByGroupLedgerId from "./getAllLedgerByGroupLedgerId.js";
 import getAllBySchoolIdWithDate from "./getAllBySchoolIdWithDate.js";
 
+import getAllByBankAndBankFixedDeposits from "./getAllByBankAndBankFixedDeposits.js";
+
 export {
   createLedger,
   getAllLedgerBySchoolId,
@@ -24,4 +26,5 @@ export {
   getAllLedgerByCashName,
   getAllLedgerByGroupLedgerId,
   getAllBySchoolIdWithDate,
+  getAllByBankAndBankFixedDeposits,
 };

@@ -12,6 +12,7 @@ import {
   updateJournalById,
   dreaftJournal,
   updateDraftJournalById,
+  updateApprovalStatusById,
 } from "../controllers/AccountEntry/Journal/index.js";
 
 router.post(
@@ -39,6 +40,12 @@ router.put(
   upload,
   roleBasedMiddleware("School"),
   updateJournalById
+);
+
+router.put(
+  "/update-approval-status-for-journal/:id/:academicYear",
+  roleBasedMiddleware("School"),
+  updateApprovalStatusById
 );
 
 router.put(

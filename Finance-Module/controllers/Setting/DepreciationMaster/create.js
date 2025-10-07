@@ -32,6 +32,8 @@ async function create(req, res) {
       ledgerId,
       rateAsPerIncomeTaxAct,
       rateAsPerICAI,
+      chargeDepreciation,
+      entryAutomation,
       academicYear,
     } = req.body;
 
@@ -42,6 +44,8 @@ async function create(req, res) {
       ledgerId,
       rateAsPerIncomeTaxAct,
       rateAsPerICAI,
+      chargeDepreciation,
+      entryAutomation,
       academicYear,
     });
 

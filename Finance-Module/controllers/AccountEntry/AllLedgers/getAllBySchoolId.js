@@ -5,6 +5,11 @@ import Journal from "../../../models/Journal.js";
 
 import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
+
+import Vendor from "../../../models/Vendor.js";
+import TDSTCSRateChart from "../../../models/TDSTCSRateChart.js";
+import AuthorisedSignature from "../../../models/AuthorisedSignature.js";
+
 import mongoose from "mongoose";
 
 async function getAllBySchoolId(req, res) {
@@ -38,6 +43,13 @@ async function getAllBySchoolId(req, res) {
         };
       }
     }
+
+    const authorisedSignature = await AuthorisedSignature.findOne({
+      schoolId,
+      academicYear,
+    })
+      .select("authorisedSignatureImage")
+      .lean();
 
     const paymentEntries = await PaymentEntry.find({
       schoolId,
@@ -75,6 +87,13 @@ async function getAllBySchoolId(req, res) {
 
     // Find Payment Entries
     for (const entry of paymentEntries) {
+      const vendor = entry.vendorCode
+        ? await Vendor.findOne({
+            vendorCode: entry.vendorCode,
+            schoolId,
+          }).lean()
+        : null;
+
       const itemsWithLedgerNames = [];
 
       for (const item of entry.itemDetails) {
@@ -111,6 +130,13 @@ async function getAllBySchoolId(req, res) {
         });
       }
 
+      // Fetch TDS/TCS Rate Chart
+      const tdsTcsRateChart =
+        entry.TDSTCSRateChartId &&
+        mongoose.Types.ObjectId.isValid(entry.TDSTCSRateChartId)
+          ? await TDSTCSRateChart.findById(entry.TDSTCSRateChartId).lean()
+          : null;
+
       const ledgerWithPaymentMode =
         entry.ledgerIdWithPaymentMode &&
         mongoose.Types.ObjectId.isValid(entry.ledgerIdWithPaymentMode)
@@ -132,28 +158,28 @@ async function getAllBySchoolId(req, res) {
       let TDSorTCSGroupLedgerName = null;
       let TDSorTCSLedgerName = null;
 
-      if (entry.TDSorTCS) {
-        // 1. Find GroupLedger by name
-        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+      if (entry.TDSorTCS && entry.TDSorTCSLedgerId) {
+        // 1. Find the TDS/TCS Ledger using the stored TDSorTCSLedgerId
+        const tdsOrTcsLedger = await Ledger.findOne({
+          _id: entry.TDSorTCSLedgerId,
           schoolId,
-          groupLedgerName: entry.TDSorTCS,
         })
-          .select("_id groupLedgerName")
+          .select("ledgerName groupLedgerId")
           .lean();
 
-        if (tdsOrTcsGroupLedger) {
-          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+        if (tdsOrTcsLedger) {
+          TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
 
-          // 2. Find Ledger under that GroupLedger
-          const tdsOrTcsLedger = await Ledger.findOne({
+          // 2. Find the GroupLedger connected to this ledger
+          const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+            _id: tdsOrTcsLedger.groupLedgerId,
             schoolId,
-            groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName")
+            .select("groupLedgerName")
             .lean();
 
-          if (tdsOrTcsLedger) {
-            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+          if (tdsOrTcsGroupLedger) {
+            TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
           }
         }
       }
@@ -194,6 +220,36 @@ async function getAllBySchoolId(req, res) {
 
         totalAmountAfterGST: entry.totalAmountAfterGST || null,
         totalCreditAmount: entry.totalCreditAmount || null,
+
+        // Vendor fields
+        nameOfVendor: vendor?.nameOfVendor || null,
+        email: vendor?.email || null,
+        contactNumber: vendor?.contactNumber || null,
+        gstNumber: vendor?.gstNumber || null,
+        panNumber: vendor?.panNumber || null,
+        address: vendor?.address || null,
+        state: vendor?.state || null,
+        nameOfAccountHolder: vendor?.nameOfAccountHolder || null,
+        nameOfBank: vendor?.nameOfBank || null,
+        ifscCode: vendor?.ifscCode || null,
+        accountNumber: vendor?.accountNumber || null,
+        accountType: vendor?.accountType || null,
+
+        // Item details
+        itemDetails: itemsWithLedgerNames,
+
+        // TDS/TCS Rate Chart fields
+        natureOfTransaction: tdsTcsRateChart?.natureOfTransaction || null,
+        rate: tdsTcsRateChart?.rate || null,
+
+        // Authorised Signature
+        authorisedSignatureImage:
+          authorisedSignature?.authorisedSignatureImage || null,
+
+        paymentMode: entry.paymentMode,
+        invoiceNumber: entry.invoiceNumber,
+        invoiceImage: entry.invoiceImage,
+        chequeImage: entry.chequeImage || null,
       };
 
       formattedData.push(entryData);
@@ -237,6 +293,12 @@ async function getAllBySchoolId(req, res) {
         });
       }
 
+      const tdsTcsRateChart =
+        entry.TDSTCSRateChartId &&
+        mongoose.Types.ObjectId.isValid(entry.TDSTCSRateChartId)
+          ? await TDSTCSRateChart.findById(entry.TDSTCSRateChartId).lean()
+          : null;
+
       const ledgerWithPaymentMode =
         entry.ledgerIdWithPaymentMode &&
         mongoose.Types.ObjectId.isValid(entry.ledgerIdWithPaymentMode)
@@ -258,28 +320,28 @@ async function getAllBySchoolId(req, res) {
       let TDSorTCSGroupLedgerName = null;
       let TDSorTCSLedgerName = null;
 
-      if (entry.TDSorTCS) {
-        // 1. Find GroupLedger by name
-        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+      if (entry.TDSorTCS && entry.TDSorTCSLedgerId) {
+        // 1. Find the TDS/TCS Ledger using the stored TDSorTCSLedgerId
+        const tdsOrTcsLedger = await Ledger.findOne({
+          _id: entry.TDSorTCSLedgerId,
           schoolId,
-          groupLedgerName: entry.TDSorTCS,
         })
-          .select("_id groupLedgerName")
+          .select("ledgerName groupLedgerId")
           .lean();
 
-        if (tdsOrTcsGroupLedger) {
-          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+        if (tdsOrTcsLedger) {
+          TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
 
-          // 2. Find Ledger under that GroupLedger
-          const tdsOrTcsLedger = await Ledger.findOne({
+          // 2. Find the GroupLedger connected to this ledger
+          const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+            _id: tdsOrTcsLedger.groupLedgerId,
             schoolId,
-            groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName")
+            .select("groupLedgerName")
             .lean();
 
-          if (tdsOrTcsLedger) {
-            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+          if (tdsOrTcsGroupLedger) {
+            TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
           }
         }
       }
@@ -319,6 +381,21 @@ async function getAllBySchoolId(req, res) {
         subTotalOfDebit: entry.subTotalOfDebit || null,
         totalAmount: entry.totalAmount || null,
         totalDebitAmount: entry.totalDebitAmount || null,
+
+        paymentMode: entry.paymentMode,
+        TDSTCSRateChartId: entry.TDSTCSRateChartId,
+        TDSTCSRate: entry.TDSTCSRate,
+        receiptImage: entry.receiptImage,
+        chequeImageForReceipt: entry.chequeImageForReceipt || null,
+        status: entry.status || null,
+
+        // TDS/TCS Rate Chart fields
+        natureOfTransaction: tdsTcsRateChart?.natureOfTransaction || null,
+        rate: tdsTcsRateChart?.rate || null,
+
+        // Authorised Signature
+        authorisedSignatureImage:
+          authorisedSignature?.authorisedSignatureImage || null,
       };
 
       formattedData.push(entryData);
@@ -413,26 +490,28 @@ async function getAllBySchoolId(req, res) {
       let TDSorTCSGroupLedgerName = null;
       let TDSorTCSLedgerName = null;
 
-      if (entry.TDSorTCS) {
-        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+      if (entry.TDSorTCS && entry.TDSorTCSLedgerId) {
+        // 1. Find the TDS/TCS Ledger using the stored TDSorTCSLedgerId
+        const tdsOrTcsLedger = await Ledger.findOne({
+          _id: entry.TDSorTCSLedgerId,
           schoolId,
-          groupLedgerName: entry.TDSorTCS,
         })
-          .select("_id groupLedgerName")
+          .select("ledgerName groupLedgerId")
           .lean();
 
-        if (tdsOrTcsGroupLedger) {
-          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+        if (tdsOrTcsLedger) {
+          TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
 
-          const tdsOrTcsLedger = await Ledger.findOne({
+          // 2. Find the GroupLedger connected to this ledger
+          const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+            _id: tdsOrTcsLedger.groupLedgerId,
             schoolId,
-            groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName")
+            .select("groupLedgerName")
             .lean();
 
-          if (tdsOrTcsLedger) {
-            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+          if (tdsOrTcsGroupLedger) {
+            TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
           }
         }
       }
@@ -523,6 +602,7 @@ async function getAllBySchoolId(req, res) {
         // Item details
         itemDetails: itemsWithLedgerNames,
         customizeEntry: entry.customizeEntry,
+        documentImage: entry.documentImage,
       };
 
       formattedData.push(entryData);

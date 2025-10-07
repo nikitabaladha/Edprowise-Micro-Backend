@@ -1,7 +1,11 @@
+import mongoose from "mongoose";
+
 import Receipt from "../../../models/Receipt.js";
 import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
-import mongoose from "mongoose";
+
+import TDSTCSRateChart from "../../../models/TDSTCSRateChart.js";
+import AuthorisedSignature from "../../../models/AuthorisedSignature.js";
 
 async function getAllReceiptBySchoolId(req, res) {
   try {
@@ -15,6 +19,13 @@ async function getAllReceiptBySchoolId(req, res) {
         message: "Access denied: School ID not found in user context.",
       });
     }
+
+    const authorisedSignature = await AuthorisedSignature.findOne({
+      schoolId,
+      academicYear,
+    })
+      .select("authorisedSignatureImage")
+      .lean();
 
     // Create date filter object
     const dateFilter = {};
@@ -84,6 +95,13 @@ async function getAllReceiptBySchoolId(req, res) {
         });
       }
 
+      // Fetch TDS/TCS Rate Chart
+      const tdsTcsRateChart =
+        entry.TDSTCSRateChartId &&
+        mongoose.Types.ObjectId.isValid(entry.TDSTCSRateChartId)
+          ? await TDSTCSRateChart.findById(entry.TDSTCSRateChartId).lean()
+          : null;
+
       const ledgerWithPaymentMode =
         entry.ledgerIdWithPaymentMode &&
         mongoose.Types.ObjectId.isValid(entry.ledgerIdWithPaymentMode)
@@ -105,34 +123,34 @@ async function getAllReceiptBySchoolId(req, res) {
       let TDSorTCSGroupLedgerName = null;
       let TDSorTCSLedgerName = null;
 
-      if (entry.TDSorTCS) {
-        // 1. Find GroupLedger by name
-        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+      if (entry.TDSorTCS && entry.TDSorTCSLedgerId) {
+        // 1. Find the TDS/TCS Ledger using the stored TDSorTCSLedgerId
+        const tdsOrTcsLedger = await Ledger.findOne({
+          _id: entry.TDSorTCSLedgerId,
           schoolId,
-          groupLedgerName: entry.TDSorTCS,
         })
-          .select("_id groupLedgerName")
+          .select("ledgerName groupLedgerId")
           .lean();
 
-        if (tdsOrTcsGroupLedger) {
-          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+        if (tdsOrTcsLedger) {
+          TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
 
-          // 2. Find Ledger under that GroupLedger
-          const tdsOrTcsLedger = await Ledger.findOne({
+          // 2. Find the GroupLedger connected to this ledger
+          const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+            _id: tdsOrTcsLedger.groupLedgerId,
             schoolId,
-            groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName")
+            .select("groupLedgerName")
             .lean();
 
-          if (tdsOrTcsLedger) {
-            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+          if (tdsOrTcsGroupLedger) {
+            TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
           }
         }
       }
 
       const entryData = {
-        // PaymentEntry fields
+        // ReceiptEntry fields
         accountingEntry: "Receipt",
         _id: entry._id,
         schoolId: entry.schoolId,
@@ -167,6 +185,20 @@ async function getAllReceiptBySchoolId(req, res) {
         subTotalOfDebit: entry.subTotalOfDebit,
         totalAmount: entry.totalAmount,
         totalDebitAmount: entry.totalDebitAmount,
+
+        // Authorised Signature
+        authorisedSignatureImage:
+          authorisedSignature?.authorisedSignatureImage || null,
+
+        paymentMode: entry.paymentMode,
+        TDSTCSRateChartId: entry.TDSTCSRateChartId,
+        TDSTCSRate: entry.TDSTCSRate,
+
+        receiptImage: entry.receiptImage,
+        chequeImageForReceipt: entry.chequeImageForReceipt || null,
+        status: entry.status || null,
+        approvalStatus: entry.approvalStatus,
+        reasonOfDisapprove: entry.reasonOfDisapprove,
       };
 
       formattedData.push(entryData);

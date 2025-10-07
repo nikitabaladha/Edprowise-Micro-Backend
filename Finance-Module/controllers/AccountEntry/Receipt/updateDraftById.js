@@ -8,7 +8,7 @@ async function generateTransactionNumber() {
   let transactionNumber = baseTransactionNumber;
   let counter = 1;
 
-  while (await PaymentEntry.exists({ transactionNumber })) {
+  while (await Receipt.exists({ transactionNumber })) {
     const suffix = String(counter).padStart(2, "0");
     transactionNumber = `${baseTransactionNumber}${suffix}`;
     counter++;
@@ -88,23 +88,34 @@ async function updateById(req, res) {
 
     const parsedTDSTCSRateWithAmount = parseFloat(TDSTCSRateWithAmount) || 0;
 
-    // Update fields
+    // ✅ FIXED: Update fields without preserving old TDS/TCS values when not provided
     existingReceipt.entryDate = entryDate || existingReceipt.entryDate;
     existingReceipt.receiptDate = receiptDate || existingReceipt.receiptDate;
     existingReceipt.narration = narration || existingReceipt.narration;
     existingReceipt.paymentMode = paymentMode || existingReceipt.paymentMode;
     existingReceipt.chequeNumber = chequeNumber || existingReceipt.chequeNumber;
     existingReceipt.itemDetails = updatedItemDetails;
-    existingReceipt.TDSorTCS = TDSorTCS || existingReceipt.TDSorTCS;
-    existingReceipt.TDSTCSRateChartId =
-      TDSTCSRateChartId || existingReceipt.TDSTCSRateChartId;
-    existingReceipt.TDSTCSRate = TDSTCSRate || existingReceipt.TDSTCSRate;
-    existingReceipt.TDSTCSRateWithAmount = parsedTDSTCSRateWithAmount;
     existingReceipt.subTotalAmount = subTotalAmount;
     existingReceipt.totalAmount = totalAmount || existingReceipt.totalAmount;
     existingReceipt.ledgerIdWithPaymentMode =
       ledgerIdWithPaymentMode || existingReceipt.ledgerIdWithPaymentMode;
     existingReceipt.status = status || existingReceipt.status;
+
+    if (TDSorTCS && TDSorTCS.trim() !== "" && parsedTDSTCSRateWithAmount > 0) {
+      // TDS/TCS is provided and amount > 0 - update all fields
+      existingReceipt.TDSorTCS = TDSorTCS;
+      existingReceipt.TDSTCSRateChartId = TDSTCSRateChartId || null;
+      existingReceipt.TDSTCSRate = parseFloat(TDSTCSRate) || 0;
+      existingReceipt.TDSTCSRateWithAmount = parsedTDSTCSRateWithAmount;
+      // Note: TDSorTCSLedgerId will be handled in the main update function, not in draft
+    } else {
+      // TDS/TCS is removed or amount is 0 - clear all TDS/TCS fields
+      existingReceipt.TDSorTCS = null;
+      existingReceipt.TDSTCSRateChartId = null;
+      existingReceipt.TDSTCSRate = 0;
+      existingReceipt.TDSTCSRateWithAmount = 0;
+      existingReceipt.TDSorTCSLedgerId = null;
+    }
 
     if (paymentMode === "Online" && !existingReceipt.transactionNumber) {
       existingReceipt.transactionNumber = await generateTransactionNumber();
@@ -114,7 +125,7 @@ async function updateById(req, res) {
 
     return res.status(200).json({
       hasError: false,
-      message: "Receipt  draft updated successfully!",
+      message: "Receipt draft updated successfully!",
       data: existingReceipt,
     });
   } catch (error) {

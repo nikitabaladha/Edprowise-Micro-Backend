@@ -167,28 +167,28 @@ async function getAllIncomeBookBySchoolId(req, res) {
       let TDSorTCSGroupLedgerName = null;
       let TDSorTCSLedgerName = null;
 
-      if (entry.TDSorTCS) {
-        // 1. Find GroupLedger by name
-        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+      if (entry.TDSorTCS && entry.TDSorTCSLedgerId) {
+        // 1. Find the TDS/TCS Ledger using the stored TDSorTCSLedgerId
+        const tdsOrTcsLedger = await Ledger.findOne({
+          _id: entry.TDSorTCSLedgerId,
           schoolId,
-          groupLedgerName: entry.TDSorTCS,
         })
-          .select("_id groupLedgerName")
+          .select("ledgerName groupLedgerId")
           .lean();
 
-        if (tdsOrTcsGroupLedger) {
-          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+        if (tdsOrTcsLedger) {
+          TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
 
-          // 2. Find Ledger under that GroupLedger
-          const tdsOrTcsLedger = await Ledger.findOne({
+          // 2. Find the GroupLedger connected to this ledger
+          const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+            _id: tdsOrTcsLedger.groupLedgerId,
             schoolId,
-            groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName")
+            .select("groupLedgerName")
             .lean();
 
-          if (tdsOrTcsLedger) {
-            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+          if (tdsOrTcsGroupLedger) {
+            TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
           }
         }
       }
@@ -321,34 +321,34 @@ async function getAllIncomeBookBySchoolId(req, res) {
       let TDSorTCSGroupLedgerName = null;
       let TDSorTCSLedgerName = null;
 
-      if (entry.TDSorTCS) {
-        // 1. Find GroupLedger by name
-        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+      if (entry.TDSorTCS && entry.TDSorTCSLedgerId) {
+        // 1. Find the TDS/TCS Ledger using the stored TDSorTCSLedgerId
+        const tdsOrTcsLedger = await Ledger.findOne({
+          _id: entry.TDSorTCSLedgerId,
           schoolId,
-          groupLedgerName: entry.TDSorTCS,
         })
-          .select("_id groupLedgerName")
+          .select("ledgerName groupLedgerId")
           .lean();
 
-        if (tdsOrTcsGroupLedger) {
-          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+        if (tdsOrTcsLedger) {
+          TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
 
-          // 2. Find Ledger under that GroupLedger
-          const tdsOrTcsLedger = await Ledger.findOne({
+          // 2. Find the GroupLedger connected to this ledger
+          const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+            _id: tdsOrTcsLedger.groupLedgerId,
             schoolId,
-            groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName")
+            .select("groupLedgerName")
             .lean();
 
-          if (tdsOrTcsLedger) {
-            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+          if (tdsOrTcsGroupLedger) {
+            TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
           }
         }
       }
 
       const entryData = {
-        // PaymentEntry fields
+        // ReceiptEntry fields
         accountingEntry: "Receipt",
         _id: entry._id,
         schoolId: entry.schoolId,
@@ -382,84 +382,6 @@ async function getAllIncomeBookBySchoolId(req, res) {
         subTotalOfDebit: entry.subTotalOfDebit || null,
         totalAmount: entry.totalAmount || null,
         totalDebitAmount: entry.totalDebitAmount || null,
-      };
-
-      formattedData.push(entryData);
-    }
-
-    // Find Journal Entries
-
-    for (const entry of JournalEntries) {
-      const itemsWithLedgerNames = [];
-      let hasIncomeHeadOfAccount = false;
-
-      for (const item of entry.itemDetails) {
-        let ledger = null;
-        if (item.ledgerId && mongoose.Types.ObjectId.isValid(item.ledgerId)) {
-          ledger = await Ledger.findOne({
-            _id: item.ledgerId,
-            schoolId,
-          })
-            .select("ledgerName groupLedgerId headOfAccountId")
-            .lean();
-
-          // Check if this ledger has "Income" HeadOfAccount
-          if (ledger?.headOfAccountId) {
-            const headOfAccount = await HeadOfAccount.findOne({
-              _id: ledger.headOfAccountId,
-              schoolId,
-              headOfAccountName: "Income",
-            }).lean();
-
-            if (headOfAccount) {
-              hasIncomeHeadOfAccount = true;
-            }
-          }
-        }
-
-        let groupLedger = null;
-        if (ledger?.groupLedgerId) {
-          groupLedger = await GroupLedger.findOne({
-            _id: ledger.groupLedgerId,
-            schoolId,
-          })
-            .select("groupLedgerName")
-            .lean();
-        }
-
-        itemsWithLedgerNames.push({
-          description: item.description,
-          ledgerId: item.ledgerId || null,
-          debitAmount: item.debitAmount,
-          creditAmount: item.creditAmount,
-          ledgerName: ledger?.ledgerName || null,
-          groupLedgerId: ledger?.groupLedgerId || null,
-          groupLedgerName: groupLedger?.groupLedgerName || null,
-        });
-      }
-
-      // Skip this entry if no Income head of account found
-      if (!hasIncomeHeadOfAccount) {
-        continue;
-      }
-
-      const entryData = {
-        accountingEntry: "Journal",
-        _id: entry._id,
-        schoolId: entry.schoolId,
-        entryDate: entry.entryDate,
-        documentDate: entry.documentDate,
-        narration: entry.narration,
-        subTotalOfDebit: entry.subTotalOfDebit,
-        totalAmountOfDebit: entry.totalAmountOfDebit,
-        totalAmountOfCredit: entry.totalAmountOfCredit,
-        journalVoucherNumber: entry.journalVoucherNumber || null,
-        createdAt: entry.createdAt,
-        updatedAt: entry.updatedAt,
-
-        // Item details
-        itemDetails: itemsWithLedgerNames,
-        customizeEntry: entry.customizeEntry,
       };
 
       formattedData.push(entryData);
@@ -576,26 +498,28 @@ async function getAllIncomeBookBySchoolId(req, res) {
       let TDSorTCSGroupLedgerName = null;
       let TDSorTCSLedgerName = null;
 
-      if (entry.TDSorTCS) {
-        const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+      if (entry.TDSorTCS && entry.TDSorTCSLedgerId) {
+        // 1. Find the TDS/TCS Ledger using the stored TDSorTCSLedgerId
+        const tdsOrTcsLedger = await Ledger.findOne({
+          _id: entry.TDSorTCSLedgerId,
           schoolId,
-          groupLedgerName: entry.TDSorTCS,
         })
-          .select("_id groupLedgerName")
+          .select("ledgerName groupLedgerId")
           .lean();
 
-        if (tdsOrTcsGroupLedger) {
-          TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
+        if (tdsOrTcsLedger) {
+          TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
 
-          const tdsOrTcsLedger = await Ledger.findOne({
+          // 2. Find the GroupLedger connected to this ledger
+          const tdsOrTcsGroupLedger = await GroupLedger.findOne({
+            _id: tdsOrTcsLedger.groupLedgerId,
             schoolId,
-            groupLedgerId: tdsOrTcsGroupLedger._id,
           })
-            .select("ledgerName")
+            .select("groupLedgerName")
             .lean();
 
-          if (tdsOrTcsLedger) {
-            TDSorTCSLedgerName = tdsOrTcsLedger.ledgerName;
+          if (tdsOrTcsGroupLedger) {
+            TDSorTCSGroupLedgerName = tdsOrTcsGroupLedger.groupLedgerName;
           }
         }
       }
@@ -623,6 +547,84 @@ async function getAllIncomeBookBySchoolId(req, res) {
         updatedAt: entry.updatedAt,
         TDSorTCSGroupLedgerName,
         TDSorTCSLedgerName,
+        itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
+      };
+
+      formattedData.push(entryData);
+    }
+
+    // Find Journal Entries
+
+    for (const entry of JournalEntries) {
+      const itemsWithLedgerNames = [];
+      let hasIncomeHeadOfAccount = false;
+
+      for (const item of entry.itemDetails) {
+        let ledger = null;
+        if (item.ledgerId && mongoose.Types.ObjectId.isValid(item.ledgerId)) {
+          ledger = await Ledger.findOne({
+            _id: item.ledgerId,
+            schoolId,
+          })
+            .select("ledgerName groupLedgerId headOfAccountId")
+            .lean();
+
+          // Check if this ledger has "Income" HeadOfAccount
+          if (ledger?.headOfAccountId) {
+            const headOfAccount = await HeadOfAccount.findOne({
+              _id: ledger.headOfAccountId,
+              schoolId,
+              headOfAccountName: "Income",
+            }).lean();
+
+            if (headOfAccount) {
+              hasIncomeHeadOfAccount = true;
+            }
+          }
+        }
+
+        let groupLedger = null;
+        if (ledger?.groupLedgerId) {
+          groupLedger = await GroupLedger.findOne({
+            _id: ledger.groupLedgerId,
+            schoolId,
+          })
+            .select("groupLedgerName")
+            .lean();
+        }
+
+        itemsWithLedgerNames.push({
+          description: item.description,
+          ledgerId: item.ledgerId || null,
+          debitAmount: item.debitAmount,
+          creditAmount: item.creditAmount,
+          ledgerName: ledger?.ledgerName || null,
+          groupLedgerId: ledger?.groupLedgerId || null,
+          groupLedgerName: groupLedger?.groupLedgerName || null,
+        });
+      }
+
+      // Skip this entry if no Income head of account found
+      if (!hasIncomeHeadOfAccount) {
+        continue;
+      }
+
+      const entryData = {
+        accountingEntry: "Journal",
+        _id: entry._id,
+        schoolId: entry.schoolId,
+        entryDate: entry.entryDate,
+        documentDate: entry.documentDate,
+        narration: entry.narration,
+        subTotalOfDebit: entry.subTotalOfDebit,
+        totalAmountOfDebit: entry.totalAmountOfDebit,
+        totalAmountOfCredit: entry.totalAmountOfCredit,
+        journalVoucherNumber: entry.journalVoucherNumber || null,
+        createdAt: entry.createdAt,
+        updatedAt: entry.updatedAt,
+
+        // Item details
         itemDetails: itemsWithLedgerNames,
         customizeEntry: entry.customizeEntry,
       };

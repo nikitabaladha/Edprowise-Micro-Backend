@@ -8,6 +8,7 @@ import {
   getAllDepreciationMasterBySchoolId,
   updateDepreciationMasterById,
   deleteDepreciationMasterById,
+  updateAllDepreciationMaster,
 } from "../controllers/Setting/DepreciationMaster/index.js";
 
 router.post(
@@ -26,6 +27,12 @@ router.put(
   "/update-depreciation-master-by-id/:id/:academicYear",
   roleBasedMiddleware("School"),
   updateDepreciationMasterById
+);
+
+router.put(
+  "/update-all-depreciation-master/:academicYear",
+  roleBasedMiddleware("School"),
+  updateAllDepreciationMaster
 );
 
 router.delete(

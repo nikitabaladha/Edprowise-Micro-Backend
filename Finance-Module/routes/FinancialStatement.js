@@ -10,6 +10,8 @@ import {
   getBalanceSheetForAssetsLiabilities,
   getScheduleToLiabilities,
   getScheduleToAssets,
+  getFixedAssetsSchedule,
+  getTotalNetdeficitNetSurplus,
 } from "../controllers/FinancialStatement/index.js";
 
 router.get(
@@ -46,6 +48,18 @@ router.get(
   "/get-financial-statement-schedule-to-assets",
   roleBasedMiddleware("School"),
   getScheduleToAssets
+);
+
+router.get(
+  "/get-financial-statement-fixed-assets-schedule",
+  roleBasedMiddleware("School"),
+  getFixedAssetsSchedule
+);
+
+router.get(
+  "/get-total-netdeficit-netsurplus",
+  roleBasedMiddleware("School"),
+  getTotalNetdeficitNetSurplus
 );
 
 export default router;

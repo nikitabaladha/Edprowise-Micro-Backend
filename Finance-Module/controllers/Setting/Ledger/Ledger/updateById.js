@@ -81,7 +81,7 @@ async function updateById(req, res) {
     existingLedger.bSPLLedgerId = bSPLLedgerId || existingLedger.bSPLLedgerId;
 
     existingLedger.openingBalance =
-      openingBalance || existingLedger.openingBalance;
+      openingBalance ?? existingLedger.openingBalance;
 
     existingLedger.balanceType = balanceType;
 

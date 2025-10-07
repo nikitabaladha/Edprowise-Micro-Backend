@@ -3,6 +3,7 @@ import Contra from "../../../models/Contra.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
+import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
 
 // Helper function to remove contra entry from balances
 async function removeContraEntryFromBalances(
@@ -82,7 +83,7 @@ function aggregateCashAccountAmounts(itemDetails) {
   return cashAccountMap;
 }
 
-// Helper function to find TDS/TCS ledger
+// Helper function to find TDS/TCS ledger - IMPROVED TO MATCH CREATE/UPDATE
 async function findTDSorTCSLedger(
   schoolId,
   academicYear,
@@ -91,6 +92,22 @@ async function findTDSorTCSLedger(
 ) {
   if (!TDSorTCS) return null;
 
+  // Use the exact same logic as your create function
+  const ledgerNameToFind =
+    TDSorTCS === "TDS" ? "TDS on Cash Withdrawn/Deposited" : "TCS";
+
+  // Find the ledger with exact name match (same as create function)
+  let tdsTcsLedger = await Ledger.findOne({
+    schoolId,
+    academicYear,
+    ledgerName: { $regex: new RegExp(`^${ledgerNameToFind}$`, "i") },
+  }).session(session || null);
+
+  if (tdsTcsLedger) {
+    return tdsTcsLedger;
+  }
+
+  // Fallback to group ledger search (same as your original logic)
   let tdsTcsGroupLedger = await GroupLedger.findOne({
     schoolId,
     academicYear,
@@ -109,7 +126,7 @@ async function findTDSorTCSLedger(
     return null;
   }
 
-  let tdsTcsLedger = await Ledger.findOne({
+  tdsTcsLedger = await Ledger.findOne({
     schoolId,
     academicYear,
     groupLedgerId: tdsTcsGroupLedger._id,
@@ -184,7 +201,7 @@ async function recalculateLedgerBalances(
   await record.save({ session });
 }
 
-// Helper function to recalculate all affected ledgers for contra entries
+// Helper function to recalculate all affected ledgers for contra entries - IMPROVED
 async function recalculateAllAffectedLedgers(
   schoolId,
   academicYear,
@@ -192,6 +209,7 @@ async function recalculateAllAffectedLedgers(
   contraEntryName,
   TDSorTCS,
   TDSTCSRateAmount,
+  TDSorTCSLedgerId, // ADD THIS PARAMETER TO USE STORED LEDGER ID
   session = null
 ) {
   // Store all ledger IDs that need to be recalculated
@@ -204,23 +222,33 @@ async function recalculateAllAffectedLedgers(
   }
 
   // 2. Add cash account ledgers if applicable
-  if (["Cash Deposited", "Cash Withdrawn", ""].includes(contraEntryName)) {
+  if (
+    ["Cash Deposited", "Cash Withdrawn", "Bank Transfer"].includes(
+      contraEntryName
+    )
+  ) {
     const cashAccountAmounts = aggregateCashAccountAmounts(itemDetails);
     for (const [cashAccountId] of cashAccountAmounts) {
       ledgerIdsToRecalculate.add(cashAccountId);
     }
   }
 
-  // 3. Add TDS/TCS ledger if applicable
+  // 3. Add TDS/TCS ledger if applicable - IMPROVED LOGIC
   if (TDSorTCS && TDSTCSRateAmount > 0) {
-    const tdsTcsLedger = await findTDSorTCSLedger(
-      schoolId,
-      academicYear,
-      TDSorTCS,
-      session
-    );
-    if (tdsTcsLedger) {
-      ledgerIdsToRecalculate.add(tdsTcsLedger._id.toString());
+    // First try to use the stored TDSorTCSLedgerId from the contra entry
+    if (TDSorTCSLedgerId) {
+      ledgerIdsToRecalculate.add(TDSorTCSLedgerId.toString());
+    } else {
+      // Fallback to finding the ledger if ID is not stored
+      const tdsTcsLedger = await findTDSorTCSLedger(
+        schoolId,
+        academicYear,
+        TDSorTCS,
+        session
+      );
+      if (tdsTcsLedger) {
+        ledgerIdsToRecalculate.add(tdsTcsLedger._id.toString());
+      }
     }
   }
 
@@ -263,6 +291,7 @@ async function cancelById(req, res) {
       const contraEntryName = existingContra.contraEntryName;
       const TDSorTCS = existingContra.TDSorTCS;
       const TDSTCSRateAmount = existingContra.TDSTCSRateAmount || 0;
+      const TDSorTCSLedgerId = existingContra.TDSorTCSLedgerId; // GET STORED LEDGER ID
 
       // Update status to "Cancelled"
       existingContra.status = "Cancelled";
@@ -284,8 +313,37 @@ async function cancelById(req, res) {
         contraEntryName,
         TDSorTCS,
         TDSTCSRateAmount,
+        TDSorTCSLedgerId, // PASS THE STORED LEDGER ID
         session
       );
+
+      // ========== NEW CODE: Remove data from TotalNetdeficitNetSurplus table ==========
+
+      // Find the TotalNetdeficitNetSurplus record
+      let totalNetRecord = await TotalNetdeficitNetSurplus.findOne({
+        schoolId,
+        academicYear,
+      }).session(session);
+
+      if (totalNetRecord) {
+        // Remove the entry for this payment
+        const originalLength = totalNetRecord.balanceDetails.length;
+        totalNetRecord.balanceDetails = totalNetRecord.balanceDetails.filter(
+          (detail) => detail.entryId?.toString() !== id.toString()
+        );
+
+        // Only save if something was actually removed
+        if (totalNetRecord.balanceDetails.length !== originalLength) {
+          // Sort balanceDetails by date
+          totalNetRecord.balanceDetails.sort(
+            (a, b) => new Date(a.entryDate) - new Date(b.entryDate)
+          );
+
+          await totalNetRecord.save({ session });
+        }
+      }
+
+      // ========== END OF NEW CODE ==========
 
       return res.status(200).json({
         hasError: false,

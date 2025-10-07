@@ -3,6 +3,12 @@ import Journal from "../../../models/Journal.js";
 import JournalValidator from "../../../validators/JournalValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
+import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
+
+function toTwoDecimals(value) {
+  if (value === null || value === undefined || isNaN(value)) return 0;
+  return Math.round(Number(value) * 100) / 100;
+}
 
 async function generateJournalVoucherNumber(schoolId, academicYear) {
   const count = await Journal.countDocuments({ schoolId, academicYear });
@@ -68,8 +74,8 @@ async function updateOpeningClosingBalance(
   debitAmount = 0,
   creditAmount = 0
 ) {
-  debitAmount = Number(debitAmount);
-  creditAmount = Number(creditAmount);
+  debitAmount = toTwoDecimals(debitAmount);
+  creditAmount = toTwoDecimals(creditAmount);
 
   const { record, openingBalance, balanceType } =
     await getOrCreateOpeningBalanceRecord(
@@ -79,25 +85,32 @@ async function updateOpeningClosingBalance(
       entryDate
     );
 
-  // Determine effective opening balance
+  // --- FIX: Determine effective opening balance ---
   const previousBalanceDetails = record.balanceDetails
     .filter((detail) => new Date(detail.entryDate) <= new Date(entryDate))
     .sort((a, b) => new Date(b.entryDate) - new Date(a.entryDate));
 
-  let effectiveOpeningBalance = openingBalance;
+  let effectiveOpeningBalance = toTwoDecimals(openingBalance);
+
   if (previousBalanceDetails.length > 0) {
-    effectiveOpeningBalance = previousBalanceDetails[0].closingBalance;
+    effectiveOpeningBalance = toTwoDecimals(
+      previousBalanceDetails[0].closingBalance
+    );
   }
 
-  // Calculate closing balance
+  // --- Calculate closing balance ---
   let closingBalance;
   if (balanceType === "Debit") {
-    closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
+    closingBalance = toTwoDecimals(
+      effectiveOpeningBalance + debitAmount - creditAmount
+    );
   } else {
-    closingBalance = effectiveOpeningBalance + debitAmount - creditAmount;
+    closingBalance = toTwoDecimals(
+      effectiveOpeningBalance + debitAmount - creditAmount
+    );
   }
 
-  // Check if exact same entry already exists
+  // --- Check if exact same entry already exists ---
   const existingEntryIndex = record.balanceDetails.findIndex(
     (detail) =>
       new Date(detail.entryDate).getTime() === new Date(entryDate).getTime() &&
@@ -111,7 +124,7 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: journalId, // Store Journal _id as entryId
+      entryId: journalId,
     };
   } else {
     const newBalanceDetail = {
@@ -120,7 +133,7 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: journalId, // Store Journal _id as entryId
+      entryId: journalId,
     };
 
     record.balanceDetails.push(newBalanceDetail);
@@ -166,7 +179,7 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
   });
 
   // Find the initial opening balance (from ledger or first entry)
-  let currentBalance = record.balanceDetails[0].openingBalance;
+  let currentBalance = toTwoDecimals(record.balanceDetails[0].openingBalance);
 
   for (let i = 0; i < record.balanceDetails.length; i++) {
     const detail = record.balanceDetails[i];
@@ -175,15 +188,21 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
       currentBalance = detail.openingBalance;
     } else {
       // Update opening balance to previous closing balance
-      detail.openingBalance = record.balanceDetails[i - 1].closingBalance;
+      detail.openingBalance = toTwoDecimals(
+        record.balanceDetails[i - 1].closingBalance
+      );
       currentBalance = detail.openingBalance;
     }
 
     // Calculate new closing balance
     if (balanceType === "Debit") {
-      detail.closingBalance = currentBalance + detail.debit - detail.credit;
+      detail.closingBalance = toTwoDecimals(
+        currentBalance + detail.debit - detail.credit
+      );
     } else {
-      detail.closingBalance = currentBalance + detail.debit - detail.credit;
+      detail.closingBalance = toTwoDecimals(
+        currentBalance + detail.debit - detail.credit
+      );
     }
 
     currentBalance = detail.closingBalance;
@@ -255,8 +274,8 @@ function aggregateAmountsByLedger(itemDetails) {
 
   itemDetails.forEach((item) => {
     const ledgerId = item.ledgerId.toString();
-    const debitAmount = parseFloat(item.debitAmount) || 0;
-    const creditAmount = parseFloat(item.creditAmount) || 0;
+    const debitAmount = toTwoDecimals(item.debitAmount) || 0;
+    const creditAmount = toTwoDecimals(item.creditAmount) || 0;
 
     if (ledgerMap.has(ledgerId)) {
       const existing = ledgerMap.get(ledgerId);
@@ -274,6 +293,8 @@ function aggregateAmountsByLedger(itemDetails) {
 
   return ledgerMap;
 }
+
+// ========
 
 export async function create(req, res) {
   const session = await mongoose.startSession();
@@ -332,14 +353,12 @@ export async function create(req, res) {
       creditAmount: parseFloat(item.creditAmount) || 0,
     }));
 
-    const subTotalOfDebit = updatedItemDetails.reduce(
-      (sum, item) => sum + item.debitAmount,
-      0
+    const subTotalOfDebit = toTwoDecimals(
+      updatedItemDetails.reduce((sum, item) => sum + item.debitAmount, 0)
     );
 
-    const subTotalOfCredit = updatedItemDetails.reduce(
-      (sum, item) => sum + item.creditAmount,
-      0
+    const subTotalOfCredit = toTwoDecimals(
+      updatedItemDetails.reduce((sum, item) => sum + item.creditAmount, 0)
     );
 
     const totalAmountOfDebit = subTotalOfDebit;
@@ -403,6 +422,93 @@ export async function create(req, res) {
         entryDate
       );
     }
+
+    // ========== NEW CODE: Store data in TotalNetdeficitNetSurplus table ==========
+
+    // Get all unique ledger IDs from itemDetails
+    const uniqueLedgerIds = [
+      ...new Set(updatedItemDetails.map((item) => item.ledgerId)),
+    ];
+
+    // Find ledgers with their Head of Account information
+    const ledgers = await Ledger.find({
+      _id: { $in: uniqueLedgerIds },
+    }).populate("headOfAccountId");
+
+    // Initialize sums
+    let incomeBalance = 0;
+    let expensesBalance = 0;
+
+    // Calculate sums based on Head of Account
+    for (const item of updatedItemDetails) {
+      const ledger = ledgers.find(
+        (l) => l._id.toString() === item.ledgerId.toString()
+      );
+
+      if (ledger && ledger.headOfAccountId) {
+        const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
+        const debitAmount = parseFloat(item.debitAmount) || 0;
+        const creditAmount = parseFloat(item.creditAmount) || 0;
+
+        if (headOfAccountName.toLowerCase() === "income") {
+          incomeBalance += debitAmount - creditAmount;
+        } else if (headOfAccountName.toLowerCase() === "expenses") {
+          expensesBalance += debitAmount - creditAmount;
+        }
+      }
+    }
+
+    // Calculate total balance
+    const totalBalance = toTwoDecimals(incomeBalance - expensesBalance);
+
+    // Round to two decimals
+    incomeBalance = toTwoDecimals(incomeBalance);
+    expensesBalance = toTwoDecimals(expensesBalance);
+
+    // Find or create TotalNetdeficitNetSurplus record
+    let totalNetRecord = await TotalNetdeficitNetSurplus.findOne({
+      schoolId,
+      academicYear,
+    }).session(session);
+
+    if (!totalNetRecord) {
+      totalNetRecord = new TotalNetdeficitNetSurplus({
+        schoolId,
+        academicYear,
+        balanceDetails: [],
+      });
+    }
+
+    const existingEntryIndex = totalNetRecord.balanceDetails.findIndex(
+      (detail) => detail.entryId?.toString() === newJournal._id.toString()
+    );
+
+    if (existingEntryIndex !== -1) {
+      totalNetRecord.balanceDetails[existingEntryIndex].incomeBalance =
+        incomeBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].expensesBalance =
+        expensesBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].totalBalance =
+        totalBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].entryDate = entryDate;
+    } else {
+      totalNetRecord.balanceDetails.push({
+        entryDate,
+        entryId: newJournal._id,
+        incomeBalance,
+        expensesBalance,
+        totalBalance,
+      });
+    }
+
+    // Sort balanceDetails by date
+    totalNetRecord.balanceDetails.sort(
+      (a, b) => new Date(a.entryDate) - new Date(b.entryDate)
+    );
+
+    await totalNetRecord.save({ session });
+
+    // ========== END OF NEW CODE ==========
 
     await session.commitTransaction();
     session.endSession();

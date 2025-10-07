@@ -207,7 +207,6 @@ async function getScheduleToLiabilities(req, res) {
         }
       }
 
-      // Adjust for balance type (Credit balances are typically negative in accounting)
       const isCreditBalance = ledger.balanceType === "Credit";
       if (isCreditBalance) {
         openingBalance = -Math.abs(openingBalance);
@@ -232,17 +231,22 @@ async function getScheduleToLiabilities(req, res) {
     }
 
     // Step 6: Convert the map to the desired array format
-    const result = Object.values(bspLedgerMap).map((bspLedger) => ({
-      bSPLLedgerId: bspLedger.bSPLLedgerId,
-      bSPLLedgerName: bspLedger.bSPLLedgerName,
-      groupLedgers: Object.values(bspLedger.groupLedgers).map(
-        (groupLedger) => ({
-          groupLedgerId: groupLedger.groupLedgerId,
-          groupLedgerName: groupLedger.groupLedgerName,
-          ledgers: Object.values(groupLedger.ledgers),
-        })
-      ),
-    }));
+
+    const result = Object.values(bspLedgerMap)
+      .map((bspLedger) => ({
+        bSPLLedgerId: bspLedger.bSPLLedgerId,
+        bSPLLedgerName: bspLedger.bSPLLedgerName,
+        groupLedgers: Object.values(bspLedger.groupLedgers)
+          .map((groupLedger) => ({
+            groupLedgerId: groupLedger.groupLedgerId,
+            groupLedgerName: groupLedger.groupLedgerName,
+            ledgers: Object.values(groupLedger.ledgers),
+          }))
+
+          .sort((a, b) => a.groupLedgerName.localeCompare(b.groupLedgerName)),
+      }))
+
+      .sort((a, b) => a.bSPLLedgerName.localeCompare(b.bSPLLedgerName));
 
     return res.status(200).json({
       hasError: false,

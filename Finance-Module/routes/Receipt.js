@@ -10,6 +10,7 @@ import {
   getAllReceiptBySchoolId,
   cancelReceiptById,
   updateReceiptById,
+  updateApprovalStatusById,
   dreaftReceipt,
   updateDraftReceiptById,
   getAllLedgerByNameWithTDSorTCS,
@@ -40,6 +41,12 @@ router.put(
   upload,
   roleBasedMiddleware("School"),
   updateReceiptById
+);
+
+router.put(
+  "/update-approval-status-for-receipt/:id/:academicYear",
+  roleBasedMiddleware("School"),
+  updateApprovalStatusById
 );
 
 router.put(

@@ -1,18 +1,5 @@
 import Joi from "joi";
 
-// const validateFutureOrTodayDate = (value, helpers) => {
-//   const inputDate = new Date(value);
-//   const today = new Date();
-//   today.setHours(0, 0, 0, 0);
-//   inputDate.setHours(0, 0, 0, 0);
-
-//   if (inputDate < today) {
-//     return helpers.message("Entry date cannot be in the past");
-//   }
-
-//   return value;
-// };
-
 const academicYearCreate = Joi.string().required().messages({
   "string.base": "Academic Year must be a string.",
   "string.empty": "Academic Year cannot be empty.",
