@@ -54,7 +54,6 @@ const itemDetails = Joi.array()
   .min(1)
   .required()
   .messages({
-    "array.base": "Item details must be an array.",
     "array.min": "At least one item detail is required.",
     "any.required": "Item details are required.",
   });

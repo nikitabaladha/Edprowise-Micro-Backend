@@ -179,6 +179,7 @@ async function getAllBySchoolId(req, res) {
         schoolId: entry.schoolId,
         entryDate: entry.entryDate,
         documentDate: entry.documentDate,
+        documentImage: entry.documentImage || null,
         narration: entry.narration,
         journalVoucherNumber: entry.journalVoucherNumber || null,
         status: entry.status,
