@@ -138,6 +138,9 @@ async function getAllBySchoolId(req, res) {
         // Authorised Signature
         authorisedSignatureImage:
           authorisedSignature?.authorisedSignatureImage || null,
+        academicYear: entry.academicYear,
+        approvalStatus: entry.approvalStatus,
+        reasonOfDisapprove: entry.reasonOfDisapprove,
       };
 
       formattedData.push(entryData);
