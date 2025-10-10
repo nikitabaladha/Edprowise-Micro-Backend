@@ -1,6 +1,7 @@
 import Ledger from "../../../../models/Ledger.js";
 import HeadOfAccount from "../../../../models/HeadOfAccount.js";
 import LedgerValidator from "../../../../validators/LedgerValidator.js";
+import TotalNetdeficitNetSurplus from "../../../../models/TotalNetdeficitNetSurplus.js";
 
 async function updateById(req, res) {
   try {
@@ -28,7 +29,6 @@ async function updateById(req, res) {
       groupLedgerId,
       bSPLLedgerId,
       openingBalance,
-      // balanceType,
     } = req.body;
 
     const existingLedger = await Ledger.findOne({
@@ -60,8 +60,6 @@ async function updateById(req, res) {
       );
     }
 
-    // Automatically set balanceType based on headOfAccountName
-
     // Determine balanceType based on openingBalance
     let balanceType;
     if (Number(openingBalance) < 0) {
@@ -86,6 +84,41 @@ async function updateById(req, res) {
     existingLedger.balanceType = balanceType;
 
     await existingLedger.save();
+
+    if (existingLedger.ledgerName.toLowerCase() === "net surplus/(deficit)") {
+      const existingTotalNetRecord = await TotalNetdeficitNetSurplus.findOne({
+        schoolId,
+        academicYear,
+      });
+
+      if (!existingTotalNetRecord) {
+        // If not found, create new
+        const newTotalNetRecord = new TotalNetdeficitNetSurplus({
+          schoolId,
+          academicYear,
+          ledgerId: existingLedger._id,
+          balanceDetails: [],
+        });
+
+        await newTotalNetRecord.save();
+        console.log(
+          `TotalNetdeficitNetSurplus record created for ledger: ${ledgerName}`
+        );
+      } else {
+        // If found, ensure it’s linked to the correct ledgerId
+        if (
+          !existingTotalNetRecord.ledgerId ||
+          existingTotalNetRecord.ledgerId.toString() !==
+            existingLedger._id.toString()
+        ) {
+          existingTotalNetRecord.ledgerId = existingLedger._id;
+          await existingTotalNetRecord.save();
+          console.log(
+            `TotalNetdeficitNetSurplus record updated with new ledger ID for: ${ledgerName}`
+          );
+        }
+      }
+    }
 
     return res.status(200).json({
       hasError: false,
