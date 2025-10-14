@@ -1,6 +1,5 @@
 import OpeningClosingBalance from "../../models/OpeningClosingBalance.js";
 import Ledger from "../../models/Ledger.js";
-import BSPLLedger from "../../models/BSPLLedger.js";
 import HeadOfAccount from "../../models/HeadOfAccount.js";
 import moment from "moment";
 import mongoose from "mongoose";
@@ -305,6 +304,28 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
         a.groupLedgerName.localeCompare(b.groupLedgerName)
       );
     });
+
+    // here if which ever groupLedgerName has closing balance  "0" i dont want it here
+    // i want if there is negative or positive value not "0" value
+
+    result.assets.forEach((asset) => {
+      asset.groupLedgers = asset.groupLedgers.filter(
+        (groupLedger) => groupLedger.closingBalance !== 0
+      );
+    });
+
+    result.liabilities.forEach((liability) => {
+      liability.groupLedgers = liability.groupLedgers.filter(
+        (groupLedger) => groupLedger.closingBalance !== 0
+      );
+    });
+
+    result.assets = result.assets.filter(
+      (asset) => asset.groupLedgers.length > 0
+    );
+    result.liabilities = result.liabilities.filter(
+      (liability) => liability.groupLedgers.length > 0
+    );
 
     return res.status(200).json({
       hasError: false,

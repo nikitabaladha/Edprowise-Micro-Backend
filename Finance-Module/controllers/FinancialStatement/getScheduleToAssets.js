@@ -249,10 +249,36 @@ async function getScheduleToAssets(req, res) {
 
       .sort((a, b) => a.bSPLLedgerName.localeCompare(b.bSPLLedgerName));
 
+    // Filter out ledgers where all four fields are 0
+    result.forEach((bspLedger) => {
+      bspLedger.groupLedgers.forEach((groupLedger) => {
+        groupLedger.ledgers = groupLedger.ledgers.filter((ledger) => {
+          return !(
+            ledger.openingBalance === 0 &&
+            ledger.closingBalance === 0 &&
+            ledger.debit === 0 &&
+            ledger.credit === 0
+          );
+        });
+      });
+    });
+
+    // Also filter out empty group ledgers and BSPL ledgers
+    result.forEach((bspLedger) => {
+      bspLedger.groupLedgers = bspLedger.groupLedgers.filter(
+        (groupLedger) => groupLedger.ledgers.length > 0
+      );
+    });
+
+    // Filter out BSPL ledgers that have no group ledgers after filtering
+    const filteredResult = result.filter(
+      (bspLedger) => bspLedger.groupLedgers.length > 0
+    );
+
     return res.status(200).json({
       hasError: false,
       message: "Schedule To Assets fetched successfully",
-      data: result,
+      data: filteredResult,
     });
   } catch (error) {
     console.error("Error fetching Schedule To Assets:", error);

@@ -624,7 +624,14 @@ async function updateById(req, res) {
     const newPaymentModeLedgerId = ledgerIdWithPaymentMode?.toString();
 
     // Handle TDS/TCS ledger
+    // Handle TDS/TCS ledger
     let newTDSorTCSLedgerId = null;
+
+    // FIX: Always update TDSTCSRateWithAmountBeforeGST regardless of the amount
+    existingPaymentEntry.TDSTCSRateWithAmountBeforeGST =
+      parsedTDSTCSRateWithAmountBeforeGST;
+
+    // Only set TDSorTCSLedgerId if TDS/TCS is selected AND amount is greater than 0
     if (TDSorTCS && parsedTDSTCSRateWithAmountBeforeGST > 0) {
       const ledgerNameToFind =
         TDSorTCS === "TDS" ? "TDS Deducted" : "TCS Deducted";
@@ -639,7 +646,13 @@ async function updateById(req, res) {
         existingPaymentEntry.TDSorTCSLedgerId = newTDSorTCSLedgerId;
       }
     } else {
+      // If TDS/TCS is removed OR amount is 0, clear the ledger ID
       existingPaymentEntry.TDSorTCSLedgerId = null;
+
+      // Also ensure TDSTCSRateWithAmountBeforeGST is properly set to 0 when TDS/TCS is removed
+      if (!TDSorTCS) {
+        existingPaymentEntry.TDSTCSRateWithAmountBeforeGST = 0;
+      }
     }
     await existingPaymentEntry.save({ session });
 
@@ -702,7 +715,7 @@ async function updateById(req, res) {
     }
 
     // 2. TDS/TCS Ledger
-    const tdsTcsAmount = Number(TDSTCSRateWithAmountBeforeGST) || 0;
+    const tdsTcsAmount = Number(parsedTDSTCSRateWithAmountBeforeGST) || 0;
 
     if (TDSorTCS && tdsTcsAmount > 0 && newTDSorTCSLedgerId) {
       if (TDSorTCS === "TDS") {

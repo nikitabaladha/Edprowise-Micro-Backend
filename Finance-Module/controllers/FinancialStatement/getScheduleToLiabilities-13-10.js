@@ -3,7 +3,7 @@ import Ledger from "../../models/Ledger.js";
 import HeadOfAccount from "../../models/HeadOfAccount.js";
 import moment from "moment";
 
-async function getScheduleToAssets(req, res) {
+async function getScheduleToLiabilities(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
@@ -50,26 +50,26 @@ async function getScheduleToAssets(req, res) {
       });
     }
 
-    // Step 1: Find HeadOfAccount IDs for "Assets"
-    const assetsHead = await HeadOfAccount.findOne({
+    // Step 1: Find HeadOfAccount IDs for "Liabilities"
+    const liabilitiesHead = await HeadOfAccount.findOne({
       schoolId,
       academicYear,
-      headOfAccountName: "Assets",
+      headOfAccountName: "Liabilities",
     });
 
-    if (!assetsHead) {
+    if (!liabilitiesHead) {
       return res.status(200).json({
         hasError: false,
-        message: "No Assets head accounts found",
+        message: "No Liabilities head accounts found",
         data: [],
       });
     }
 
-    // Step 2: Find all ledgers under Assets with proper population
+    // Step 2: Find all ledgers under Liabilities with proper population
     const ledgers = await Ledger.find({
       schoolId,
       academicYear,
-      headOfAccountId: assetsHead._id,
+      headOfAccountId: liabilitiesHead._id,
     })
       .populate({
         path: "groupLedgerId",
@@ -83,7 +83,7 @@ async function getScheduleToAssets(req, res) {
     if (ledgers.length === 0) {
       return res.status(200).json({
         hasError: false,
-        message: "No ledgers found for Assets head",
+        message: "No ledgers found for Liabilities head",
         data: [],
       });
     }
@@ -207,7 +207,6 @@ async function getScheduleToAssets(req, res) {
         }
       }
 
-      // Adjust for balance type (Credit balances are typically negative in accounting)
       const isCreditBalance = ledger.balanceType === "Credit";
       if (isCreditBalance) {
         openingBalance = -Math.abs(openingBalance);
@@ -233,25 +232,34 @@ async function getScheduleToAssets(req, res) {
 
     // Step 6: Convert the map to the desired array format
 
-    const result = Object.values(bspLedgerMap).map((bspLedger) => ({
-      bSPLLedgerId: bspLedger.bSPLLedgerId,
-      bSPLLedgerName: bspLedger.bSPLLedgerName,
-      groupLedgers: Object.values(bspLedger.groupLedgers).map(
-        (groupLedger) => ({
-          groupLedgerId: groupLedger.groupLedgerId,
-          groupLedgerName: groupLedger.groupLedgerName,
-          ledgers: Object.values(groupLedger.ledgers),
-        })
-      ),
-    }));
+    const result = Object.values(bspLedgerMap)
+      .map((bspLedger) => ({
+        bSPLLedgerId: bspLedger.bSPLLedgerId,
+        bSPLLedgerName: bspLedger.bSPLLedgerName,
+        groupLedgers: Object.values(bspLedger.groupLedgers)
+          .map((groupLedger) => ({
+            groupLedgerId: groupLedger.groupLedgerId,
+            groupLedgerName: groupLedger.groupLedgerName,
+            ledgers: Object.values(groupLedger.ledgers),
+          }))
+
+          .sort((a, b) => a.groupLedgerName.localeCompare(b.groupLedgerName)),
+      }))
+
+      .sort((a, b) => a.bSPLLedgerName.localeCompare(b.bSPLLedgerName));
+
+    // here if which ever ledgerName has opening balance,closing balance ,debit and credit all "0" i dont want it here
+    // i want if there is negative or positive value not "0" value
+
+    // see if any one is not 0 then give that one but if all four are 0 then exclude that ledgerName
 
     return res.status(200).json({
       hasError: false,
-      message: "Schedule To Assets fetched successfully",
+      message: "Schedule To Liabilities fetched successfully",
       data: result,
     });
   } catch (error) {
-    console.error("Error fetching Schedule To Assets:", error);
+    console.error("Error fetching Schedule To Liabilities:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",
@@ -259,4 +267,4 @@ async function getScheduleToAssets(req, res) {
   }
 }
 
-export default getScheduleToAssets;
+export default getScheduleToLiabilities;
