@@ -296,6 +296,7 @@ function aggregateAmountsByLedger(itemDetails) {
   return ledgerMap;
 }
 
+// ====
 async function create(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -436,6 +437,8 @@ async function create(req, res) {
       );
     }
 
+    // ========== NEW CODE: Store data in TotalNetdeficitNetSurplus table ==========
+
     // Get all unique ledger IDs from itemDetails
     const uniqueLedgerIds = [
       ...new Set(updatedItemDetails.map((item) => item.ledgerId)),
@@ -519,131 +522,7 @@ async function create(req, res) {
 
     await totalNetRecord.save({ session });
 
-    // =====Start Of Net Surplus/(Deficit)...Capital Fund=====
-
-    // Find the required ledgers
-    const netSurplusDeficitLedger = await Ledger.findOne({
-      schoolId,
-      academicYear,
-      ledgerName: "Net Surplus/(Deficit)",
-    }).session(session);
-
-    const capitalFundLedger = await Ledger.findOne({
-      schoolId,
-      academicYear,
-      ledgerName: "Capital Fund",
-    }).session(session);
-
-    if (!netSurplusDeficitLedger || !capitalFundLedger) {
-      throw new Error(
-        "Required ledgers (Net Surplus/(Deficit) or Capital Fund) not found"
-      );
-    }
-
-    // Initialize amounts for both ledgers
-    let netSurplusDebitAmount = 0;
-    let netSurplusCreditAmount = 0;
-    let capitalFundDebitAmount = 0;
-    let capitalFundCreditAmount = 0;
-
-    // Analyze each journal item to determine the correct posting
-    for (const item of updatedItemDetails) {
-      const ledger = ledgers.find(
-        (l) => l._id.toString() === item.ledgerId.toString()
-      );
-
-      if (ledger && ledger.headOfAccountId) {
-        const headOfAccountName =
-          ledger.headOfAccountId.headOfAccountName.toLowerCase();
-        const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
-        const creditAmount = parseFloat(item.creditAmount) || 0;
-
-        // Scenario analysis based on your requirements
-        if (headOfAccountName === "income") {
-          if (creditAmount > 0) {
-            // Income with credit amount → Net Surplus Debit, Capital Fund Credit
-            netSurplusDebitAmount += creditAmount;
-            capitalFundCreditAmount += creditAmount;
-          }
-          if (amountAfterGST > 0) {
-            // Income with debit amount → Net Surplus Credit, Capital Fund Debit
-            netSurplusCreditAmount += amountAfterGST;
-            capitalFundDebitAmount += amountAfterGST;
-          }
-        } else if (headOfAccountName === "expenses") {
-          if (creditAmount > 0) {
-            // Expenses with credit amount → Net Surplus Debit, Capital Fund Credit
-            netSurplusDebitAmount += creditAmount;
-            capitalFundCreditAmount += creditAmount;
-          }
-          if (amountAfterGST > 0) {
-            // Expenses with debit amount → Net Surplus Credit, Capital Fund Debit
-            netSurplusCreditAmount += amountAfterGST;
-            capitalFundDebitAmount += amountAfterGST;
-          }
-        }
-      }
-    }
-
-    // Round to two decimals
-    netSurplusDebitAmount = toTwoDecimals(netSurplusDebitAmount);
-    netSurplusCreditAmount = toTwoDecimals(netSurplusCreditAmount);
-    capitalFundDebitAmount = toTwoDecimals(capitalFundDebitAmount);
-    capitalFundCreditAmount = toTwoDecimals(capitalFundCreditAmount);
-
-    // Update Net Surplus/(Deficit) ledger
-    if (netSurplusDebitAmount > 0 || netSurplusCreditAmount > 0) {
-      await updateOpeningClosingBalance(
-        schoolId,
-        academicYear,
-        netSurplusDeficitLedger._id,
-        entryDate,
-        newPaymentEntry._id,
-        netSurplusDebitAmount,
-        netSurplusCreditAmount
-      );
-
-      // Recalculate balances
-      await recalculateLedgerBalances(
-        schoolId,
-        academicYear,
-        netSurplusDeficitLedger._id
-      );
-      await recalculateAllBalancesAfterDate(
-        schoolId,
-        academicYear,
-        netSurplusDeficitLedger._id,
-        entryDate
-      );
-    }
-
-    // Update Capital Fund ledger
-    if (capitalFundDebitAmount > 0 || capitalFundCreditAmount > 0) {
-      await updateOpeningClosingBalance(
-        schoolId,
-        academicYear,
-        capitalFundLedger._id,
-        entryDate,
-        newPaymentEntry._id,
-        capitalFundDebitAmount,
-        capitalFundCreditAmount
-      );
-
-      // Recalculate balances
-      await recalculateLedgerBalances(
-        schoolId,
-        academicYear,
-        capitalFundLedger._id
-      );
-      await recalculateAllBalancesAfterDate(
-        schoolId,
-        academicYear,
-        capitalFundLedger._id,
-        entryDate
-      );
-    }
-
-    // =====End of Net Surplus/(Deficit)...Capital Fund=====
+    // ========== END OF NEW CODE ==========
 
     await session.commitTransaction();
     session.endSession();

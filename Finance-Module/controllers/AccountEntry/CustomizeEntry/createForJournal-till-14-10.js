@@ -1,21 +1,19 @@
 import mongoose from "mongoose";
-import PaymentEntry from "../../../models/PaymentEntry.js";
-import PaymentEntryValidator from "../../../validators/CustomizeEntryForPaymentValidator.js";
+import Journal from "../../../models/Journal.js";
+import JournalValidator from "../../../validators/JournalValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
 import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
-
-import { hasBankOrCashLedger } from "../../CommonFunction/CommonFunction.js";
 
 function toTwoDecimals(value) {
   if (value === null || value === undefined || isNaN(value)) return 0;
   return Math.round(Number(value) * 100) / 100;
 }
 
-async function generatePaymentVoucherNumber(schoolId, academicYear) {
-  const count = await PaymentEntry.countDocuments({ schoolId, academicYear });
+async function generateJournalVoucherNumber(schoolId, academicYear) {
+  const count = await Journal.countDocuments({ schoolId, academicYear });
   const nextNumber = count + 1;
-  return `PVN/${academicYear}/${nextNumber}`;
+  return `JVN/${academicYear}/${nextNumber}`;
 }
 
 async function getOrCreateOpeningBalanceRecord(
@@ -72,7 +70,7 @@ async function updateOpeningClosingBalance(
   academicYear,
   ledgerId,
   entryDate,
-  paymentEntryId,
+  journalId,
   debitAmount = 0,
   creditAmount = 0
 ) {
@@ -116,7 +114,7 @@ async function updateOpeningClosingBalance(
   const existingEntryIndex = record.balanceDetails.findIndex(
     (detail) =>
       new Date(detail.entryDate).getTime() === new Date(entryDate).getTime() &&
-      detail.entryId?.toString() === paymentEntryId.toString()
+      detail.entryId?.toString() === journalId.toString()
   );
 
   if (existingEntryIndex !== -1) {
@@ -126,7 +124,7 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: paymentEntryId,
+      entryId: journalId,
     };
   } else {
     const newBalanceDetail = {
@@ -135,7 +133,7 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: paymentEntryId,
+      entryId: journalId,
     };
 
     record.balanceDetails.push(newBalanceDetail);
@@ -276,18 +274,18 @@ function aggregateAmountsByLedger(itemDetails) {
 
   itemDetails.forEach((item) => {
     const ledgerId = item.ledgerId.toString();
-    const amountAfterGST = toTwoDecimals(item.amountAfterGST) || 0;
+    const debitAmount = toTwoDecimals(item.debitAmount) || 0;
     const creditAmount = toTwoDecimals(item.creditAmount) || 0;
 
     if (ledgerMap.has(ledgerId)) {
       const existing = ledgerMap.get(ledgerId);
       ledgerMap.set(ledgerId, {
-        amountAfterGST: existing.amountAfterGST + amountAfterGST,
+        debitAmount: existing.debitAmount + debitAmount,
         creditAmount: existing.creditAmount + creditAmount,
       });
     } else {
       ledgerMap.set(ledgerId, {
-        amountAfterGST: amountAfterGST,
+        debitAmount: debitAmount,
         creditAmount: creditAmount,
       });
     }
@@ -296,12 +294,15 @@ function aggregateAmountsByLedger(itemDetails) {
   return ledgerMap;
 }
 
-async function create(req, res) {
+// ========
+
+export async function create(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const schoolId = req.user?.schoolId;
+
     if (!schoolId) {
       await session.abortTransaction();
       session.endSession();
@@ -311,98 +312,88 @@ async function create(req, res) {
       });
     }
 
-    const { error } = PaymentEntryValidator.PaymentEntryValidator.validate(
+    const { error } = JournalValidator.CustomizeEntryJournalValidator.validate(
       req.body
     );
-
     if (error) {
       const errorMessages = error.details.map((err) => err.message).join(", ");
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ hasError: true, message: errorMessages });
+      return res.status(400).json({
+        hasError: true,
+        message: errorMessages,
+      });
     }
 
     const {
       entryDate,
-      invoiceDate,
+      documentDate,
       narration,
       itemDetails,
       status,
-      totalAmountAfterGST,
-      totalCreditAmount,
-      customizeEntry,
       academicYear,
+      customizeEntry,
     } = req.body;
 
-    const hasValidLedger = await hasBankOrCashLedger(
-      schoolId,
-      academicYear,
-      itemDetails
-    );
+    const { documentImage } = req.files || {};
 
-    if (!hasValidLedger) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        hasError: true,
-        message:
-          "At least one ledger must have Group Ledger Name as 'Bank' or 'Cash'",
-      });
-    }
-
-    const paymentVoucherNumber = await generatePaymentVoucherNumber(
+    const JournalVoucherNumber = await generateJournalVoucherNumber(
       schoolId,
       academicYear
     );
 
-    const { invoiceImage } = req.files || {};
+    const documentImagePath = documentImage?.[0]?.mimetype.startsWith("image/")
+      ? "/Images/FinanceModule/DocumentImageForJournal"
+      : "/Documents/FinanceModule/DocumentImageForJournal";
 
-    const invoiceImageFullPath = invoiceImage?.[0]
-      ? `${
-          invoiceImage[0].mimetype.startsWith("image/")
-            ? "/Images/FinanceModule/InvoiceImage"
-            : "/Documents/FinanceModule/InvoiceImage"
-        }/${invoiceImage[0].filename}`
+    const documentImageFullPath = documentImage?.[0]
+      ? `${documentImagePath}/${documentImage[0].filename}`
       : null;
 
     const updatedItemDetails = itemDetails.map((item) => ({
       ...item,
-      amountAfterGST: parseFloat(item.amountAfterGST) || 0,
+      debitAmount: parseFloat(item.debitAmount) || 0,
       creditAmount: parseFloat(item.creditAmount) || 0,
     }));
 
-    const subTotalAmountAfterGST = toTwoDecimals(
-      updatedItemDetails.reduce(
-        (sum, item) => sum + (parseFloat(item.amountAfterGST) || 0),
-        0
-      )
+    const subTotalOfDebit = toTwoDecimals(
+      updatedItemDetails.reduce((sum, item) => sum + item.debitAmount, 0)
     );
 
     const subTotalOfCredit = toTwoDecimals(
-      updatedItemDetails.reduce(
-        (sum, item) => sum + (parseFloat(item.creditAmount) || 0),
-        0
-      )
+      updatedItemDetails.reduce((sum, item) => sum + item.creditAmount, 0)
     );
 
-    const newPaymentEntry = new PaymentEntry({
+    const totalAmountOfDebit = subTotalOfDebit;
+    const totalAmountOfCredit = subTotalOfCredit;
+
+    if (totalAmountOfDebit !== totalAmountOfCredit) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        hasError: true,
+        message: "Total Debit and Credit amounts must be equal.",
+      });
+    }
+
+    const newJournal = new Journal({
       schoolId,
-      paymentVoucherNumber,
+      journalVoucherNumber: JournalVoucherNumber,
       entryDate,
-      invoiceDate,
+      documentDate,
       narration,
       itemDetails: updatedItemDetails,
-      subTotalAmountAfterGST,
-      subTotalOfCredit,
-      totalAmountAfterGST,
-      totalCreditAmount,
-      customizeEntry,
-      invoiceImage: invoiceImageFullPath,
+      subTotalOfCredit: subTotalOfCredit,
+      subTotalOfDebit: subTotalOfDebit,
+      totalAmountOfDebit,
+      totalAmountOfCredit,
+      documentImage: documentImageFullPath,
       status,
       academicYear,
+      customizeEntry,
     });
 
-    await newPaymentEntry.save({ session });
+    await newJournal.save({ session });
 
     // Store all ledger IDs that need to be updated
     const ledgerIdsToUpdate = new Set();
@@ -416,14 +407,14 @@ async function create(req, res) {
         academicYear,
         ledgerId,
         entryDate,
-        newPaymentEntry._id,
-        amounts.amountAfterGST,
+        newJournal._id,
+        amounts.debitAmount,
         amounts.creditAmount
       );
       ledgerIdsToUpdate.add(ledgerId);
     }
 
-    // --- Recalculate all ledgers that were updated ---
+    // Recalculate all ledgers that were updated
     for (const ledgerId of ledgerIdsToUpdate) {
       await recalculateLedgerBalances(schoolId, academicYear, ledgerId);
 
@@ -435,6 +426,8 @@ async function create(req, res) {
         entryDate
       );
     }
+
+    // ========== NEW CODE: Store data in TotalNetdeficitNetSurplus table ==========
 
     // Get all unique ledger IDs from itemDetails
     const uniqueLedgerIds = [
@@ -458,13 +451,13 @@ async function create(req, res) {
 
       if (ledger && ledger.headOfAccountId) {
         const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
-        const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
+        const debitAmount = parseFloat(item.debitAmount) || 0;
         const creditAmount = parseFloat(item.creditAmount) || 0;
 
         if (headOfAccountName.toLowerCase() === "income") {
-          incomeBalance += amountAfterGST - creditAmount;
+          incomeBalance += debitAmount - creditAmount;
         } else if (headOfAccountName.toLowerCase() === "expenses") {
-          expensesBalance += amountAfterGST - creditAmount;
+          expensesBalance += debitAmount - creditAmount;
         }
       }
     }
@@ -491,7 +484,7 @@ async function create(req, res) {
     }
 
     const existingEntryIndex = totalNetRecord.balanceDetails.findIndex(
-      (detail) => detail.entryId?.toString() === newPaymentEntry._id.toString()
+      (detail) => detail.entryId?.toString() === newJournal._id.toString()
     );
 
     if (existingEntryIndex !== -1) {
@@ -505,7 +498,7 @@ async function create(req, res) {
     } else {
       totalNetRecord.balanceDetails.push({
         entryDate,
-        entryId: newPaymentEntry._id,
+        entryId: newJournal._id,
         incomeBalance,
         expensesBalance,
         totalBalance,
@@ -519,139 +512,15 @@ async function create(req, res) {
 
     await totalNetRecord.save({ session });
 
-    // =====Start Of Net Surplus/(Deficit)...Capital Fund=====
-
-    // Find the required ledgers
-    const netSurplusDeficitLedger = await Ledger.findOne({
-      schoolId,
-      academicYear,
-      ledgerName: "Net Surplus/(Deficit)",
-    }).session(session);
-
-    const capitalFundLedger = await Ledger.findOne({
-      schoolId,
-      academicYear,
-      ledgerName: "Capital Fund",
-    }).session(session);
-
-    if (!netSurplusDeficitLedger || !capitalFundLedger) {
-      throw new Error(
-        "Required ledgers (Net Surplus/(Deficit) or Capital Fund) not found"
-      );
-    }
-
-    // Initialize amounts for both ledgers
-    let netSurplusDebitAmount = 0;
-    let netSurplusCreditAmount = 0;
-    let capitalFundDebitAmount = 0;
-    let capitalFundCreditAmount = 0;
-
-    // Analyze each journal item to determine the correct posting
-    for (const item of updatedItemDetails) {
-      const ledger = ledgers.find(
-        (l) => l._id.toString() === item.ledgerId.toString()
-      );
-
-      if (ledger && ledger.headOfAccountId) {
-        const headOfAccountName =
-          ledger.headOfAccountId.headOfAccountName.toLowerCase();
-        const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
-        const creditAmount = parseFloat(item.creditAmount) || 0;
-
-        // Scenario analysis based on your requirements
-        if (headOfAccountName === "income") {
-          if (creditAmount > 0) {
-            // Income with credit amount → Net Surplus Debit, Capital Fund Credit
-            netSurplusDebitAmount += creditAmount;
-            capitalFundCreditAmount += creditAmount;
-          }
-          if (amountAfterGST > 0) {
-            // Income with debit amount → Net Surplus Credit, Capital Fund Debit
-            netSurplusCreditAmount += amountAfterGST;
-            capitalFundDebitAmount += amountAfterGST;
-          }
-        } else if (headOfAccountName === "expenses") {
-          if (creditAmount > 0) {
-            // Expenses with credit amount → Net Surplus Debit, Capital Fund Credit
-            netSurplusDebitAmount += creditAmount;
-            capitalFundCreditAmount += creditAmount;
-          }
-          if (amountAfterGST > 0) {
-            // Expenses with debit amount → Net Surplus Credit, Capital Fund Debit
-            netSurplusCreditAmount += amountAfterGST;
-            capitalFundDebitAmount += amountAfterGST;
-          }
-        }
-      }
-    }
-
-    // Round to two decimals
-    netSurplusDebitAmount = toTwoDecimals(netSurplusDebitAmount);
-    netSurplusCreditAmount = toTwoDecimals(netSurplusCreditAmount);
-    capitalFundDebitAmount = toTwoDecimals(capitalFundDebitAmount);
-    capitalFundCreditAmount = toTwoDecimals(capitalFundCreditAmount);
-
-    // Update Net Surplus/(Deficit) ledger
-    if (netSurplusDebitAmount > 0 || netSurplusCreditAmount > 0) {
-      await updateOpeningClosingBalance(
-        schoolId,
-        academicYear,
-        netSurplusDeficitLedger._id,
-        entryDate,
-        newPaymentEntry._id,
-        netSurplusDebitAmount,
-        netSurplusCreditAmount
-      );
-
-      // Recalculate balances
-      await recalculateLedgerBalances(
-        schoolId,
-        academicYear,
-        netSurplusDeficitLedger._id
-      );
-      await recalculateAllBalancesAfterDate(
-        schoolId,
-        academicYear,
-        netSurplusDeficitLedger._id,
-        entryDate
-      );
-    }
-
-    // Update Capital Fund ledger
-    if (capitalFundDebitAmount > 0 || capitalFundCreditAmount > 0) {
-      await updateOpeningClosingBalance(
-        schoolId,
-        academicYear,
-        capitalFundLedger._id,
-        entryDate,
-        newPaymentEntry._id,
-        capitalFundDebitAmount,
-        capitalFundCreditAmount
-      );
-
-      // Recalculate balances
-      await recalculateLedgerBalances(
-        schoolId,
-        academicYear,
-        capitalFundLedger._id
-      );
-      await recalculateAllBalancesAfterDate(
-        schoolId,
-        academicYear,
-        capitalFundLedger._id,
-        entryDate
-      );
-    }
-
-    // =====End of Net Surplus/(Deficit)...Capital Fund=====
+    // ========== END OF NEW CODE ==========
 
     await session.commitTransaction();
     session.endSession();
 
     return res.status(201).json({
       hasError: false,
-      message: "Payment Entry created successfully!",
-      data: newPaymentEntry,
+      message: "Journal created successfully!",
+      data: newJournal,
     });
   } catch (error) {
     await session.abortTransaction();
@@ -663,11 +532,11 @@ async function create(req, res) {
         .join(", ");
       return res.status(400).json({
         hasError: true,
-        message: `Duplicate entry for ${field}. Payment Entry already exists.`,
+        message: `Duplicate entry for ${field}. Journal already exists.`,
       });
     }
 
-    console.error("Error creating Payment Entry:", error);
+    console.error("Error creating Journal:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",

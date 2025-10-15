@@ -604,8 +604,6 @@ export async function updateById(req, res) {
       );
     }
 
-    // ========== NEW CODE: Update data in TotalNetdeficitNetSurplus table ==========
-
     // Get all unique ledger IDs from updatedItemDetails
     const uniqueLedgerIds = [
       ...new Set(updatedItemDetails.map((item) => item.ledgerId)),
@@ -693,8 +691,163 @@ export async function updateById(req, res) {
     );
 
     await totalNetRecord.save({ session });
-    // ========== END OF NEW CODE ==========
 
+    // =====Start Of Net Surplus/(Deficit)...Capital Fund=====
+
+    const netSurplusDeficitLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Net Surplus/(Deficit)",
+    }).session(session);
+
+    const capitalFundLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Capital Fund",
+    }).session(session);
+
+    if (!netSurplusDeficitLedger || !capitalFundLedger) {
+      throw new Error(
+        "Required ledgers (Net Surplus/(Deficit) or Capital Fund) not found"
+      );
+    }
+
+    // Initialize amounts for both ledgers
+    let netSurplusDebitAmount = 0;
+    let netSurplusCreditAmount = 0;
+    let capitalFundDebitAmount = 0;
+    let capitalFundCreditAmount = 0;
+
+    // Analyze each journal item to determine the correct posting (SAME LOGIC AS CREATE)
+    for (const item of updatedItemDetails) {
+      const ledger = ledgers.find(
+        (l) => l._id.toString() === item.ledgerId.toString()
+      );
+
+      if (ledger && ledger.headOfAccountId) {
+        const headOfAccountName =
+          ledger.headOfAccountId.headOfAccountName.toLowerCase();
+        const debitAmount = parseFloat(item.debitAmount) || 0;
+        const creditAmount = parseFloat(item.creditAmount) || 0;
+
+        // Scenario analysis based on your requirements (SAME AS CREATE)
+        if (headOfAccountName === "income") {
+          if (creditAmount > 0) {
+            // Income with credit amount → Net Surplus Debit, Capital Fund Credit
+            netSurplusDebitAmount += creditAmount;
+            capitalFundCreditAmount += creditAmount;
+          }
+          if (debitAmount > 0) {
+            // Income with debit amount → Net Surplus Credit, Capital Fund Debit
+            netSurplusCreditAmount += debitAmount;
+            capitalFundDebitAmount += debitAmount;
+          }
+        } else if (headOfAccountName === "expenses") {
+          if (creditAmount > 0) {
+            // Expenses with credit amount → Net Surplus Debit, Capital Fund Credit
+            netSurplusDebitAmount += creditAmount;
+            capitalFundCreditAmount += creditAmount;
+          }
+          if (debitAmount > 0) {
+            // Expenses with debit amount → Net Surplus Credit, Capital Fund Debit
+            netSurplusCreditAmount += debitAmount;
+            capitalFundDebitAmount += debitAmount;
+          }
+        }
+      }
+    }
+
+    // Round to two decimals
+    netSurplusDebitAmount = toTwoDecimals(netSurplusDebitAmount);
+    netSurplusCreditAmount = toTwoDecimals(netSurplusCreditAmount);
+    capitalFundDebitAmount = toTwoDecimals(capitalFundDebitAmount);
+    capitalFundCreditAmount = toTwoDecimals(capitalFundCreditAmount);
+
+    // Check if we need to completely remove entries (both debit and credit are 0)
+    const hasNetSurplusEntries =
+      netSurplusDebitAmount > 0 || netSurplusCreditAmount > 0;
+    const hasCapitalFundEntries =
+      capitalFundDebitAmount > 0 || capitalFundCreditAmount > 0;
+
+    // Handle Net Surplus/(Deficit) ledger
+    if (!hasNetSurplusEntries) {
+      // Remove the entry completely if no amounts
+      await removeJournalEntryFromLedger(
+        schoolId,
+        academicYear,
+        id,
+        netSurplusDeficitLedger._id,
+        session
+      );
+    } else {
+      // Update Net Surplus/(Deficit) ledger with correct debit/credit amounts
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        entryDate,
+        existingJournal._id,
+        netSurplusDebitAmount,
+        netSurplusCreditAmount,
+        session
+      );
+
+      // Recalculate balances
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        session
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        entryDate,
+        session
+      );
+    }
+
+    // Handle Capital Fund ledger
+    if (!hasCapitalFundEntries) {
+      // Remove the entry completely if no amounts
+      await removeJournalEntryFromLedger(
+        schoolId,
+        academicYear,
+        id,
+        capitalFundLedger._id,
+        session
+      );
+    } else {
+      // Update Capital Fund ledger with correct debit/credit amounts
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        entryDate,
+        existingJournal._id,
+        capitalFundDebitAmount,
+        capitalFundCreditAmount,
+        session
+      );
+
+      // Recalculate balances
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        session
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        entryDate,
+        session
+      );
+    }
+
+    // =====End of Net Surplus/(Deficit)...Capital Fund=====
     await session.commitTransaction();
     session.endSession();
 

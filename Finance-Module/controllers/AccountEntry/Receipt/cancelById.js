@@ -298,8 +298,6 @@ async function cancelById(req, res) {
       );
     }
 
-    // ========== NEW CODE: Remove data from TotalNetdeficitNetSurplus table ==========
-
     // Find the TotalNetdeficitNetSurplus record
     let totalNetRecord = await TotalNetdeficitNetSurplus.findOne({
       schoolId,

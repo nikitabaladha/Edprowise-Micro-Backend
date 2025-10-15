@@ -825,8 +825,6 @@ async function updateById(req, res) {
 
     // ========= Net Surplus/(Deficit) Ledger and Capital Fund ===========
 
-    // this below thing to store data in Net Surplus/(Deficit) Ledger and Capital Fund works perfectly fine
-
     const netSurplusDeficitLedger = await Ledger.findOne({
       schoolId,
       academicYear,

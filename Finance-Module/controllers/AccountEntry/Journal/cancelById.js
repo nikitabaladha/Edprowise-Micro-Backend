@@ -133,6 +133,56 @@ async function recalculateAllAffectedLedgers(
   }
 }
 
+// Helper function to recalculate all balances after a specific date
+async function recalculateAllBalancesAfterDate(
+  schoolId,
+  academicYear,
+  ledgerId,
+  date,
+  session = null
+) {
+  const record = await OpeningClosingBalance.findOne({
+    schoolId,
+    academicYear,
+    ledgerId,
+  }).session(session || null);
+
+  if (!record || record.balanceDetails.length === 0) {
+    return;
+  }
+
+  // Sort by date and entrySequence
+  record.balanceDetails.sort((a, b) => {
+    const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
+    if (dateDiff !== 0) return dateDiff;
+    return (a.entrySequence || 0) - (b.entrySequence || 0);
+  });
+
+  const startIndex = record.balanceDetails.findIndex(
+    (detail) => new Date(detail.entryDate) > new Date(date)
+  );
+
+  if (startIndex === -1) {
+    return;
+  }
+
+  const previousBalance =
+    startIndex > 0
+      ? record.balanceDetails[startIndex - 1].closingBalance
+      : record.balanceDetails[0].openingBalance;
+
+  let currentBalance = previousBalance;
+
+  for (let i = startIndex; i < record.balanceDetails.length; i++) {
+    const detail = record.balanceDetails[i];
+    detail.openingBalance = currentBalance;
+    detail.closingBalance = currentBalance + detail.debit - detail.credit;
+    currentBalance = detail.closingBalance;
+  }
+
+  await record.save({ session });
+}
+
 async function cancelById(req, res) {
   const session = await mongoose.startSession();
 
@@ -184,8 +234,6 @@ async function cancelById(req, res) {
         session
       );
 
-      // ========== NEW CODE: Remove data from TotalNetdeficitNetSurplus table ==========
-
       // Find the TotalNetdeficitNetSurplus record
       let totalNetRecord = await TotalNetdeficitNetSurplus.findOne({
         schoolId,
@@ -210,7 +258,129 @@ async function cancelById(req, res) {
         }
       }
 
-      // ========== END OF NEW CODE ==========
+      // =====Net Surplus/(Deficit)...Capital Fund=====
+
+      // =====Start Of Net Surplus/(Deficit)...Capital Fund=====
+
+      // Get all unique ledger IDs from itemDetails
+      const uniqueLedgerIds = [
+        ...new Set(existingJournal.itemDetails.map((item) => item.ledgerId)),
+      ];
+
+      // Find ledgers with their Head of Account information
+      const ledgers = await Ledger.find({
+        _id: { $in: uniqueLedgerIds },
+      })
+        .populate("headOfAccountId")
+        .session(session);
+
+      // Calculate income and expenses totals (same logic as create/update)
+      // Initialize amounts for both ledgers (same logic as create/update)
+      let netSurplusDebitAmount = 0;
+      let netSurplusCreditAmount = 0;
+      let capitalFundDebitAmount = 0;
+      let capitalFundCreditAmount = 0;
+
+      for (const item of existingJournal.itemDetails) {
+        const ledger = ledgers.find(
+          (l) => l._id.toString() === item.ledgerId.toString()
+        );
+
+        if (ledger && ledger.headOfAccountId) {
+          const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
+          const debitAmount = parseFloat(item.debitAmount) || 0;
+          const creditAmount = parseFloat(item.creditAmount) || 0;
+
+          // Scenario analysis based on your requirements (SAME AS CREATE/UPDATE)
+          if (headOfAccountName === "income") {
+            if (creditAmount > 0) {
+              // Income with credit amount → Net Surplus Debit, Capital Fund Credit
+              netSurplusDebitAmount += creditAmount;
+              capitalFundCreditAmount += creditAmount;
+            }
+            if (debitAmount > 0) {
+              // Income with debit amount → Net Surplus Credit, Capital Fund Debit
+              netSurplusCreditAmount += debitAmount;
+              capitalFundDebitAmount += debitAmount;
+            }
+          } else if (headOfAccountName === "expenses") {
+            if (creditAmount > 0) {
+              // Expenses with credit amount → Net Surplus Debit, Capital Fund Credit
+              netSurplusDebitAmount += creditAmount;
+              capitalFundCreditAmount += creditAmount;
+            }
+            if (debitAmount > 0) {
+              // Expenses with debit amount → Net Surplus Credit, Capital Fund Debit
+              netSurplusCreditAmount += debitAmount;
+              capitalFundDebitAmount += debitAmount;
+            }
+          }
+        }
+      }
+
+      // ========= Net Surplus/(Deficit) Ledger ===========
+      const netSurplusDeficitLedger = await Ledger.findOne({
+        schoolId,
+        academicYear,
+        ledgerName: "Net Surplus/(Deficit)",
+      }).session(session);
+
+      if (netSurplusDeficitLedger) {
+        // Remove the entry from Net Surplus/(Deficit) ledger
+        await removeJournalEntryFromBalances(
+          schoolId,
+          academicYear,
+          existingJournal._id,
+          session
+        );
+
+        // Recalculate balances for Net Surplus/(Deficit) ledger
+        await recalculateLedgerBalances(
+          schoolId,
+          academicYear,
+          netSurplusDeficitLedger._id,
+          session
+        );
+        await recalculateAllBalancesAfterDate(
+          schoolId,
+          academicYear,
+          netSurplusDeficitLedger._id,
+          existingJournal.entryDate,
+          session
+        );
+      }
+
+      // ========= Capital Fund Ledger ===========
+      const capitalFundLedger = await Ledger.findOne({
+        schoolId,
+        academicYear,
+        ledgerName: "Capital Fund",
+      }).session(session);
+
+      if (capitalFundLedger) {
+        // Remove the entry from Capital Fund ledger
+        await removeJournalEntryFromBalances(
+          schoolId,
+          academicYear,
+          existingJournal._id,
+          session
+        );
+
+        // Recalculate balances for Capital Fund ledger
+        await recalculateLedgerBalances(
+          schoolId,
+          academicYear,
+          capitalFundLedger._id,
+          session
+        );
+        await recalculateAllBalancesAfterDate(
+          schoolId,
+          academicYear,
+          capitalFundLedger._id,
+          existingJournal.entryDate,
+          session
+        );
+      }
 
       return res.status(200).json({
         hasError: false,
