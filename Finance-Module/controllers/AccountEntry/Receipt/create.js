@@ -525,8 +525,6 @@ async function create(req, res) {
       );
     }
 
-    // ========== NEW CODE: Store data in TotalNetdeficitNetSurplus table ==========
-
     // Get all unique ledger IDs from itemDetails
     const uniqueLedgerIds = [
       ...new Set(updatedItemDetails.map((item) => item.ledgerId)),
@@ -609,7 +607,144 @@ async function create(req, res) {
 
     await totalNetRecord.save({ session });
 
-    // ========== END OF NEW CODE ==========
+    // =====Net Surplus/(Deficit)...Capital Fund=====
+
+    // ========= Net Surplus/(Deficit) Ledger ===========
+
+    const netSurplusDeficitLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Net Surplus/(Deficit)",
+    }).session(session);
+
+    if (!netSurplusDeficitLedger) {
+      throw new Error("Net Surplus/(Deficit) ledger not found");
+    }
+
+    // Calculate amounts for Net Surplus/(Deficit)
+    let netSurplusDebitAmount = 0;
+    let hasIncome = false;
+    let hasExpenses = false;
+
+    // Calculate income and expenses totals
+    let incomeTotal = 0;
+    let expensesTotal = 0;
+
+    for (const item of updatedItemDetails) {
+      const ledger = ledgers.find(
+        (l) => l._id.toString() === item.ledgerId.toString()
+      );
+
+      if (ledger && ledger.headOfAccountId) {
+        const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
+        const amount = parseFloat(item.amount) || 0;
+
+        if (headOfAccountName.toLowerCase() === "income") {
+          hasIncome = true;
+          incomeTotal += amount;
+        } else if (headOfAccountName.toLowerCase() === "expenses") {
+          hasExpenses = true;
+          expensesTotal += amount;
+        }
+      }
+    }
+
+    incomeTotal = toTwoDecimals(incomeTotal);
+    expensesTotal = toTwoDecimals(expensesTotal);
+
+    // Determine Net Surplus/(Deficit) amounts based on scenarios
+    if (hasIncome && hasExpenses) {
+      // Scenario 1: Both Income & Expenses
+      netSurplusDebitAmount = incomeTotal - expensesTotal;
+    } else if (hasIncome && !hasExpenses) {
+      // Scenario 2: Only Income
+      netSurplusDebitAmount = incomeTotal;
+    } else if (!hasIncome && hasExpenses) {
+      // Scenario 3: Only Expenses
+      netSurplusDebitAmount = expensesTotal;
+    }
+
+    netSurplusDebitAmount = toTwoDecimals(netSurplusDebitAmount);
+
+    // Update Net Surplus/(Deficit) ledger
+    if (netSurplusDebitAmount !== 0) {
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        entryDate,
+        newReceipt._id,
+        netSurplusDebitAmount,
+        0
+      );
+
+      // Recalculate balances
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        entryDate
+      );
+    }
+
+    // ========= Capital Fund Ledger ===========
+
+    const capitalFundLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Capital Fund",
+    }).session(session);
+
+    if (!capitalFundLedger) {
+      throw new Error("Capital Fund ledger not found");
+    }
+
+    let capitalFundCreditAmount = 0;
+
+    if (hasIncome && hasExpenses) {
+      // Scenario 1: Credit Capital Fund with (income - expenses)
+      capitalFundCreditAmount = incomeTotal - expensesTotal;
+    } else if (hasIncome && !hasExpenses) {
+      // Scenario 2: Credit Capital Fund with income amount
+      capitalFundCreditAmount = incomeTotal;
+    } else if (!hasIncome && hasExpenses) {
+      // Scenario 3: Debit Capital Fund with expenses amount
+      capitalFundCreditAmount = expensesTotal;
+    }
+
+    capitalFundCreditAmount = toTwoDecimals(capitalFundCreditAmount);
+
+    if (capitalFundCreditAmount !== 0) {
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        entryDate,
+        newReceipt._id,
+        0,
+        capitalFundCreditAmount
+      );
+
+      // Recalculate balances
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        entryDate
+      );
+    }
+
+    // =====Net Surplus/(Deficit)...Capital Fund=====
 
     await session.commitTransaction();
     session.endSession();

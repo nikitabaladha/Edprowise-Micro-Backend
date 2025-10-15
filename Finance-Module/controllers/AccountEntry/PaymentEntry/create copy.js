@@ -631,9 +631,51 @@ async function create(req, res) {
 
     await totalNetRecord.save({ session });
 
-    // =====Net Surplus/(Deficit)...Capital Fund=====
+    // i want that after above things done then agin in table OpeningClosingBalance
+    // i want to find that if there is any ledgerId whose ledgerName is "Net Surplus/(Deficit)"
+    // if no then create one entry with that perticular ledgerId and
+    // if item.ledgerId having headOfAccount "Income" or headOfAccount "Expenses"
+    // then opening closing balance table store in "debit" : amountAfterGST
+    // credit will be 0 and closing Balance ---> opening +debit - credit
+    // if first entry then there will be no opening balance so you can store 0 as opening balance
+    // and other things debit=amountAfterGSt
+    // credit = 0 and
+    // example : closingBalance = 0+100-0= 100
+    //
 
-    // ========= Net Surplus/(Deficit) Ledger ===========
+    // if second entry then for opening Balance you can use previous date's or previous entries
+    // closingBalance as opening balance
+    // and can store openingBalance = 100
+    // debitAmount = example amountAfterGSt =200
+    // creditAmount= 0
+    // example : closingBalance = 100+200-0= 300
+
+    //if having both income and expenses then for that ledger i need to do it like incomeBalance - expense balance
+    // so which ever has ledgrId with income and whichever has ledgrId with expenses
+    // then you need to do income-expenses
+
+    // enrty  enrtyDate   HeadofAccount	BS&P&LLedger	GroupLedger	             Ledger.          OpeningBalance. debit credit ClosingBalance
+    // enrty1 01-01-2025  Income         School Fees   LateFees and ExcessFees  ExcessFees.     0.              100.   0.     100
+    // enrty2 01-01-2025  Income         School   Fees   LateFees and ExcessFees  ExcessFees.     100             200.   0.     300
+
+    // if any entry have both income and expenses and both having  amountAfterGSt.                amountAfterGST
+    // enrty  enrtyDate   HeadofAccount	BS&P&LLedger	 GroupLedger	             Ledger.
+    // enrty3 01-01-2025  Income        School Fees     LateFees and ExcessFees  ExcessFees.      200
+    // enrty3 01-01-2025  Expenses      Administration  Charity&Gifts            Donation.        100
+
+    // for entry1 for  "Net Surplus/(Deficit)". you need to store it like
+    // enrty  enrtyDate   HeadofAccount.        	BS&P&LLedger	           GroupLedger	            Ledger.                  OpeningBalance. debit credit ClosingBalance
+    // enrty1 01-01-2025  Net Surplus/(Deficit)	  Net Surplus/(Deficit)	   Net Surplus/(Deficit)	  Net Surplus/(Deficit)	     0.            100.   0.     100
+    // enrty2 01-01-2025  Net Surplus/(Deficit)	  Net Surplus/(Deficit)	   Net Surplus/(Deficit)	  Net Surplus/(Deficit)	    100            200    0.     300
+    // enrty3 01-01-2025  Net Surplus/(Deficit)	  Net Surplus/(Deficit)	   Net Surplus/(Deficit)	  Net Surplus/(Deficit)	    300            100    0.     400
+
+    // Add this code right after await totalNetRecord.save({ session });
+
+    // see if i have 2 item.ledgrId one with income and having amountAfterGST  100
+    // and another with having expenses amountAfterGST 40 then it must store
+    // income - expenses = 100-40 = 60
+    // then it must store 60 but currently it is storing 140 in debit why
+
     const netSurplusDeficitLedger = await Ledger.findOne({
       schoolId,
       academicYear,
@@ -644,15 +686,10 @@ async function create(req, res) {
       throw new Error("Net Surplus/(Deficit) ledger not found");
     }
 
-    // Calculate amounts for Net Surplus/(Deficit)
-    let netSurplusCreditAmount = 0;
-    let hasIncome = false;
-    let hasExpenses = false;
+    // Calculate net amount for this payment entry (income - expenses)
+    let netAmount = 0;
 
-    // Calculate income and expenses totals
-    let incomeTotal = 0;
-    let expensesTotal = 0;
-
+    // Calculate net amount based on Head of Account from the itemDetails
     for (const item of updatedItemDetails) {
       const ledger = ledgers.find(
         (l) => l._id.toString() === item.ledgerId.toString()
@@ -663,45 +700,29 @@ async function create(req, res) {
         const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
 
         if (headOfAccountName.toLowerCase() === "income") {
-          hasIncome = true;
-          incomeTotal += amountAfterGST;
+          netAmount += amountAfterGST;
         } else if (headOfAccountName.toLowerCase() === "expenses") {
-          hasExpenses = true;
-          expensesTotal += amountAfterGST;
+          netAmount += amountAfterGST;
         }
       }
     }
 
-    incomeTotal = toTwoDecimals(incomeTotal);
-    expensesTotal = toTwoDecimals(expensesTotal);
+    netAmount = toTwoDecimals(netAmount);
 
-    // Determine Net Surplus/(Deficit) amounts based on scenarios
-    if (hasIncome && hasExpenses) {
-      // Scenario 1: Both Income & Expenses
-      netSurplusCreditAmount = incomeTotal - expensesTotal;
-    } else if (hasIncome && !hasExpenses) {
-      // Scenario 2: Only Income
-      netSurplusCreditAmount = incomeTotal;
-    } else if (!hasIncome && hasExpenses) {
-      // Scenario 3: Only Expenses
-      netSurplusCreditAmount = expensesTotal;
-    }
-
-    netSurplusCreditAmount = toTwoDecimals(netSurplusCreditAmount);
-
-    // Update Net Surplus/(Deficit) ledger
-    if (netSurplusCreditAmount !== 0) {
+    // Only proceed if there's actually income or expense entries
+    if (netAmount !== 0) {
+      // Update OpeningClosingBalance for Net Surplus/(Deficit) ledger
       await updateOpeningClosingBalance(
         schoolId,
         academicYear,
         netSurplusDeficitLedger._id,
         entryDate,
         newPaymentEntry._id,
-        0,
-        netSurplusCreditAmount
+        netAmount > 0 ? netAmount : 0, // debit if positive
+        netAmount < 0 ? Math.abs(netAmount) : 0 // credit if negative
       );
 
-      // Recalculate balances
+      // Recalculate balances for Net Surplus/(Deficit) ledger
       await recalculateLedgerBalances(
         schoolId,
         academicYear,
@@ -714,59 +735,6 @@ async function create(req, res) {
         entryDate
       );
     }
-
-    // ========= Capital Fund Ledger ===========
-    const capitalFundLedger = await Ledger.findOne({
-      schoolId,
-      academicYear,
-      ledgerName: "Capital Fund",
-    }).session(session);
-
-    if (!capitalFundLedger) {
-      throw new Error("Capital Fund ledger not found");
-    }
-
-    let capitalFundDebitAmount = 0;
-
-    if (hasIncome && hasExpenses) {
-      // Scenario 1: Credit Capital Fund with (income - expenses)
-      capitalFundDebitAmount = incomeTotal - expensesTotal;
-    } else if (hasIncome && !hasExpenses) {
-      // Scenario 2: Credit Capital Fund with income amount
-      capitalFundDebitAmount = incomeTotal;
-    } else if (!hasIncome && hasExpenses) {
-      // Scenario 3: Debit Capital Fund with expenses amount
-      capitalFundDebitAmount = expensesTotal;
-    }
-
-    capitalFundDebitAmount = toTwoDecimals(capitalFundDebitAmount);
-
-    if (capitalFundDebitAmount !== 0) {
-      await updateOpeningClosingBalance(
-        schoolId,
-        academicYear,
-        capitalFundLedger._id,
-        entryDate,
-        newPaymentEntry._id,
-        capitalFundDebitAmount,
-        0
-      );
-
-      // Recalculate balances
-      await recalculateLedgerBalances(
-        schoolId,
-        academicYear,
-        capitalFundLedger._id
-      );
-      await recalculateAllBalancesAfterDate(
-        schoolId,
-        academicYear,
-        capitalFundLedger._id,
-        entryDate
-      );
-    }
-
-    // =====Net Surplus/(Deficit)...Capital Fund=====
 
     await session.commitTransaction();
     session.endSession();

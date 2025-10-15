@@ -4,138 +4,7 @@ import PaymentEntry from "../../../models/PaymentEntry.js";
 import PaymentEntryValidator from "../../../validators/PaymentEntryValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
-import GroupLedger from "../../../models/GroupLedger.js";
-
-// after every enrty i have entry.ledgerId
-// now check that whichever entry.lederId has Headof account "Income"
-// now check that whichever entry.lederId has Headof account "Expenses"
-// then sum of amountAfterGST of "Income" will be stored in ToatalNetdeficitSurplus table at place of incomeBalance
-// then sum of amountAfterGST of "Expenses" will be stored in ToatalNetdeficitSurplus table at place of expensesBalance
-// and in totalBalance = (incomeBalance)-(expensesBalance)
-
-// example : Payment entry Table has
-
-// _id
-// 68e0c2a8042cd59091c17aa8
-// schoolId
-// "SID144732"
-// academicYear
-// "2025-2026"
-// paymentVoucherNumber
-// "PVN/2025-2026/1"
-// customizeEntry
-// false
-// vendorCode
-// "VEN-001"
-// vendorId
-// "6889a25b3a71e55803bf9747"
-// entryDate
-// 2025-10-04T00:00:00.000+00:00
-// invoiceDate
-// 2025-10-04T00:00:00.000+00:00
-// invoiceNumber
-// "9725560023"
-// poNumber
-// ""
-// dueDate
-// 2025-10-04T00:00:00.000+00:00
-// narration
-// "Test"
-// paymentMode
-// "Cash"
-// chequeNumber
-// ""
-// transactionNumber
-// null
-
-// itemDetails
-// Array (2)
-
-// 0
-// Object
-// itemName
-// ""
-// ledgerId
-// "68a9a450f46f002cf6a53f69"
-// amountBeforeGST
-// 30
-// GSTAmount
-// 10
-// amountAfterGST
-// 40
-// _id
-// 68e0c314042cd59091c17b5a
-
-// 1
-// Object
-// itemName
-// ""
-// ledgerId
-// "68a9a450f46f002cf6a53f56"
-// amountBeforeGST
-// 20
-// GSTAmount
-// 10
-// amountAfterGST
-// 30
-// _id
-// 68e0c314042cd59091c17b5c
-
-// 2
-// Object
-// itemName
-// ""
-// ledgerId
-// "68a9a469f46f002cf6a541f3"
-// amountBeforeGST
-// 20
-// GSTAmount
-// 0
-// amountAfterGST
-// 20
-// _id
-// 68e0c314042cd59091c17b5b
-// subTotalAmountAfterGST
-// 60
-// TDSorTCS
-// "TDS"
-// TDSorTCSLedgerId
-// "68d376f72a52805b6871b739"
-// TDSTCSRateChartId
-// "6889a4ca3a71e55803bf97f0"
-// TDSTCSRate
-// 5
-// TDSTCSRateWithAmountBeforeGST
-// 2.5
-// totalAmountBeforeGST
-// 50
-// totalGSTAmount
-// 10
-// totalAmountAfterGST
-// 57.5
-// invoiceImage
-// null
-// chequeImage
-// null
-// ledgerIdWithPaymentMode
-// "68a9a46af46f002cf6a5420d"
-// status
-// "Posted"
-// approvalStatus
-// "Pending"
-// createdAt
-// 2025-10-04T06:46:00.680+00:00
-// updatedAt
-// 2025-10-04T06:47:48.915+00:00
-// __v
-// 2
-
-// example : TotalNetdeficitNetSurplus
-
-// entryDate    incomeBalance        expensesBalance        totalBalance
-// 04-10-2025   40+20=60             20                      40
-
-// are you getting what i am saying ?
+import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
 
 function toTwoDecimals(value) {
   if (value === null || value === undefined || isNaN(value)) return 0;
@@ -679,6 +548,225 @@ async function create(req, res) {
         entryDate
       );
     }
+
+    // Get all unique ledger IDs from itemDetails
+    const uniqueLedgerIds = [
+      ...new Set(updatedItemDetails.map((item) => item.ledgerId)),
+    ];
+
+    // Find ledgers with their Head of Account information
+    const ledgers = await Ledger.find({
+      _id: { $in: uniqueLedgerIds },
+    }).populate("headOfAccountId");
+
+    // Initialize sums
+    let incomeBalance = 0;
+    let expensesBalance = 0;
+
+    // Calculate sums based on Head of Account
+    for (const item of updatedItemDetails) {
+      const ledger = ledgers.find(
+        (l) => l._id.toString() === item.ledgerId.toString()
+      );
+
+      if (ledger && ledger.headOfAccountId) {
+        const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
+        const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
+
+        if (headOfAccountName.toLowerCase() === "income") {
+          incomeBalance += amountAfterGST;
+        } else if (headOfAccountName.toLowerCase() === "expenses") {
+          expensesBalance += amountAfterGST;
+        }
+      }
+    }
+
+    // Calculate total balance
+    const totalBalance = toTwoDecimals(incomeBalance - expensesBalance);
+
+    // Round to two decimals
+    incomeBalance = toTwoDecimals(incomeBalance);
+    expensesBalance = toTwoDecimals(expensesBalance);
+
+    // Find or create TotalNetdeficitNetSurplus record
+    let totalNetRecord = await TotalNetdeficitNetSurplus.findOne({
+      schoolId,
+      academicYear,
+    }).session(session);
+
+    if (!totalNetRecord) {
+      totalNetRecord = new TotalNetdeficitNetSurplus({
+        schoolId,
+        academicYear,
+        balanceDetails: [],
+      });
+    }
+
+    const existingEntryIndex = totalNetRecord.balanceDetails.findIndex(
+      (detail) => detail.entryId?.toString() === newPaymentEntry._id.toString()
+    );
+
+    if (existingEntryIndex !== -1) {
+      totalNetRecord.balanceDetails[existingEntryIndex].incomeBalance =
+        incomeBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].expensesBalance =
+        expensesBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].totalBalance =
+        totalBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].entryDate = entryDate;
+    } else {
+      totalNetRecord.balanceDetails.push({
+        entryDate,
+        entryId: newPaymentEntry._id,
+        incomeBalance,
+        expensesBalance,
+        totalBalance,
+      });
+    }
+
+    // Sort balanceDetails by date
+    totalNetRecord.balanceDetails.sort(
+      (a, b) => new Date(a.entryDate) - new Date(b.entryDate)
+    );
+
+    await totalNetRecord.save({ session });
+
+    // =====Net Surplus/(Deficit)...Capital Fund=====
+
+    // ========= Net Surplus/(Deficit) Ledger ===========
+    const netSurplusDeficitLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Net Surplus/(Deficit)",
+    }).session(session);
+
+    if (!netSurplusDeficitLedger) {
+      throw new Error("Net Surplus/(Deficit) ledger not found");
+    }
+
+    // Calculate amounts for Net Surplus/(Deficit)
+    let netSurplusDebitAmount = 0;
+    let hasIncome = false;
+    let hasExpenses = false;
+
+    // Calculate income and expenses totals
+    let incomeTotal = 0;
+    let expensesTotal = 0;
+
+    for (const item of updatedItemDetails) {
+      const ledger = ledgers.find(
+        (l) => l._id.toString() === item.ledgerId.toString()
+      );
+
+      if (ledger && ledger.headOfAccountId) {
+        const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
+        const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
+
+        if (headOfAccountName.toLowerCase() === "income") {
+          hasIncome = true;
+          incomeTotal += amountAfterGST;
+        } else if (headOfAccountName.toLowerCase() === "expenses") {
+          hasExpenses = true;
+          expensesTotal += amountAfterGST;
+        }
+      }
+    }
+
+    incomeTotal = toTwoDecimals(incomeTotal);
+    expensesTotal = toTwoDecimals(expensesTotal);
+
+    // Determine Net Surplus/(Deficit) amounts based on scenarios
+    if (hasIncome && hasExpenses) {
+      // Scenario 1: Both Income & Expenses
+      netSurplusDebitAmount = incomeTotal - expensesTotal;
+    } else if (hasIncome && !hasExpenses) {
+      // Scenario 2: Only Income
+      netSurplusDebitAmount = incomeTotal;
+    } else if (!hasIncome && hasExpenses) {
+      // Scenario 3: Only Expenses
+      netSurplusDebitAmount = expensesTotal;
+    }
+
+    netSurplusDebitAmount = toTwoDecimals(netSurplusDebitAmount);
+
+    // Update Net Surplus/(Deficit) ledger
+    if (netSurplusDebitAmount !== 0) {
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        entryDate,
+        newPaymentEntry._id,
+        netSurplusDebitAmount,
+        0
+      );
+
+      // Recalculate balances
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        entryDate
+      );
+    }
+
+    // ========= Capital Fund Ledger ===========
+    const capitalFundLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Capital Fund",
+    }).session(session);
+
+    if (!capitalFundLedger) {
+      throw new Error("Capital Fund ledger not found");
+    }
+
+    let capitalFundCreditAmount = 0;
+
+    if (hasIncome && hasExpenses) {
+      // Scenario 1: Credit Capital Fund with (income - expenses)
+      capitalFundCreditAmount = incomeTotal - expensesTotal;
+    } else if (hasIncome && !hasExpenses) {
+      // Scenario 2: Credit Capital Fund with income amount
+      capitalFundCreditAmount = incomeTotal;
+    } else if (!hasIncome && hasExpenses) {
+      // Scenario 3: Debit Capital Fund with expenses amount
+      capitalFundCreditAmount = expensesTotal;
+    }
+
+    capitalFundCreditAmount = toTwoDecimals(capitalFundCreditAmount);
+
+    if (capitalFundCreditAmount !== 0) {
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        entryDate,
+        newPaymentEntry._id,
+        0,
+        capitalFundCreditAmount
+      );
+
+      // Recalculate balances
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        entryDate
+      );
+    }
+
+    // =====Net Surplus/(Deficit)...Capital Fund=====
 
     await session.commitTransaction();
     session.endSession();

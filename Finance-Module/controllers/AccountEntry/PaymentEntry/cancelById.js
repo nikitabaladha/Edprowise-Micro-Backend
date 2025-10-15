@@ -327,7 +327,113 @@ async function cancelById(req, res) {
       }
     }
 
-    // ========== END OF NEW CODE ==========
+    // ========== Handle Net Surplus/(Deficit) and Capital Fund Ledgers ==========
+
+    // Get all unique ledger IDs from itemDetails
+    const uniqueLedgerIds = [
+      ...new Set(existingPayment.itemDetails.map((item) => item.ledgerId)),
+    ];
+
+    // Find ledgers with their Head of Account information
+    const ledgers = await Ledger.find({
+      _id: { $in: uniqueLedgerIds },
+    })
+      .populate("headOfAccountId")
+      .session(session);
+
+    // Calculate income and expenses totals (same logic as create/update)
+    let incomeTotal = 0;
+    let expensesTotal = 0;
+    let hasIncome = false;
+    let hasExpenses = false;
+
+    for (const item of existingPayment.itemDetails) {
+      const ledger = ledgers.find(
+        (l) => l._id.toString() === item.ledgerId.toString()
+      );
+
+      if (ledger && ledger.headOfAccountId) {
+        const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
+        const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
+
+        if (headOfAccountName.toLowerCase() === "income") {
+          hasIncome = true;
+          incomeTotal += amountAfterGST;
+        } else if (headOfAccountName.toLowerCase() === "expenses") {
+          hasExpenses = true;
+          expensesTotal += amountAfterGST;
+        }
+      }
+    }
+
+    incomeTotal = incomeTotal;
+    expensesTotal = expensesTotal;
+
+    // ========= Net Surplus/(Deficit) Ledger ===========
+    const netSurplusDeficitLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Net Surplus/(Deficit)",
+    }).session(session);
+
+    if (netSurplusDeficitLedger) {
+      // Remove the entry from Net Surplus/(Deficit) ledger
+      await removePaymentEntryFromLedger(
+        schoolId,
+        academicYear,
+        existingPayment._id,
+        netSurplusDeficitLedger._id,
+        session
+      );
+
+      // Recalculate balances for Net Surplus/(Deficit) ledger
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        session
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        existingPayment.entryDate,
+        session
+      );
+    }
+
+    // ========= Capital Fund Ledger ===========
+    const capitalFundLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Capital Fund",
+    }).session(session);
+
+    if (capitalFundLedger) {
+      // Remove the entry from Capital Fund ledger
+      await removePaymentEntryFromLedger(
+        schoolId,
+        academicYear,
+        existingPayment._id,
+        capitalFundLedger._id,
+        session
+      );
+
+      // Recalculate balances for Capital Fund ledger
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        session
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        existingPayment.entryDate,
+        session
+      );
+    }
 
     await session.commitTransaction();
     session.endSession();
@@ -348,4 +454,5 @@ async function cancelById(req, res) {
     });
   }
 }
+
 export default cancelById;

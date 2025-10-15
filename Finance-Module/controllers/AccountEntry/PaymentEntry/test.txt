@@ -1,0 +1,33 @@
+// =========xxxxxxxxxxxx===========
+
+// first scenario =====
+
+// see if in entry there are two item.ledgerId
+// example one for income and having amountAfterGST is 200
+// and another for expenses and having amountAfterGST is 80 then
+// you need to store debit amount for Net Surplus/(Deficit)", as 200-80 = 200
+
+// see if in entry there are two item.ledgerId
+// example one for income and having amountAfterGST is 200
+// and another for expenses and having amountAfterGST is 80 then
+// you need to store credit amount for Capital Fund", as  = -200
+
+// second scenario =====
+
+// see if in entry there are only one item.ledgerId
+// example one for income and having amountAfterGST is 100
+// you need to store debit amount for Net Surplus/(Deficit)", 100
+
+// see if in entry there are only one item.ledgerId
+// example one for income and having amountAfterGST is 100
+// you need to store credit amount for Capital Fund", as  = -100
+
+// third scenario =====
+
+// see if in entry there are only one item.ledgerId
+// example one for expenses and having amountAfterGST is 40
+// you need to store debit amount for Net Surplus/(Deficit)", 40
+
+// see if in entry there are only one item.ledgerId
+// example one for expenses and having amountAfterGST is 40
+// you need to store credit amount for Capital Fund", as  = -40

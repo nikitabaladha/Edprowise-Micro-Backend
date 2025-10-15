@@ -498,7 +498,7 @@ async function updateById(req, res) {
       });
     }
 
-    // --- Track old ledger IDs like Contra does ---
+    // --- Track old ledger IDs ---
     const oldItemLedgerIds = existingPaymentEntry.itemDetails.map((item) =>
       item.ledgerId?.toString()
     );
@@ -596,7 +596,7 @@ async function updateById(req, res) {
         await generateTransactionNumber();
     }
 
-    // --- Step A: Reset old balances to zero first (like Contra does) ---
+    // --- Step A: Reset ALL old balances to zero first (including Net Surplus and Capital Fund) ---
     const balanceRecords = await OpeningClosingBalance.find({
       schoolId,
       academicYear,
@@ -615,7 +615,7 @@ async function updateById(req, res) {
 
     await existingPaymentEntry.save({ session });
 
-    // --- Step B: Remove old entries if ledgers changed or removed (like Contra) ---
+    // --- Step B: Remove old entries if ledgers changed or removed ---
 
     // Get new ledger IDs
     const newItemLedgerIds = updatedItemDetails.map((item) =>
@@ -623,8 +623,6 @@ async function updateById(req, res) {
     );
     const newPaymentModeLedgerId = ledgerIdWithPaymentMode?.toString();
 
-    // Handle TDS/TCS ledger
-    // Handle TDS/TCS ledger
     let newTDSorTCSLedgerId = null;
 
     // FIX: Always update TDSTCSRateWithAmountBeforeGST regardless of the amount
@@ -785,8 +783,6 @@ async function updateById(req, res) {
       );
     }
 
-    // ========== NEW CODE: Update data in TotalNetdeficitNetSurplus table ==========
-
     // Get all unique ledger IDs from updatedItemDetails
     const uniqueLedgerIds = [
       ...new Set(updatedItemDetails.map((item) => item.ledgerId)),
@@ -873,7 +869,169 @@ async function updateById(req, res) {
     );
 
     await totalNetRecord.save({ session });
-    // ========== END OF NEW CODE ==========
+
+    // ========= Net Surplus/(Deficit) Ledger and Capital Fund ===========
+
+    // this below thing to store data in Net Surplus/(Deficit) Ledger and Capital Fund works perfectly fine
+
+    const netSurplusDeficitLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Net Surplus/(Deficit)",
+    }).session(session);
+
+    if (!netSurplusDeficitLedger) {
+      throw new Error("Net Surplus/(Deficit) ledger not found");
+    }
+
+    // Calculate amounts for Net Surplus/(Deficit)
+    let netSurplusCreditAmount = 0;
+    let hasIncome = false;
+    let hasExpenses = false;
+
+    // Calculate income and expenses totals
+    let incomeTotal = 0;
+    let expensesTotal = 0;
+
+    for (const item of updatedItemDetails) {
+      const ledger = ledgers.find(
+        (l) => l._id.toString() === item.ledgerId.toString()
+      );
+
+      if (ledger && ledger.headOfAccountId) {
+        const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
+        const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
+
+        if (headOfAccountName.toLowerCase() === "income") {
+          hasIncome = true;
+          incomeTotal += amountAfterGST;
+        } else if (headOfAccountName.toLowerCase() === "expenses") {
+          hasExpenses = true;
+          expensesTotal += amountAfterGST;
+        }
+      }
+    }
+
+    incomeTotal = toTwoDecimals(incomeTotal);
+    expensesTotal = toTwoDecimals(expensesTotal);
+
+    // Determine Net Surplus/(Deficit) amounts based on scenarios
+    if (hasIncome && hasExpenses) {
+      // Scenario 1: Both Income & Expenses
+      netSurplusCreditAmount = incomeTotal - expensesTotal;
+    } else if (hasIncome && !hasExpenses) {
+      // Scenario 2: Only Income
+      netSurplusCreditAmount = incomeTotal;
+    } else if (!hasIncome && hasExpenses) {
+      // Scenario 3: Only Expenses
+      netSurplusCreditAmount = expensesTotal;
+    }
+
+    netSurplusCreditAmount = toTwoDecimals(netSurplusCreditAmount);
+
+    // Check if we need to remove the Net Surplus/(Deficit) entry completely
+    if (netSurplusCreditAmount === 0) {
+      // Remove the entry completely if amount is 0 (no income/expenses)
+      await removePaymentFromLedger(
+        schoolId,
+        academicYear,
+        id,
+        netSurplusDeficitLedger._id,
+        session
+      );
+    } else {
+      // Update Net Surplus/(Deficit) ledger
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        entryDate,
+        existingPaymentEntry._id,
+        0,
+        netSurplusCreditAmount,
+        session
+      );
+
+      // Recalculate balances
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        session
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        entryDate,
+        session
+      );
+    }
+
+    // ========= Capital Fund Ledger ===========
+    const capitalFundLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Capital Fund",
+    }).session(session);
+
+    if (!capitalFundLedger) {
+      throw new Error("Capital Fund ledger not found");
+    }
+
+    let capitalFundDebitAmount = 0;
+
+    if (hasIncome && hasExpenses) {
+      // Scenario 1: Credit Capital Fund with (income - expenses)
+      capitalFundDebitAmount = incomeTotal - expensesTotal;
+    } else if (hasIncome && !hasExpenses) {
+      // Scenario 2: Credit Capital Fund with income amount
+      capitalFundDebitAmount = incomeTotal;
+    } else if (!hasIncome && hasExpenses) {
+      // Scenario 3: Debit Capital Fund with expenses amount
+      capitalFundDebitAmount = expensesTotal;
+    }
+
+    capitalFundDebitAmount = toTwoDecimals(capitalFundDebitAmount);
+
+    // Check if we need to remove the Capital Fund entry completely
+    if (capitalFundDebitAmount === 0) {
+      // Remove the entry completely if amount is 0 (no income/expenses)
+      await removePaymentFromLedger(
+        schoolId,
+        academicYear,
+        id,
+        capitalFundLedger._id,
+        session
+      );
+    } else {
+      // Update Capital Fund ledger
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        entryDate,
+        existingPaymentEntry._id,
+        capitalFundDebitAmount,
+        0,
+        session
+      );
+
+      // Recalculate balances
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        session
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        entryDate,
+        session
+      );
+    }
 
     await session.commitTransaction();
     session.endSession();

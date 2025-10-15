@@ -51,24 +51,40 @@ async function create(req, res) {
       Expenses: 4000,
     };
 
-    const baseCode = typeToBaseCode[headOfAccount.headOfAccountName];
+    // const baseCode = typeToBaseCode[headOfAccount.headOfAccountName];
+    // if (!baseCode) {
+    //   return res.status(400).json({
+    //     hasError: true,
+    //     message:
+    //       "Head of Account must from 'Assets','Liabilities','Income', or 'Expenses'",
+    //   });
+    // }
+
+    // Determine base code (add Capital Fund and Net Surplus/(Deficit) support)
+    let baseCode = typeToBaseCode[headOfAccount.headOfAccountName];
+
+    // If it's Capital Fund or Net Surplus/(Deficit), assign custom base codes
     if (!baseCode) {
-      return res.status(400).json({
-        hasError: true,
-        message:
-          "Head of Account must from 'Assets','Liabilities','Income', or 'Expenses'",
-      });
+      if (headOfAccount.headOfAccountName === "Capital Fund") {
+        baseCode = 5000;
+      } else if (headOfAccount.headOfAccountName === "Net Surplus/(Deficit)") {
+        baseCode = 6000;
+      } else {
+        return res.status(400).json({
+          hasError: true,
+          message:
+            "Head of Account must be one of 'Assets', 'Liabilities', 'Income', 'Expenses', 'Capital Fund', or 'Net Surplus/(Deficit)'",
+        });
+      }
     }
 
-    // Determine balanceType based on openingBalance
     let balanceType;
     if (Number(openingBalance) < 0) {
       balanceType = "Credit";
     } else {
-      balanceType = "Debit"; // includes 0 and positive
+      balanceType = "Debit";
     }
 
-    // Atomically find and increment the counter
     const counter = await CounterForFinaceLedger.findOneAndUpdate(
       { schoolId, headOfAccountType: headOfAccount.headOfAccountName },
       { $inc: { lastLedgerCode: 1 } },
@@ -81,6 +97,13 @@ async function create(req, res) {
       headOfAccount.headOfAccountName
     );
     const finalOpeningBalance = isAssetOrLiability ? openingBalance || 0 : 0;
+
+    // see other than Assets,
+    // Liabilities,
+    // Income,
+    // Expenses, there can be two more head of account "Capital Fund" and "Net Surplus/(Deficit)"
+    // but can not have typeToBaseCode so what to do because currently it is giving me error
+    // Head of Account must from 'Assets','Liabilities','Income', or 'Expenses'
 
     const newLedger = new Ledger({
       schoolId,
@@ -96,21 +119,18 @@ async function create(req, res) {
 
     await newLedger.save();
 
-    // ========== NEW CODE: Create TotalNetdeficitNetSurplus if ledgerName is "Net Surplus/(Deficit)" ==========
     if (ledgerName.toLowerCase() === "net surplus/(deficit)") {
-      // Check if TotalNetdeficitNetSurplus record already exists
       const existingTotalNetRecord = await TotalNetdeficitNetSurplus.findOne({
         schoolId,
         academicYear,
       });
 
       if (!existingTotalNetRecord) {
-        // Create new TotalNetdeficitNetSurplus record
         const newTotalNetRecord = new TotalNetdeficitNetSurplus({
           schoolId,
           academicYear,
-          ledgerId: newLedger._id, // Store the ledger ID of "Net Surplus/(Deficit)"
-          balanceDetails: [], // Initialize with empty array
+          ledgerId: newLedger._id,
+          balanceDetails: [],
         });
 
         await newTotalNetRecord.save();
@@ -118,7 +138,6 @@ async function create(req, res) {
           `TotalNetdeficitNetSurplus record created for ledger: ${ledgerName}`
         );
       } else {
-        // Update existing record with the new ledger ID
         existingTotalNetRecord.ledgerId = newLedger._id;
         await existingTotalNetRecord.save();
         console.log(
@@ -126,7 +145,6 @@ async function create(req, res) {
         );
       }
     }
-    // ========== END OF NEW CODE ==========
 
     return res.status(201).json({
       hasError: false,

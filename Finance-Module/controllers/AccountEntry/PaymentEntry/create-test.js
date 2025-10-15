@@ -631,9 +631,13 @@ async function create(req, res) {
 
     await totalNetRecord.save({ session });
 
-    // =====Net Surplus/(Deficit)...Capital Fund=====
+    // =========xxxxxxxxxxxx===========
 
-    // ========= Net Surplus/(Deficit) Ledger ===========
+    // whether it is income or expenses always store in "Net Surplus/(Deficit)"
+    // at debit part and see the value of amountAfterGST must always store as it is
+    // whether it is income or expenses
+    // currently if expenses you are storing negative value why
+
     const netSurplusDeficitLedger = await Ledger.findOne({
       schoolId,
       academicYear,
@@ -644,15 +648,10 @@ async function create(req, res) {
       throw new Error("Net Surplus/(Deficit) ledger not found");
     }
 
-    // Calculate amounts for Net Surplus/(Deficit)
-    let netSurplusCreditAmount = 0;
-    let hasIncome = false;
-    let hasExpenses = false;
+    // Calculate net amount for this payment entry (income - expenses)
+    let netAmount = 0;
 
-    // Calculate income and expenses totals
-    let incomeTotal = 0;
-    let expensesTotal = 0;
-
+    // Calculate net amount based on Head of Account from the itemDetails
     for (const item of updatedItemDetails) {
       const ledger = ledgers.find(
         (l) => l._id.toString() === item.ledgerId.toString()
@@ -663,45 +662,28 @@ async function create(req, res) {
         const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
 
         if (headOfAccountName.toLowerCase() === "income") {
-          hasIncome = true;
-          incomeTotal += amountAfterGST;
+          netAmount += amountAfterGST;
         } else if (headOfAccountName.toLowerCase() === "expenses") {
-          hasExpenses = true;
-          expensesTotal += amountAfterGST;
+          netAmount -= amountAfterGST;
         }
       }
     }
 
-    incomeTotal = toTwoDecimals(incomeTotal);
-    expensesTotal = toTwoDecimals(expensesTotal);
+    netAmount = toTwoDecimals(netAmount);
 
-    // Determine Net Surplus/(Deficit) amounts based on scenarios
-    if (hasIncome && hasExpenses) {
-      // Scenario 1: Both Income & Expenses
-      netSurplusCreditAmount = incomeTotal - expensesTotal;
-    } else if (hasIncome && !hasExpenses) {
-      // Scenario 2: Only Income
-      netSurplusCreditAmount = incomeTotal;
-    } else if (!hasIncome && hasExpenses) {
-      // Scenario 3: Only Expenses
-      netSurplusCreditAmount = expensesTotal;
-    }
-
-    netSurplusCreditAmount = toTwoDecimals(netSurplusCreditAmount);
-
-    // Update Net Surplus/(Deficit) ledger
-    if (netSurplusCreditAmount !== 0) {
+    if (netAmount !== 0) {
+      // Update OpeningClosingBalance for Net Surplus/(Deficit) ledger
       await updateOpeningClosingBalance(
         schoolId,
         academicYear,
         netSurplusDeficitLedger._id,
         entryDate,
         newPaymentEntry._id,
-        0,
-        netSurplusCreditAmount
+        netAmount, // debit if positive
+        0
       );
 
-      // Recalculate balances
+      // Recalculate balances for Net Surplus/(Deficit) ledger
       await recalculateLedgerBalances(
         schoolId,
         academicYear,
@@ -715,6 +697,8 @@ async function create(req, res) {
       );
     }
 
+    // =========xxxxxxxxxxxx===========
+
     // ========= Capital Fund Ledger ===========
     const capitalFundLedger = await Ledger.findOne({
       schoolId,
@@ -726,33 +710,24 @@ async function create(req, res) {
       throw new Error("Capital Fund ledger not found");
     }
 
-    let capitalFundDebitAmount = 0;
+    if (netAmount !== 0) {
+      // whether it is income or expenses always store in "Capital Fund"
+      // at credit part and see the value of amountAfterGST must always store as it is
+      // whether it is income or expenses
+      // currently if expenses you are storing negative value why
 
-    if (hasIncome && hasExpenses) {
-      // Scenario 1: Credit Capital Fund with (income - expenses)
-      capitalFundDebitAmount = incomeTotal - expensesTotal;
-    } else if (hasIncome && !hasExpenses) {
-      // Scenario 2: Credit Capital Fund with income amount
-      capitalFundDebitAmount = incomeTotal;
-    } else if (!hasIncome && hasExpenses) {
-      // Scenario 3: Debit Capital Fund with expenses amount
-      capitalFundDebitAmount = expensesTotal;
-    }
-
-    capitalFundDebitAmount = toTwoDecimals(capitalFundDebitAmount);
-
-    if (capitalFundDebitAmount !== 0) {
+      const capitalFundAmount = -netAmount;
       await updateOpeningClosingBalance(
         schoolId,
         academicYear,
         capitalFundLedger._id,
         entryDate,
         newPaymentEntry._id,
-        capitalFundDebitAmount,
-        0
+        0, // debit if netAmount is negative
+        capitalFundAmount // credit if netAmount
       );
 
-      // Recalculate balances
+      // Recalculate balances for Capital Fund ledger
       await recalculateLedgerBalances(
         schoolId,
         academicYear,
@@ -765,8 +740,6 @@ async function create(req, res) {
         entryDate
       );
     }
-
-    // =====Net Surplus/(Deficit)...Capital Fund=====
 
     await session.commitTransaction();
     session.endSession();
