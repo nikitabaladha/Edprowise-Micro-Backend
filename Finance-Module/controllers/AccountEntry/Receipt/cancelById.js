@@ -326,7 +326,7 @@ async function cancelById(req, res) {
 
     // Get all unique ledger IDs from itemDetails
     const uniqueLedgerIds = [
-      ...new Set(existingPayment.itemDetails.map((item) => item.ledgerId)),
+      ...new Set(existingReceipt.itemDetails.map((item) => item.ledgerId)),
     ];
 
     // Find ledgers with their Head of Account information
