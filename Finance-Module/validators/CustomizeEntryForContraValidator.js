@@ -25,6 +25,9 @@ const dateOfCashDepositedWithdrawlDate = Joi.date().required().messages({
 const itemDetails = Joi.array()
   .items(
     Joi.object({
+      itemName: Joi.string().optional().allow(null, "").messages({
+        "string.base": "Description must be a string.",
+      }),
       ledgerId: Joi.string().required().messages({
         "any.required": "Ledger ID is required.",
         "string.base": "Ledger ID must be a string.",

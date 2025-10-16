@@ -215,6 +215,7 @@ async function getAllBySchoolId(req, res) {
         }
 
         itemsWithLedgerNames.push({
+          itemName: item.itemName || null,
           ledgerId: item.ledgerId || null,
           debitAmount: item.debitAmount || null,
           creditAmount: item.creditAmount || null,

@@ -2,31 +2,4 @@ npm run dev-all
 
 
 
-TytjPSHjUtVw7YdZ
-
-nikitabaladha1996_db_user
-
-MONGO_URI=mongodb+srv://nikitabaladha1996_db_user:TytjPSHjUtVw7YdZ@cluster0.oufamda.mongodb.net/Fees_Module_Testing?retryWrites=true&w=majority&appName=Cluster0
-
-
-
-
-Student ABC
-
-
-studentid:123
-academicYear
-schoolId
-class:PQR
-availabilityType:[{
-date:01-01-2024
-section:A
-availalitytype:Absent
-},{
-date:31-12-2024
-class:PQR
-section:A
-availalitytype:Absent
-}]
-
 

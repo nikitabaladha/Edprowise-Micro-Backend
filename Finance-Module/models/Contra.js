@@ -31,6 +31,9 @@ const ContraSchema = new mongoose.Schema(
     dateOfCashDepositedWithdrawlDate: { type: Date },
     itemDetails: [
       {
+        itemName: {
+          type: String,
+        },
         ledgerId: {
           type: String,
         },
