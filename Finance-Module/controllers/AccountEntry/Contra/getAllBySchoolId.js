@@ -67,6 +67,7 @@ async function getAllBySchoolId(req, res) {
       return {
         _id: entry._id,
         schoolId: entry.schoolId,
+        academicYear: entry.academicYear,
         entryDate: entry.entryDate,
         dateOfCashDepositedWithdrawlDate:
           entry.dateOfCashDepositedWithdrawlDate,

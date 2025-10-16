@@ -75,6 +75,7 @@ async function getAllBySchoolId(req, res) {
         // Receipt fields
         _id: entry._id,
         schoolId: entry.schoolId,
+        academicYear: academicYear,
         entryDate: entry.entryDate,
         receiptDate: entry.receiptDate,
         narration: entry.narration,
