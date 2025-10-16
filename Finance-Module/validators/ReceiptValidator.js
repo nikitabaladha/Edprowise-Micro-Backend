@@ -51,13 +51,14 @@ const narration = Joi.string().required().messages({
 });
 
 const paymentMode = Joi.string()
-  .valid("Cash", "Online", "Cheque")
+  .valid("Cash", "Online Net Banking", "Cheque/Bank Account")
   .required()
   .messages({
+    "string.empty": "Payment Mode is required.",
     "any.required": "Payment mode is required",
     "string.base": "Payment mode must be a string",
-    "any.only": "Payment mode must be either 'Cash', 'Online' or 'Cheque'.",
-    "string.empty": "Payment mode cannot be empty",
+    "any.only":
+      "Payment mode must be either 'Cash', 'Online Net Banking', or 'Cheque/Bank Account'.",
   });
 
 const chequeNumber = Joi.string().allow(null, "").optional().messages({

@@ -13,12 +13,17 @@ async function getAllByPaymentMode(req, res) {
       });
     }
 
-    const validModes = ["Not Defined", "Cash", "Online", "Cheque"];
+    const validModes = [
+      "Not Defined",
+      "Cash",
+      "Online Net Banking",
+      "Cheque/Bank Account",
+    ];
     if (!validModes.includes(paymentMode)) {
       return res.status(400).json({
         hasError: true,
         message:
-          "Invalid payment mode. Valid values are: Not Defined, Cash, Online, Cheque.",
+          "Invalid payment mode. Valid values are: 'Cash', 'Online Net Banking', or 'Cheque/Bank Account'",
       });
     }
 

@@ -557,7 +557,10 @@ async function updateById(req, res) {
     existingReceipt.ledgerIdWithPaymentMode = ledgerIdWithPaymentMode;
     existingReceipt.status = status;
 
-    if (paymentMode === "Online" && !existingReceipt.transactionNumber) {
+    if (
+      paymentMode === "Online Net Banking" &&
+      !existingReceipt.transactionNumber
+    ) {
       existingReceipt.transactionNumber = await generateTransactionNumber();
     }
 

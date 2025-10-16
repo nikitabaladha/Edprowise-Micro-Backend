@@ -27,7 +27,7 @@ const ReceiptSchema = new mongoose.Schema(
     narration: { type: String },
     paymentMode: {
       type: String,
-      enum: ["Cash", "Online", "Cheque", ""],
+      enum: ["Cash", "Online Net Banking", "Cheque/Bank Account", ""],
     },
     chequeNumber: {
       type: String,

@@ -64,6 +64,7 @@ async function getAllBySchoolId(req, res) {
         totalDebit: totalDebit,
         createdAt: ledger.createdAt,
         updatedAt: ledger.updatedAt,
+        paymentMode: ledger.paymentMode ?? null,
       };
     });
 

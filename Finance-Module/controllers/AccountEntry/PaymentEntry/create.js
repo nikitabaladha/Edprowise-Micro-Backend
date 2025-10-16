@@ -406,7 +406,9 @@ async function create(req, res) {
     );
 
     const transactionNumber =
-      paymentMode === "Online" ? await generateTransactionNumber() : null;
+      paymentMode === "Online Net Banking"
+        ? await generateTransactionNumber()
+        : null;
 
     let TDSorTCSLedgerId = null;
     const tdsTcsAmount = Number(TDSTCSRateWithAmountBeforeGST) || 0;

@@ -32,7 +32,13 @@ const LedgerSchema = new mongoose.Schema(
     balanceType: { type: String, enum: ["Debit", "Credit"] },
     paymentMode: {
       type: String,
-      enum: ["Not Defined", "Cash", "Online", "Cheque"],
+      enum: [
+        "Not Defined",
+        "Cash",
+        "Online Net Banking",
+        "Cheque/Bank Account",
+        "",
+      ],
       default: "Not Defined",
     },
     ledgerCode: { type: String },
