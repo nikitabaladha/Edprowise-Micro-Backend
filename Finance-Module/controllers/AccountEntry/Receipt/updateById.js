@@ -548,10 +548,26 @@ async function updateById(req, res) {
     existingReceipt.paymentMode = paymentMode;
     existingReceipt.chequeNumber = chequeNumber;
     existingReceipt.itemDetails = updatedItemDetails;
-    existingReceipt.TDSorTCS = TDSorTCS;
-    existingReceipt.TDSTCSRateChartId = TDSTCSRateChartId;
-    existingReceipt.TDSTCSRate = TDSTCSRate;
-    existingReceipt.TDSTCSRateWithAmount = parsedTDSTCSRateWithAmount;
+    // existingReceipt.TDSorTCS = TDSorTCS;
+    // existingReceipt.TDSTCSRateChartId = TDSTCSRateChartId;
+    // existingReceipt.TDSTCSRate = TDSTCSRate;
+    // existingReceipt.TDSTCSRateWithAmount = parsedTDSTCSRateWithAmount;
+
+    // Handle TDS/TCS fields properly
+    if (TDSorTCS) {
+      existingReceipt.TDSorTCS = TDSorTCS;
+      existingReceipt.TDSTCSRateChartId = TDSTCSRateChartId;
+      existingReceipt.TDSTCSRate = TDSTCSRate;
+      existingReceipt.TDSTCSRateWithAmount = parsedTDSTCSRateWithAmount;
+    } else {
+      // Reset TDS/TCS fields when TDSorTCS is not provided or is empty
+      existingReceipt.TDSorTCS = undefined;
+      existingReceipt.TDSTCSRateChartId = "";
+      existingReceipt.TDSTCSRate = 0;
+      existingReceipt.TDSTCSRateWithAmount = 0;
+      existingReceipt.TDSorTCSLedgerId = null;
+    }
+
     existingReceipt.subTotalAmount = subTotalAmount;
     existingReceipt.totalAmount = totalAmount;
     existingReceipt.ledgerIdWithPaymentMode = ledgerIdWithPaymentMode;
