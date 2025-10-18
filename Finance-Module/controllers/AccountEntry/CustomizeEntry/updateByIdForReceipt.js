@@ -747,31 +747,32 @@ async function updateById(req, res) {
       if (ledger && ledger.headOfAccountId) {
         const headOfAccountName =
           ledger.headOfAccountId.headOfAccountName.toLowerCase();
-        const amount = parseFloat(item.amount) || 0;
         const debitAmount = parseFloat(item.debitAmount) || 0;
+        const amount = parseFloat(item.amount) || 0;
 
         // Scenario analysis based on your requirements (SAME AS CREATE)
         if (headOfAccountName === "income") {
-          if (debitAmount > 0) {
-            // Income with credit amount → Net Surplus Debit, Capital Fund Credit
-            netSurplusDebitAmount += debitAmount;
-            capitalFundCreditAmount += debitAmount;
-          }
           if (amount > 0) {
+            // Income with credit amount → Net Surplus Debit, Capital Fund Credit
+
+            netSurplusDebitAmount += amount;
+            capitalFundCreditAmount += amount;
+          }
+          if (debitAmount > 0) {
             // Income with debit amount → Net Surplus Credit, Capital Fund Debit
-            netSurplusCreditAmount += amount;
-            capitalFundDebitAmount += amount;
+            netSurplusCreditAmount += debitAmount;
+            capitalFundDebitAmount += debitAmount;
           }
         } else if (headOfAccountName === "expenses") {
-          if (debitAmount > 0) {
-            // Expenses with credit amount → Net Surplus Debit, Capital Fund Credit
-            netSurplusDebitAmount += debitAmount;
-            capitalFundCreditAmount += debitAmount;
-          }
           if (amount > 0) {
+            // Expenses with credit amount → Net Surplus Debit, Capital Fund Credit
+            netSurplusDebitAmount += amount;
+            capitalFundCreditAmount += amount;
+          }
+          if (debitAmount > 0) {
             // Expenses with debit amount → Net Surplus Credit, Capital Fund Debit
-            netSurplusCreditAmount += amount;
-            capitalFundDebitAmount += amount;
+            netSurplusCreditAmount += debitAmount;
+            capitalFundDebitAmount += debitAmount;
           }
         }
       }
