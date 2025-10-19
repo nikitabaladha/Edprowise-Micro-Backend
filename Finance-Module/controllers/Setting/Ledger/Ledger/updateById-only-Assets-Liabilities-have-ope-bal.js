@@ -60,23 +60,22 @@ async function updateById(req, res) {
       );
     }
 
-    const currentOpeningBalance =
-      openingBalance !== undefined
-        ? openingBalance
-        : existingLedger.openingBalance;
-
+    // Determine balanceType based on openingBalance
     let balanceType;
-    if (Number(currentOpeningBalance) < 0) {
+    if (Number(openingBalance) < 0) {
       balanceType = "Credit";
     } else {
-      balanceType = "Debit";
+      balanceType = "Debit"; // includes 0 and positive
     }
 
     existingLedger.ledgerName = ledgerName || existingLedger.ledgerName;
+
     existingLedger.headOfAccountId =
       headOfAccountId || existingLedger.headOfAccountId;
+
     existingLedger.groupLedgerId =
       groupLedgerId || existingLedger.groupLedgerId;
+
     existingLedger.bSPLLedgerId = bSPLLedgerId || existingLedger.bSPLLedgerId;
 
     existingLedger.openingBalance =
@@ -106,7 +105,7 @@ async function updateById(req, res) {
           `TotalNetdeficitNetSurplus record created for ledger: ${ledgerName}`
         );
       } else {
-        // If found, ensure it's linked to the correct ledgerId
+        // If found, ensure it’s linked to the correct ledgerId
         if (
           !existingTotalNetRecord.ledgerId ||
           existingTotalNetRecord.ledgerId.toString() !==

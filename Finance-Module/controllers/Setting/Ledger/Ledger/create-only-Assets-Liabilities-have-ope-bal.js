@@ -49,19 +49,24 @@ async function create(req, res) {
       Liabilities: 2000,
       Income: 3000,
       Expenses: 4000,
-      "Capital Fund": 5000, // Add Capital Fund to the map
-      "Net Surplus/(Deficit)": 6000, // Add Net Surplus/(Deficit) to the map
     };
 
-    // Get base code directly from the map
-    const baseCode = typeToBaseCode[headOfAccount.headOfAccountName];
+    // Determine base code (add Capital Fund and Net Surplus/(Deficit) support)
+    let baseCode = typeToBaseCode[headOfAccount.headOfAccountName];
 
+    // If it's Capital Fund or Net Surplus/(Deficit), assign custom base codes
     if (!baseCode) {
-      return res.status(400).json({
-        hasError: true,
-        message:
-          "Head of Account must be one of 'Assets', 'Liabilities', 'Income', 'Expenses', 'Capital Fund', or 'Net Surplus/(Deficit)'",
-      });
+      if (headOfAccount.headOfAccountName === "Capital Fund") {
+        baseCode = 5000;
+      } else if (headOfAccount.headOfAccountName === "Net Surplus/(Deficit)") {
+        baseCode = 6000;
+      } else {
+        return res.status(400).json({
+          hasError: true,
+          message:
+            "Head of Account must be one of 'Assets', 'Liabilities', 'Income', 'Expenses', 'Capital Fund', or 'Net Surplus/(Deficit)'",
+        });
+      }
     }
 
     let balanceType;
@@ -79,8 +84,10 @@ async function create(req, res) {
 
     const ledgerCode = baseCode + counter.lastLedgerCode;
 
-    // REMOVE THE RESTRICTION: Allow opening balance for ALL account types
-    const finalOpeningBalance = openingBalance || 0;
+    const isAssetOrLiability = ["Assets", "Liabilities"].includes(
+      headOfAccount.headOfAccountName
+    );
+    const finalOpeningBalance = isAssetOrLiability ? openingBalance || 0 : 0;
 
     const newLedger = new Ledger({
       schoolId,
@@ -88,7 +95,7 @@ async function create(req, res) {
       groupLedgerId,
       bSPLLedgerId,
       ledgerName,
-      openingBalance: finalOpeningBalance, // This will store whatever value is provided
+      openingBalance: finalOpeningBalance,
       academicYear,
       ledgerCode: ledgerCode.toString(),
       balanceType,
@@ -146,5 +153,4 @@ async function create(req, res) {
     });
   }
 }
-
 export default create;
