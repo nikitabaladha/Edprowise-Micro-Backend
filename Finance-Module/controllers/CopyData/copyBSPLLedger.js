@@ -1,34 +1,3 @@
-// import BSPLLedger from "../../models/BSPLLedger.js";
-
-// const copyBSPLLedgers = async (
-//   schoolId,
-//   newAcademicYear,
-//   prevAcademicYear,
-//   session
-// ) => {
-//   const previousBSPLLedgers = await BSPLLedger.find({
-//     schoolId,
-//     academicYear: prevAcademicYear,
-//   }).session(session);
-
-//   // at time of copying head of account Id in newBSPLLedgers i want to copy headOfAccountId of newlycreated year
-
-//   const newBSPLLedgers = previousBSPLLedgers.map((ledger) => ({
-//     schoolId,
-//     headOfAccountId: ledger.headOfAccountId,
-//     bSPLLedgerName: ledger.bSPLLedgerName,
-//     academicYear: newAcademicYear,
-//   }));
-
-//   if (newBSPLLedgers.length > 0) {
-//     await BSPLLedger.insertMany(newBSPLLedgers, { session });
-//   }
-
-//   return newBSPLLedgers.length;
-// };
-
-// export default copyBSPLLedgers;
-
 import BSPLLedger from "../../models/BSPLLedger.js";
 import HeadOfAccount from "../../models/HeadOfAccount.js";
 

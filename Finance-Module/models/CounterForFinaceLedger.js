@@ -8,7 +8,14 @@ const CounterForFinaceLedgerSchema = new mongoose.Schema({
   },
   headOfAccountType: {
     type: String,
-    enum: ["Assets", "Liabilities", "Income", "Expenditure"],
+    enum: [
+      "Assets",
+      "Liabilities",
+      "Income",
+      "Expenditure",
+      "Net Surplus/(Deficit)",
+      "Capital Fund",
+    ],
     required: true,
   },
   lastLedgerCode: {

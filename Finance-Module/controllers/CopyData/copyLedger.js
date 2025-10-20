@@ -2,6 +2,7 @@ import Ledger from "../../models/Ledger.js";
 import GroupLedger from "../../models/GroupLedger.js";
 import BSPLLedger from "../../models/BSPLLedger.js";
 import HeadOfAccount from "../../models/HeadOfAccount.js";
+import OpeningClosingBalance from "../../models/OpeningClosingBalance.js";
 
 const copyLedgers = async (
   schoolId,
@@ -9,7 +10,6 @@ const copyLedgers = async (
   prevAcademicYear,
   session
 ) => {
-  // 1. Get all previous Ledgers
   const previousLedgers = await Ledger.find({
     schoolId,
     academicYear: prevAcademicYear,
@@ -19,7 +19,6 @@ const copyLedgers = async (
     return 0;
   }
 
-  // 2. Get all referenced documents from previous year
   const prevHeadOfAccountIds = [
     ...new Set(previousLedgers.map((l) => l.headOfAccountId)),
   ];
@@ -49,7 +48,6 @@ const copyLedgers = async (
       }).session(session),
     ]);
 
-  // 3. Get all new documents for the current year
   const [newHeadOfAccounts, newGroupLedgers, newBSPLLedgers] =
     await Promise.all([
       HeadOfAccount.find({
@@ -66,7 +64,6 @@ const copyLedgers = async (
       }).session(session),
     ]);
 
-  // 4. Create mappings from old to new IDs
   const createNameToIdMap = (items, nameField) => {
     const map = {};
     items.forEach((item) => {
@@ -82,10 +79,27 @@ const copyLedgers = async (
   const groupLedgerMap = createNameToIdMap(newGroupLedgers, "groupLedgerName");
   const bsplLedgerMap = createNameToIdMap(newBSPLLedgers, "bSPLLedgerName");
 
-  // 5. Create new Ledgers with updated references
+  const prevLedgerIds = previousLedgers.map((l) => l._id);
+  const prevOpeningClosingBalances = await OpeningClosingBalance.find({
+    schoolId,
+    academicYear: prevAcademicYear,
+    ledgerId: { $in: prevLedgerIds },
+  }).session(session);
+
+  const ledgerClosingBalanceMap = {};
+  prevOpeningClosingBalances.forEach((balance) => {
+    if (balance.balanceDetails && balance.balanceDetails.length > 0) {
+      const lastEntry =
+        balance.balanceDetails[balance.balanceDetails.length - 1];
+      ledgerClosingBalanceMap[balance.ledgerId.toString()] =
+        lastEntry.closingBalance;
+    } else {
+      ledgerClosingBalanceMap[balance.ledgerId.toString()] = 0;
+    }
+  });
+
   const newLedgers = [];
   for (const prevLedger of previousLedgers) {
-    // Find previous references
     const prevHoa = prevHeadOfAccounts.find((hoa) =>
       hoa._id.equals(prevLedger.headOfAccountId)
     );
@@ -98,12 +112,24 @@ const copyLedgers = async (
 
     if (!prevHoa || !prevGroup || !prevBspl) continue;
 
-    // Find new references
     const newHeadOfAccountId = headOfAccountMap[prevHoa.headOfAccountName];
     const newGroupLedgerId = groupLedgerMap[prevGroup.groupLedgerName];
     const newBSPLLedgerId = bsplLedgerMap[prevBspl.bSPLLedgerName];
 
     if (!newHeadOfAccountId || !newGroupLedgerId || !newBSPLLedgerId) continue;
+
+    const prevLedgerIdStr = prevLedger._id.toString();
+    const openingBalance =
+      ledgerClosingBalanceMap[prevLedgerIdStr] !== undefined
+        ? ledgerClosingBalanceMap[prevLedgerIdStr]
+        : prevLedger.openingBalance;
+
+    let balanceType;
+    if (openingBalance < 0) {
+      balanceType = "Credit";
+    } else {
+      balanceType = "Debit";
+    }
 
     newLedgers.push({
       schoolId,
@@ -111,13 +137,14 @@ const copyLedgers = async (
       groupLedgerId: newGroupLedgerId,
       bSPLLedgerId: newBSPLLedgerId,
       ledgerName: prevLedger.ledgerName,
-      openingBalance: prevLedger.openingBalance,
+      openingBalance: openingBalance,
+      balanceType: balanceType,
       paymentMode: prevLedger.paymentMode,
+      ledgerCode: prevLedger.ledgerCode,
       academicYear: newAcademicYear,
     });
   }
 
-  // 6. Insert the new Ledgers
   if (newLedgers.length > 0) {
     await Ledger.insertMany(newLedgers, { session });
   }

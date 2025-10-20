@@ -1,33 +1,3 @@
-// import GroupLedger from "../../models/GroupLedger.js";
-
-// const copyGroupLedgers = async (
-//   schoolId,
-//   newAcademicYear,
-//   prevAcademicYear,
-//   session
-// ) => {
-//   const previousGroupLedgers = await GroupLedger.find({
-//     schoolId,
-//     academicYear: prevAcademicYear,
-//   }).session(session);
-
-//   const newGroupLedgers = previousGroupLedgers.map((ledger) => ({
-//     schoolId,
-//     headOfAccountId: ledger.headOfAccountId,
-//     bSPLLedgerId: ledger.bSPLLedgerId,
-//     groupLedgerName: ledger.groupLedgerName,
-//     academicYear: newAcademicYear,
-//   }));
-
-//   if (newGroupLedgers.length > 0) {
-//     await GroupLedger.insertMany(newGroupLedgers, { session });
-//   }
-
-//   return newGroupLedgers.length;
-// };
-
-// export default copyGroupLedgers;
-
 import GroupLedger from "../../models/GroupLedger.js";
 import BSPLLedger from "../../models/BSPLLedger.js";
 import HeadOfAccount from "../../models/HeadOfAccount.js";
