@@ -1,11 +1,9 @@
 import mongoose from "mongoose";
-import PaymentEntry from "../../../models/PaymentEntry.js";
-import PaymentEntryValidator from "../../../validators/CustomizeEntryForPaymentValidator.js";
+import Journal from "../../../models/Journal.js";
+import JournalValidator from "../../../validators/JournalValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
 import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
-
-import { hasBankOrCashLedger } from "../../CommonFunction/CommonFunction.js";
 
 function toTwoDecimals(value) {
   if (value === null || value === undefined || isNaN(value)) return 0;
@@ -72,7 +70,7 @@ async function updateOpeningClosingBalance(
   academicYear,
   ledgerId,
   entryDate,
-  paymentEntryId,
+  journalId,
   debitAmount = 0,
   creditAmount = 0,
   session
@@ -91,7 +89,7 @@ async function updateOpeningClosingBalance(
 
   // Find existing entry FIRST to preserve its sequence
   const existingEntryIndex = record.balanceDetails.findIndex(
-    (detail) => detail.entryId?.toString() === paymentEntryId.toString()
+    (detail) => detail.entryId?.toString() === journalId.toString()
   );
 
   let entrySequence;
@@ -179,7 +177,7 @@ async function updateOpeningClosingBalance(
       debit: debitAmount,
       credit: creditAmount,
       closingBalance,
-      entryId: paymentEntryId,
+      entryId: journalId,
     };
 
     record.balanceDetails.push(newBalanceDetail);
@@ -326,10 +324,10 @@ async function recalculateAllBalancesAfterDate(
   await record.save({ session });
 }
 
-async function removePaymentEntryFromLedger(
+async function removeJournalEntryFromLedger(
   schoolId,
   academicYear,
-  paymentEntryId,
+  journalId,
   ledgerId,
   session
 ) {
@@ -345,7 +343,7 @@ async function removePaymentEntryFromLedger(
   // Remove the entry from balanceDetails
   const originalLength = record.balanceDetails.length;
   record.balanceDetails = record.balanceDetails.filter(
-    (detail) => detail.entryId?.toString() !== paymentEntryId.toString()
+    (detail) => detail.entryId?.toString() !== journalId.toString()
   );
 
   if (record.balanceDetails.length === originalLength) return; // nothing removed
@@ -407,18 +405,18 @@ function aggregateAmountsByLedger(itemDetails) {
 
   itemDetails.forEach((item) => {
     const ledgerId = item.ledgerId.toString();
-    const amountAfterGST = toTwoDecimals(item.amountAfterGST) || 0;
+    const debitAmount = toTwoDecimals(item.debitAmount) || 0;
     const creditAmount = toTwoDecimals(item.creditAmount) || 0;
 
     if (ledgerMap.has(ledgerId)) {
       const existing = ledgerMap.get(ledgerId);
       ledgerMap.set(ledgerId, {
-        amountAfterGST: existing.amountAfterGST + amountAfterGST,
-        creditAmount: existing.creditAmount + creditAmount,
+        debitAmount: toTwoDecimals(existing.debitAmount + debitAmount),
+        creditAmount: toTwoDecimals(existing.creditAmount + creditAmount),
       });
     } else {
       ledgerMap.set(ledgerId, {
-        amountAfterGST: amountAfterGST,
+        debitAmount: debitAmount,
         creditAmount: creditAmount,
       });
     }
@@ -427,303 +425,110 @@ function aggregateAmountsByLedger(itemDetails) {
   return ledgerMap;
 }
 
-async function propagateBalanceChangeToNextYear(
-  schoolId,
-  currentAcademicYear,
-  ledgerId,
-  session
-) {
-  try {
-    // Find the current ledger to get its details
-    const currentLedger = await Ledger.findOne({
-      schoolId,
-      academicYear: currentAcademicYear,
-      _id: ledgerId,
-    }).session(session);
-
-    if (!currentLedger) {
-      console.log(`Ledger ${ledgerId} not found in ${currentAcademicYear}`);
-      return;
-    }
-
-    // Calculate next academic year
-    const [yearPart1, yearPart2] = currentAcademicYear.split("-");
-    const nextAcademicYear = `${parseInt(yearPart1) + 1}-${
-      parseInt(yearPart2) + 1
-    }`;
-
-    // Find the next year's ledger that has the CURRENT ledger as parent
-    const nextYearLedger = await Ledger.findOne({
-      schoolId,
-      academicYear: nextAcademicYear,
-      parentLedgerId: currentLedger._id,
-    }).session(session);
-
-    if (!nextYearLedger) {
-      console.log(`No next year ledger found for ${currentLedger.ledgerName}`);
-      return; // No next year ledger found
-    }
-
-    // Get the current year's balance record for this ledger
-    const currentYearBalance = await OpeningClosingBalance.findOne({
-      schoolId,
-      academicYear: currentAcademicYear,
-      ledgerId: ledgerId,
-    }).session(session);
-
-    let newOpeningBalance = 0;
-
-    // FIXED: Handle both cases properly
-    if (currentYearBalance && currentYearBalance.balanceDetails.length > 0) {
-      // Case 1: There are balance details - use last closing balance
-      const lastEntry =
-        currentYearBalance.balanceDetails[
-          currentYearBalance.balanceDetails.length - 1
-        ];
-      newOpeningBalance = lastEntry.closingBalance;
-    } else {
-      // Case 2: No balance details exist - use the current ledger's opening balance
-      // This happens when all entries are removed or ledger has no transactions
-      newOpeningBalance = currentLedger.openingBalance || 0;
-    }
-
-    // Update the next year's ledger opening balance
-    await Ledger.findOneAndUpdate(
-      {
-        schoolId,
-        academicYear: nextAcademicYear,
-        _id: nextYearLedger._id,
-      },
-      {
-        $set: {
-          openingBalance: newOpeningBalance,
-          balanceType: newOpeningBalance < 0 ? "Credit" : "Debit",
-        },
-      },
-      { session }
-    );
-
-    // Update the OpeningClosingBalance for next year
-    let nextYearOpeningBalance = await OpeningClosingBalance.findOne({
-      schoolId,
-      academicYear: nextAcademicYear,
-      ledgerId: nextYearLedger._id,
-    }).session(session);
-
-    if (!nextYearOpeningBalance) {
-      // Create new OpeningClosingBalance record if it doesn't exist
-      nextYearOpeningBalance = new OpeningClosingBalance({
-        schoolId,
-        academicYear: nextAcademicYear,
-        ledgerId: nextYearLedger._id,
-        balanceDetails: [],
-        balanceType: newOpeningBalance < 0 ? "Credit" : "Debit",
-      });
-
-      // Create initial balance detail with the new opening balance
-      nextYearOpeningBalance.balanceDetails.push({
-        entryDate: new Date(),
-        openingBalance: newOpeningBalance,
-        debit: 0,
-        credit: 0,
-        closingBalance: newOpeningBalance,
-      });
-    } else {
-      // FIXED: Find and update the opening balance entry
-      // Look for an entry without entryId (opening balance entry)
-      let openingBalanceEntry = nextYearOpeningBalance.balanceDetails.find(
-        (detail) => !detail.entryId
-      );
-
-      if (
-        !openingBalanceEntry &&
-        nextYearOpeningBalance.balanceDetails.length > 0
-      ) {
-        // If no dedicated opening balance entry, use the first entry
-        openingBalanceEntry = nextYearOpeningBalance.balanceDetails[0];
-      }
-
-      if (openingBalanceEntry) {
-        const oldOpeningBalance = openingBalanceEntry.openingBalance;
-
-        // Only update if the opening balance has changed
-        if (oldOpeningBalance !== newOpeningBalance) {
-          openingBalanceEntry.openingBalance = newOpeningBalance;
-          openingBalanceEntry.closingBalance = toTwoDecimals(
-            newOpeningBalance +
-              openingBalanceEntry.debit -
-              openingBalanceEntry.credit
-          );
-
-          // Recalculate all subsequent entries
-          let currentBalance = openingBalanceEntry.closingBalance;
-          const startIndex =
-            nextYearOpeningBalance.balanceDetails.indexOf(openingBalanceEntry) +
-            1;
-
-          for (
-            let i = startIndex;
-            i < nextYearOpeningBalance.balanceDetails.length;
-            i++
-          ) {
-            const detail = nextYearOpeningBalance.balanceDetails[i];
-            detail.openingBalance = currentBalance;
-            detail.closingBalance = toTwoDecimals(
-              currentBalance + detail.debit - detail.credit
-            );
-            currentBalance = detail.closingBalance;
-          }
-        }
-      } else {
-        // If no entries exist at all, create an opening balance entry
-        nextYearOpeningBalance.balanceDetails.push({
-          entryDate: new Date(),
-          openingBalance: newOpeningBalance,
-          debit: 0,
-          credit: 0,
-          closingBalance: newOpeningBalance,
-        });
-      }
-    }
-
-    await nextYearOpeningBalance.save({ session });
-
-    // Recursively propagate to the next year if it exists
-    await propagateBalanceChangeToNextYear(
-      schoolId,
-      nextAcademicYear,
-      nextYearLedger._id,
-      session
-    );
-  } catch (propagationError) {
-    console.error(
-      `Error in propagateBalanceChangeToNextYear for ledger ${ledgerId}:`,
-      propagationError
-    );
-    throw propagationError;
-  }
-}
-
-async function updateById(req, res) {
-  // First, do all validations BEFORE starting the transaction
-  const schoolId = req.user?.schoolId;
-  const { id, academicYear } = req.params;
-
-  if (!schoolId) {
-    return res.status(401).json({
-      hasError: true,
-      message: "Access denied: Unauthorized request.",
-    });
-  }
-
-  const { error } = PaymentEntryValidator.PaymentEntryValidatorUpdate.validate(
-    req.body
-  );
-  if (error) {
-    const errorMessages = error.details.map((err) => err.message).join(", ");
-    return res.status(400).json({
-      hasError: true,
-      message: errorMessages,
-    });
-  }
-
-  const {
-    entryDate,
-    invoiceDate,
-    narration,
-    itemDetails,
-    status,
-    totalAmountAfterGST,
-    totalCreditAmount,
-  } = req.body;
-
-  // Validate Bank/Cash ledger requirement BEFORE transaction
-  const hasValidLedger = await hasBankOrCashLedger(
-    schoolId,
-    academicYear,
-    itemDetails
-  );
-
-  if (!hasValidLedger) {
-    return res.status(400).json({
-      hasError: true,
-      message:
-        "At least one ledger must have Group Ledger Name as 'Bank' or 'Cash'",
-    });
-  }
-
+export async function updateById(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const existingPaymentEntry = await PaymentEntry.findOne({
+    const schoolId = req.user?.schoolId;
+    const { id, academicYear } = req.params;
+
+    if (!schoolId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(401).json({
+        hasError: true,
+        message: "Access denied: Unauthorized request.",
+      });
+    }
+
+    const { error } = JournalValidator.JournalValidatorUpdate.validate(
+      req.body
+    );
+    if (error) {
+      const errorMessages = error.details.map((err) => err.message).join(", ");
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        hasError: true,
+        message: errorMessages,
+      });
+    }
+
+    const { entryDate, documentDate, narration, itemDetails, status } =
+      req.body;
+
+    const existingJournal = await Journal.findOne({
       _id: id,
       schoolId,
       academicYear,
     }).session(session);
 
-    if (!existingPaymentEntry) {
+    if (!existingJournal) {
       await session.abortTransaction();
       session.endSession();
       return res.status(404).json({
         hasError: true,
-        message: "PaymentEntry not found.",
+        message: "Journal not found.",
       });
     }
 
-    // ... rest of your existing code remains exactly the same ...
-    const oldItemLedgerIds = existingPaymentEntry.itemDetails.map((item) =>
+    const oldItemLedgerIds = existingJournal.itemDetails.map((item) =>
       item.ledgerId?.toString()
     );
 
     // Store old values for comparison
-    const oldEntryDate = existingPaymentEntry.entryDate;
-    const oldItemDetails = existingPaymentEntry.itemDetails;
+    const oldItemDetails = existingJournal.itemDetails;
+    const oldEntryDate = existingJournal.entryDate;
 
     // Handle uploaded files
-    const { invoiceImage } = req.files || {};
+    const { documentImage } = req.files || {};
 
-    if (invoiceImage?.[0]) {
-      const invoiceImagePath = invoiceImage[0].mimetype.startsWith("image/")
-        ? "/Images/FinanceModule/InvoiceImage"
-        : "/Documents/FinanceModule/InvoiceImage";
-      existingPaymentEntry.invoiceImage = `${invoiceImagePath}/${invoiceImage[0].filename}`;
+    if (documentImage?.[0]) {
+      const documentImagePath = documentImage[0].mimetype.startsWith("image/")
+        ? "/Images/FinanceModule/DocumentImageForJournal"
+        : "/Documents/FinanceModule/DocumentImageForJournal";
+      existingJournal.documentImage = `${documentImagePath}/${documentImage[0].filename}`;
     }
 
-    // Recalculate item details amounts
     const updatedItemDetails = itemDetails.map((item) => ({
       ...item,
-      amountAfterGST: toTwoDecimals(item.amountAfterGST) || 0,
+      debitAmount: toTwoDecimals(item.debitAmount) || 0,
       creditAmount: toTwoDecimals(item.creditAmount) || 0,
     }));
 
-    const subTotalAmountAfterGST = toTwoDecimals(
-      updatedItemDetails.reduce(
-        (sum, item) => sum + (parseFloat(item.amountAfterGST) || 0),
-        0
-      )
+    const subTotalOfDebit = toTwoDecimals(
+      updatedItemDetails.reduce((sum, item) => sum + item.debitAmount, 0)
     );
 
     const subTotalOfCredit = toTwoDecimals(
-      updatedItemDetails.reduce(
-        (sum, item) => sum + (parseFloat(item.creditAmount) || 0),
-        0
-      )
+      updatedItemDetails.reduce((sum, item) => sum + item.creditAmount, 0)
     );
 
-    // Update fields
-    existingPaymentEntry.entryDate = entryDate;
-    existingPaymentEntry.invoiceDate = invoiceDate;
-    existingPaymentEntry.narration = narration;
-    existingPaymentEntry.itemDetails = updatedItemDetails;
-    existingPaymentEntry.subTotalAmountAfterGST = subTotalAmountAfterGST;
-    existingPaymentEntry.subTotalOfCredit = subTotalOfCredit;
-    existingPaymentEntry.totalAmountAfterGST = totalAmountAfterGST;
-    existingPaymentEntry.totalCreditAmount = totalCreditAmount;
+    const totalAmountOfDebit = subTotalOfDebit || 0;
+    const totalAmountOfCredit = subTotalOfCredit || 0;
 
-    existingPaymentEntry.status = status;
+    if (totalAmountOfDebit !== totalAmountOfCredit) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        hasError: true,
+        message: "Total Debit and Credit amounts must be equal.",
+      });
+    }
 
-    await existingPaymentEntry.save({ session });
+    // Update journal fields
+    existingJournal.entryDate = entryDate || existingJournal.entryDate;
+    existingJournal.documentDate = documentDate || existingJournal.documentDate;
+    existingJournal.itemDetails = updatedItemDetails;
+    existingJournal.subTotalOfDebit = subTotalOfDebit;
+    existingJournal.subTotalOfCredit = subTotalOfCredit;
+    existingJournal.totalAmountOfDebit = totalAmountOfDebit;
+    existingJournal.totalAmountOfCredit = totalAmountOfCredit;
+    existingJournal.narration = narration || existingJournal.narration;
+    existingJournal.status = status || existingJournal.status;
+
+    await existingJournal.save({ session });
 
     // Get new ledger IDs
     const newItemLedgerIds = updatedItemDetails.map((item) =>
@@ -747,10 +552,12 @@ async function updateById(req, res) {
       await record.save({ session });
     }
 
+    // --- Step B: Remove old entries if ledgers changed or removed (like Receipt) ---
+
     // Remove entries from old ledgers that are no longer used
     for (const oldLedgerId of oldItemLedgerIds) {
       if (oldLedgerId && !newItemLedgerIds.includes(oldLedgerId)) {
-        await removePaymentEntryFromLedger(
+        await removeJournalEntryFromLedger(
           schoolId,
           academicYear,
           id,
@@ -772,8 +579,8 @@ async function updateById(req, res) {
         academicYear,
         ledgerId,
         entryDate,
-        existingPaymentEntry._id,
-        amounts.amountAfterGST,
+        existingJournal._id,
+        amounts.debitAmount,
         amounts.creditAmount,
         session
       );
@@ -821,14 +628,13 @@ async function updateById(req, res) {
 
       if (ledger && ledger.headOfAccountId) {
         const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
-
-        const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
+        const debitAmount = parseFloat(item.debitAmount) || 0;
         const creditAmount = parseFloat(item.creditAmount) || 0;
 
         if (headOfAccountName.toLowerCase() === "income") {
-          incomeBalance += amountAfterGST - creditAmount;
+          incomeBalance += debitAmount - creditAmount;
         } else if (headOfAccountName.toLowerCase() === "expenses") {
-          expensesBalance += amountAfterGST - creditAmount;
+          expensesBalance += debitAmount - creditAmount;
         }
       }
     }
@@ -872,7 +678,7 @@ async function updateById(req, res) {
       // Create new entry if it doesn't exist
       totalNetRecord.balanceDetails.push({
         entryDate,
-        entryId: existingPaymentEntry._id,
+        entryId: existingJournal._id,
         incomeBalance,
         expensesBalance,
         totalBalance,
@@ -921,7 +727,7 @@ async function updateById(req, res) {
       if (ledger && ledger.headOfAccountId) {
         const headOfAccountName =
           ledger.headOfAccountId.headOfAccountName.toLowerCase();
-        const amountAfterGST = parseFloat(item.amountAfterGST) || 0;
+        const debitAmount = parseFloat(item.debitAmount) || 0;
         const creditAmount = parseFloat(item.creditAmount) || 0;
 
         // Scenario analysis based on your requirements (SAME AS CREATE)
@@ -931,10 +737,10 @@ async function updateById(req, res) {
             netSurplusDebitAmount += creditAmount;
             capitalFundCreditAmount += creditAmount;
           }
-          if (amountAfterGST > 0) {
+          if (debitAmount > 0) {
             // Income with debit amount → Net Surplus Credit, Capital Fund Debit
-            netSurplusCreditAmount += amountAfterGST;
-            capitalFundDebitAmount += amountAfterGST;
+            netSurplusCreditAmount += debitAmount;
+            capitalFundDebitAmount += debitAmount;
           }
         } else if (headOfAccountName === "expenses") {
           if (creditAmount > 0) {
@@ -942,10 +748,10 @@ async function updateById(req, res) {
             netSurplusDebitAmount += creditAmount;
             capitalFundCreditAmount += creditAmount;
           }
-          if (amountAfterGST > 0) {
+          if (debitAmount > 0) {
             // Expenses with debit amount → Net Surplus Credit, Capital Fund Debit
-            netSurplusCreditAmount += amountAfterGST;
-            capitalFundDebitAmount += amountAfterGST;
+            netSurplusCreditAmount += debitAmount;
+            capitalFundDebitAmount += debitAmount;
           }
         }
       }
@@ -966,7 +772,7 @@ async function updateById(req, res) {
     // Handle Net Surplus/(Deficit) ledger
     if (!hasNetSurplusEntries) {
       // Remove the entry completely if no amounts
-      await removePaymentEntryFromLedger(
+      await removeJournalEntryFromLedger(
         schoolId,
         academicYear,
         id,
@@ -980,7 +786,7 @@ async function updateById(req, res) {
         academicYear,
         netSurplusDeficitLedger._id,
         entryDate,
-        existingPaymentEntry._id,
+        existingJournal._id,
         netSurplusDebitAmount,
         netSurplusCreditAmount,
         session
@@ -1005,7 +811,7 @@ async function updateById(req, res) {
     // Handle Capital Fund ledger
     if (!hasCapitalFundEntries) {
       // Remove the entry completely if no amounts
-      await removePaymentEntryFromLedger(
+      await removeJournalEntryFromLedger(
         schoolId,
         academicYear,
         id,
@@ -1019,7 +825,7 @@ async function updateById(req, res) {
         academicYear,
         capitalFundLedger._id,
         entryDate,
-        existingPaymentEntry._id,
+        existingJournal._id,
         capitalFundDebitAmount,
         capitalFundCreditAmount,
         session
@@ -1043,65 +849,19 @@ async function updateById(req, res) {
 
     // =====End of Net Surplus/(Deficit)...Capital Fund=====
 
-    // --- Step E: Propagate changes to subsequent academic years ---
-    const affectedLedgerIds = new Set([...ledgerIdsToUpdate]);
-
-    // Also include Net Surplus/(Deficit) and Capital Fund if they were affected
-    if (netSurplusDeficitLedger) {
-      affectedLedgerIds.add(netSurplusDeficitLedger._id.toString());
-    }
-    if (capitalFundLedger) {
-      affectedLedgerIds.add(capitalFundLedger._id.toString());
-    }
-
-    // FIXED: Include ALL ledgers that need propagation
-    const allLedgersToPropagate = new Set([...affectedLedgerIds]);
-
-    // FIXED: CRITICAL - Also include ALL old item ledgers
-    for (const oldLedgerId of oldItemLedgerIds) {
-      if (oldLedgerId) {
-        allLedgersToPropagate.add(oldLedgerId);
-      }
-    }
-
-    console.log(
-      `All ledger IDs for propagation:`,
-      Array.from(allLedgersToPropagate)
-    );
-
-    // Propagate changes for each affected ledger
-    for (const ledgerId of allLedgersToPropagate) {
-      try {
-        await propagateBalanceChangeToNextYear(
-          schoolId,
-          academicYear,
-          ledgerId,
-          session
-        );
-      } catch (propagationError) {
-        console.error(
-          `Error propagating changes for ledger ${ledgerId}:`,
-          propagationError
-        );
-        // Don't throw here - we want to continue with other ledgers
-      }
-    }
-
-    // =====End of Net Surplus/(Deficit)...Capital Fund=====
-
     await session.commitTransaction();
     session.endSession();
 
     return res.status(200).json({
       hasError: false,
-      message: "Payment updated successfully!",
-      data: existingPaymentEntry,
+      message: "Journal updated successfully!",
+      data: existingJournal,
     });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
 
-    console.error("Error updating Payment Entry:", error);
+    console.error("Error updating Journal Entry:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error. Please try again later.",

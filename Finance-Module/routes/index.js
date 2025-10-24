@@ -8,7 +8,6 @@ import AuthorisedSignatureRoutes from "./AuthorisedSignature.js";
 import AllLedgerRoutes from "./AllLedgers.js";
 import ContraRoutes from "./Contra.js";
 import JournalRoutes from "./Journal.js";
-import FinancialInformationRoutes from "./FinancialInformation.js";
 import ReportsRoutes from "./AllReports.js";
 import DepreciationMasterRoutes from "./DepreciationMaster.js";
 import TrialBalanceRoutes from "./TrialBalance.js";
@@ -30,7 +29,7 @@ export default (app) => {
   app.use("/api", FinanceModuleYearRoutes);
   app.use("/api", AllLedgerRoutes);
   app.use("/api", ReportsRoutes);
-  app.use("/api", FinancialInformationRoutes);
+
   app.use("/api", DepreciationMasterRoutes);
   app.use("/api", TrialBalanceRoutes);
   app.use("/api", OpeningClosingBalanceRoutes);

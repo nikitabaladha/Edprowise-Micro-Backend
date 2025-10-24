@@ -427,59 +427,272 @@ function aggregateAmountsByLedger(itemDetails) {
   return ledgerMap;
 }
 
+async function propagateBalanceChangeToNextYear(
+  schoolId,
+  currentAcademicYear,
+  ledgerId,
+  session
+) {
+  try {
+    // Find the current ledger to get its details
+    const currentLedger = await Ledger.findOne({
+      schoolId,
+      academicYear: currentAcademicYear,
+      _id: ledgerId,
+    }).session(session);
+
+    if (!currentLedger) {
+      console.log(`Ledger ${ledgerId} not found in ${currentAcademicYear}`);
+      return;
+    }
+
+    // Calculate next academic year
+    const [yearPart1, yearPart2] = currentAcademicYear.split("-");
+    const nextAcademicYear = `${parseInt(yearPart1) + 1}-${
+      parseInt(yearPart2) + 1
+    }`;
+
+    // Find the next year's ledger that has the CURRENT ledger as parent
+    const nextYearLedger = await Ledger.findOne({
+      schoolId,
+      academicYear: nextAcademicYear,
+      parentLedgerId: currentLedger._id,
+    }).session(session);
+
+    if (!nextYearLedger) {
+      console.log(`No next year ledger found for ${currentLedger.ledgerName}`);
+      return; // No next year ledger found
+    }
+
+    // Get the current year's balance record for this ledger
+    const currentYearBalance = await OpeningClosingBalance.findOne({
+      schoolId,
+      academicYear: currentAcademicYear,
+      ledgerId: ledgerId,
+    }).session(session);
+
+    let newOpeningBalance = 0;
+
+    // FIXED: Handle both cases properly
+    if (currentYearBalance && currentYearBalance.balanceDetails.length > 0) {
+      // Case 1: There are balance details - use last closing balance
+      const lastEntry =
+        currentYearBalance.balanceDetails[
+          currentYearBalance.balanceDetails.length - 1
+        ];
+      newOpeningBalance = lastEntry.closingBalance;
+    } else {
+      // Case 2: No balance details exist - use the current ledger's opening balance
+      // This happens when all entries are removed or ledger has no transactions
+      newOpeningBalance = currentLedger.openingBalance || 0;
+    }
+
+    // Update the next year's ledger opening balance
+    await Ledger.findOneAndUpdate(
+      {
+        schoolId,
+        academicYear: nextAcademicYear,
+        _id: nextYearLedger._id,
+      },
+      {
+        $set: {
+          openingBalance: newOpeningBalance,
+          balanceType: newOpeningBalance < 0 ? "Credit" : "Debit",
+        },
+      },
+      { session }
+    );
+
+    // Update the OpeningClosingBalance for next year
+    let nextYearOpeningBalance = await OpeningClosingBalance.findOne({
+      schoolId,
+      academicYear: nextAcademicYear,
+      ledgerId: nextYearLedger._id,
+    }).session(session);
+
+    if (!nextYearOpeningBalance) {
+      // Create new OpeningClosingBalance record if it doesn't exist
+      nextYearOpeningBalance = new OpeningClosingBalance({
+        schoolId,
+        academicYear: nextAcademicYear,
+        ledgerId: nextYearLedger._id,
+        balanceDetails: [],
+        balanceType: newOpeningBalance < 0 ? "Credit" : "Debit",
+      });
+
+      // Create initial balance detail with the new opening balance
+      nextYearOpeningBalance.balanceDetails.push({
+        entryDate: new Date(),
+        openingBalance: newOpeningBalance,
+        debit: 0,
+        credit: 0,
+        closingBalance: newOpeningBalance,
+      });
+    } else {
+      // FIXED: Find and update the opening balance entry
+      // Look for an entry without entryId (opening balance entry)
+      let openingBalanceEntry = nextYearOpeningBalance.balanceDetails.find(
+        (detail) => !detail.entryId
+      );
+
+      if (
+        !openingBalanceEntry &&
+        nextYearOpeningBalance.balanceDetails.length > 0
+      ) {
+        // If no dedicated opening balance entry, use the first entry
+        openingBalanceEntry = nextYearOpeningBalance.balanceDetails[0];
+      }
+
+      if (openingBalanceEntry) {
+        const oldOpeningBalance = openingBalanceEntry.openingBalance;
+
+        // Only update if the opening balance has changed
+        if (oldOpeningBalance !== newOpeningBalance) {
+          openingBalanceEntry.openingBalance = newOpeningBalance;
+          openingBalanceEntry.closingBalance = toTwoDecimals(
+            newOpeningBalance +
+              openingBalanceEntry.debit -
+              openingBalanceEntry.credit
+          );
+
+          // Recalculate all subsequent entries
+          let currentBalance = openingBalanceEntry.closingBalance;
+          const startIndex =
+            nextYearOpeningBalance.balanceDetails.indexOf(openingBalanceEntry) +
+            1;
+
+          for (
+            let i = startIndex;
+            i < nextYearOpeningBalance.balanceDetails.length;
+            i++
+          ) {
+            const detail = nextYearOpeningBalance.balanceDetails[i];
+            detail.openingBalance = currentBalance;
+            detail.closingBalance = toTwoDecimals(
+              currentBalance + detail.debit - detail.credit
+            );
+            currentBalance = detail.closingBalance;
+          }
+        }
+      } else {
+        // If no entries exist at all, create an opening balance entry
+        nextYearOpeningBalance.balanceDetails.push({
+          entryDate: new Date(),
+          openingBalance: newOpeningBalance,
+          debit: 0,
+          credit: 0,
+          closingBalance: newOpeningBalance,
+        });
+      }
+    }
+
+    await nextYearOpeningBalance.save({ session });
+
+    // Recursively propagate to the next year if it exists
+    await propagateBalanceChangeToNextYear(
+      schoolId,
+      nextAcademicYear,
+      nextYearLedger._id,
+      session
+    );
+  } catch (propagationError) {
+    console.error(
+      `Error in propagateBalanceChangeToNextYear for ledger ${ledgerId}:`,
+      propagationError
+    );
+    throw propagationError;
+  }
+}
+
 export async function updateById(req, res) {
+  // First, do all validations BEFORE starting the transaction
+  const schoolId = req.user?.schoolId;
+  const { id, academicYear } = req.params;
+
+  if (!schoolId) {
+    return res.status(401).json({
+      hasError: true,
+      message: "Access denied: Unauthorized request.",
+    });
+  }
+
+  const { error } = ContraValidator.ContraValidatorUpdate.validate(req.body);
+  if (error) {
+    const errorMessages = error.details.map((err) => err.message).join(", ");
+    return res.status(400).json({
+      hasError: true,
+      message: errorMessages,
+    });
+  }
+
+  const {
+    entryDate,
+    dateOfCashDepositedWithdrawlDate,
+    narration,
+    itemDetails,
+    status,
+    contraEntryName,
+  } = req.body;
+
+  // Validate Bank/Cash ledger requirement BEFORE transaction
+  const hasValidLedger = await hasBankOrCashLedger(
+    schoolId,
+    academicYear,
+    itemDetails
+  );
+
+  if (!hasValidLedger) {
+    return res.status(400).json({
+      hasError: true,
+      message:
+        "At least one ledger must have Group Ledger Name as 'Bank' or 'Cash'",
+    });
+  }
+
+  // Validate debit/credit equality BEFORE transaction
+  const updatedItemDetails = itemDetails.map((item) => ({
+    ...item,
+    debitAmount: parseFloat(item.debitAmount) || 0,
+    creditAmount: parseFloat(item.creditAmount) || 0,
+  }));
+
+  const subTotalOfDebit = toTwoDecimals(
+    updatedItemDetails.reduce((sum, item) => sum + item.debitAmount, 0)
+  );
+
+  const subTotalOfCredit = toTwoDecimals(
+    updatedItemDetails.reduce((sum, item) => sum + item.creditAmount, 0)
+  );
+
+  const totalAmountOfDebit = subTotalOfDebit;
+  const totalAmountOfCredit = subTotalOfCredit;
+
+  if (totalAmountOfDebit !== totalAmountOfCredit) {
+    return res.status(400).json({
+      hasError: true,
+      message: "Total Debit and Credit amounts must be equal.",
+    });
+  }
+
+  // Validate cash account requirement for Cash Deposited/Withdrawn BEFORE transaction
+  if (["Cash Deposited", "Cash Withdrawn"].includes(contraEntryName)) {
+    const missingCashAccount = updatedItemDetails.some(
+      (item) => !item.ledgerIdOfCashAccount
+    );
+    if (missingCashAccount) {
+      return res.status(400).json({
+        hasError: true,
+        message:
+          "LedgerId Of CashAccount is required for Cash Deposited or Cash Withdrawn entries.",
+      });
+    }
+  }
+
+  // NOW start the transaction after all validations pass
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const schoolId = req.user?.schoolId;
-    const { id, academicYear } = req.params;
-
-    if (!schoolId) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(401).json({
-        hasError: true,
-        message: "Access denied: Unauthorized request.",
-      });
-    }
-
-    const { error } = ContraValidator.ContraValidatorUpdate.validate(req.body);
-    if (error) {
-      const errorMessages = error.details.map((err) => err.message).join(", ");
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        hasError: true,
-        message: errorMessages,
-      });
-    }
-
-    const {
-      entryDate,
-      dateOfCashDepositedWithdrawlDate,
-      narration,
-      itemDetails,
-      status,
-      contraEntryName,
-    } = req.body;
-
-    const hasValidLedger = await hasBankOrCashLedger(
-      schoolId,
-      academicYear,
-      itemDetails
-    );
-
-    if (!hasValidLedger) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        hasError: true,
-        message:
-          "At least one ledger must have Group Ledger Name as 'Bank' or 'Cash'",
-      });
-    }
-
     const existingContra = await Contra.findOne({
       _id: id,
       schoolId,
@@ -510,47 +723,6 @@ export async function updateById(req, res) {
         ? "/Images/FinanceModule/chequeImageForContra"
         : "/Documents/FinanceModule/chequeImageForContra";
       existingContra.chequeImageForContra = `${basePath}/${chequeImageForContra[0].filename}`;
-    }
-
-    const updatedItemDetails = itemDetails.map((item) => ({
-      ...item,
-      debitAmount: parseFloat(item.debitAmount) || 0,
-      creditAmount: parseFloat(item.creditAmount) || 0,
-    }));
-
-    const subTotalOfDebit = toTwoDecimals(
-      updatedItemDetails.reduce((sum, item) => sum + item.debitAmount, 0)
-    );
-
-    const subTotalOfCredit = toTwoDecimals(
-      updatedItemDetails.reduce((sum, item) => sum + item.creditAmount, 0)
-    );
-
-    const totalAmountOfDebit = subTotalOfDebit;
-    const totalAmountOfCredit = subTotalOfCredit;
-
-    if (totalAmountOfDebit !== totalAmountOfCredit) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        hasError: true,
-        message: "Total Debit and Credit amounts must be equal.",
-      });
-    }
-
-    if (["Cash Deposited", "Cash Withdrawn"].includes(contraEntryName)) {
-      const missingCashAccount = updatedItemDetails.some(
-        (item) => !item.ledgerIdOfCashAccount
-      );
-      if (missingCashAccount) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({
-          hasError: true,
-          message:
-            "LedgerId Of CashAccount is required for Cash Deposited or Cash Withdrawn entries.",
-        });
-      }
     }
 
     // Update fields
@@ -942,6 +1114,52 @@ export async function updateById(req, res) {
         entryDate,
         session
       );
+    }
+
+    // =====End of Net Surplus/(Deficit)...Capital Fund=====
+
+    // --- Step E: Propagate changes to subsequent academic years ---
+    const affectedLedgerIds = new Set([...ledgerIdsToUpdate]);
+
+    // Also include Net Surplus/(Deficit) and Capital Fund if they were affected
+    if (netSurplusDeficitLedger) {
+      affectedLedgerIds.add(netSurplusDeficitLedger._id.toString());
+    }
+    if (capitalFundLedger) {
+      affectedLedgerIds.add(capitalFundLedger._id.toString());
+    }
+
+    // FIXED: Include ALL ledgers that need propagation
+    const allLedgersToPropagate = new Set([...affectedLedgerIds]);
+
+    // FIXED: CRITICAL - Also include ALL old item ledgers
+    for (const oldLedgerId of oldItemLedgerIds) {
+      if (oldLedgerId) {
+        allLedgersToPropagate.add(oldLedgerId);
+      }
+    }
+
+    console.log(
+      `All ledger IDs for propagation:`,
+      Array.from(allLedgersToPropagate)
+    );
+
+    // Propagate changes for each affected ledger
+    for (const ledgerId of allLedgersToPropagate) {
+      try {
+        await propagateBalanceChangeToNextYear(
+          schoolId,
+          academicYear,
+          ledgerId,
+          session
+        );
+      } catch (propagationError) {
+        console.error(
+          `Error propagating changes for ledger ${ledgerId}:`,
+          propagationError
+        );
+        // Don't throw here - we want to continue with other ledgers
+      }
     }
 
     // =====End of Net Surplus/(Deficit)...Capital Fund=====

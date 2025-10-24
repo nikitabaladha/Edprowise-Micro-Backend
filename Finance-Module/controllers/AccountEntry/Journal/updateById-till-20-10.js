@@ -1,143 +1,68 @@
-// see for example if i have 2 entries on same date like 26-09-2025
-
-// enrty     HeadofAccount	BS&P&LLedger	       GroupLedger	Ledger	      OpeningBalance  Debit	Credit Closing Balance
-// entry-1.  Liabilities	  Current Liabilities	 Net Deficit	TDS Deducted. -1000.          100.     0.     -900
-// entry-2.  Liabilities	  Current Liabilities	 Net Deficit. TDS Deducted  -900.           100      0.     -800
-
-// then if i change entry one like for debit insted of 100 i do 200 then it must be like
-
-// enrty     HeadofAccount	BS&P&LLedger	       GroupLedger	Ledger	      OpeningBalance  Debit	Credit Closing Balance
-// entry-1.  Liabilities	  Current Liabilities	 Net Deficit	TDS Deducted. -1000.          200.     0.     -800
-// entry-2.  Liabilities	  Current Liabilities	 Net Deficit. TDS Deducted. -800.           100      0.     -700
-
-// but here it is changing the place of enrty1 and entry 2 and stores wrong value
-// enrty     HeadofAccount	BS&P&LLedger	       GroupLedger	Ledger	      OpeningBalance  Debit	Credit Closing Balance
-// entry-2.  Liabilities	  Current Liabilities	 Net Deficit	TDS Deducted. -900.           100.     0.     -800
-// entry-1.  Liabilities	  Current Liabilities	 Net Deficit. TDS Deducted. -800.           200      0.     -600
-
-// why why why?
-
-// first time entry
-
-// _id
-// 68d6568e1090de3be0c9bf3d
-// schoolId
-// "SID144732"
-// academicYear
-// "2025-2026"
-// ledgerId
-// 68a9a476f46f002cf6a5433e
-
-// balanceDetails
-// Array (2)
-
-// 0
-// Object
-// entryId
-// "68d6568e1090de3be0c9bf37"
-// entryDate
-// 2025-09-26T00:00:00.000+00:00
-// openingBalance
-// -1000
-// debit
-// 100
-// credit
-// 0
-// closingBalance
-// -900
-// _id
-// 68d6568e1090de3be0c9bf3e
-
-// 1
-// Object
-// entryId
-// "68d6569d1090de3be0c9bf5e"
-// entryDate
-// 2025-09-26T00:00:00.000+00:00
-// openingBalance
-// -900
-// debit
-// 100
-// credit
-// 0
-// closingBalance
-// -800
-// _id
-// 68d6569d1090de3be0c9bf65
-// balanceType
-// "Credit"
-// createdAt
-// 2025-09-26T09:02:06.371+00:00
-// updatedAt
-// 2025-09-26T09:02:21.880+00:00
-// __v
-// 3
-
-// after update it is like
-
-// _id
-// 68d6568e1090de3be0c9bf3d
-// schoolId
-// "SID144732"
-// academicYear
-// "2025-2026"
-// ledgerId
-// 68a9a476f46f002cf6a5433e
-
-// balanceDetails
-// Array (2)
-
-// 0
-// Object
-// entryId
-// "68d6569d1090de3be0c9bf5e"
-// entryDate
-// 2025-09-26T00:00:00.000+00:00
-// openingBalance
-// -900
-// debit
-// 100
-// credit
-// 0
-// closingBalance
-// -800
-// _id
-// 68d6569d1090de3be0c9bf65
-
-// 1
-// Object
-// entryId
-// "68d6568e1090de3be0c9bf37"
-// entryDate
-// 2025-09-26T00:00:00.000+00:00
-// openingBalance
-// -800
-// debit
-// 200
-// credit
-// 0
-// closingBalance
-// -600
-// _id
-// 68d656f3b1780ece2e49ba7b
-// balanceType
-// "Credit"
-// createdAt
-// 2025-09-26T09:02:06.371+00:00
-// updatedAt
-// 2025-09-26T09:03:47.988+00:00
-// __v
-// 7
-
 import mongoose from "mongoose";
 import Journal from "../../../models/Journal.js";
 import JournalValidator from "../../../validators/JournalValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
+import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
 
 function toTwoDecimals(value) {
   if (value === null || value === undefined || isNaN(value)) return 0;
   return Math.round(Number(value) * 100) / 100;
+}
+
+async function getOrCreateOpeningBalanceRecord(
+  schoolId,
+  academicYear,
+  ledgerId,
+  entryDate,
+  session
+) {
+  const ledger = await Ledger.findOne({
+    schoolId,
+    academicYear,
+    _id: ledgerId,
+  }).session(session);
+
+  let openingBalance = 0;
+  let balanceType = "Debit";
+
+  if (ledger) {
+    balanceType = ledger.balanceType;
+    openingBalance = toTwoDecimals(ledger.openingBalance || 0);
+  }
+
+  let record = await OpeningClosingBalance.findOne({
+    schoolId,
+    academicYear,
+    ledgerId,
+  });
+
+  if (!record) {
+    record = new OpeningClosingBalance({
+      schoolId,
+      academicYear,
+      ledgerId,
+      balanceDetails: [],
+      balanceType,
+    });
+  }
+
+  // Find the latest balance detail before the entry date
+  const previousBalanceDetails = record.balanceDetails
+    .filter((detail) => new Date(detail.entryDate) < new Date(entryDate))
+    .sort((a, b) => {
+      const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
+      if (dateDiff !== 0) return dateDiff;
+      return (a.entrySequence || 0) - (b.entrySequence || 0);
+    });
+
+  if (previousBalanceDetails.length > 0) {
+    const lastBalanceDetail =
+      previousBalanceDetails[previousBalanceDetails.length - 1];
+    openingBalance = toTwoDecimals(lastBalanceDetail.closingBalance);
+  }
+
+  return { record, openingBalance, balanceType };
 }
 
 async function updateOpeningClosingBalance(
@@ -170,7 +95,6 @@ async function updateOpeningClosingBalance(
   let entrySequence;
 
   if (existingEntryIndex !== -1) {
-    // ✅ PRESERVE the original sequence when updating
     const existing = record.balanceDetails[existingEntryIndex];
     entrySequence = existing.entrySequence; // Keep the original sequence
 
@@ -335,15 +259,7 @@ async function recalculateLedgerBalances(
       currentBalance = toTwoDecimals(detail.openingBalance);
     } else {
       const previousDetail = record.balanceDetails[i - 1];
-      const currentDate = new Date(detail.entryDate).toDateString();
-      const previousDate = new Date(previousDetail.entryDate).toDateString();
-
-      if (
-        currentDate !== previousDate ||
-        detail.entrySequence - previousDetail.entrySequence === 1
-      ) {
-        detail.openingBalance = toTwoDecimals(previousDetail.closingBalance);
-      }
+      detail.openingBalance = toTwoDecimals(previousDetail.closingBalance);
       currentBalance = toTwoDecimals(detail.openingBalance);
     }
 
@@ -373,7 +289,7 @@ async function recalculateAllBalancesAfterDate(
     return;
   }
 
-  // FIXED: Sort by date and entrySequence
+  // Sort by date and entrySequence
   record.balanceDetails.sort((a, b) => {
     const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
     if (dateDiff !== 0) return dateDiff;
@@ -408,59 +324,80 @@ async function recalculateAllBalancesAfterDate(
   await record.save({ session });
 }
 
-async function getOrCreateOpeningBalanceRecord(
+async function removeJournalEntryFromLedger(
   schoolId,
   academicYear,
+  journalId,
   ledgerId,
-  entryDate,
   session
 ) {
-  const ledger = await Ledger.findOne({
-    schoolId,
-    academicYear,
-    _id: ledgerId,
-  }).session(session);
-
-  let openingBalance = 0;
-  let balanceType = "Debit";
-
-  if (ledger) {
-    balanceType = ledger.balanceType;
-    openingBalance = toTwoDecimals(ledger.openingBalance || 0);
-  }
-
-  let record = await OpeningClosingBalance.findOne({
+  // Find the record
+  const record = await OpeningClosingBalance.findOne({
     schoolId,
     academicYear,
     ledgerId,
+  }).session(session);
+
+  if (!record) return;
+
+  // Remove the entry from balanceDetails
+  const originalLength = record.balanceDetails.length;
+  record.balanceDetails = record.balanceDetails.filter(
+    (detail) => detail.entryId?.toString() !== journalId.toString()
+  );
+
+  if (record.balanceDetails.length === originalLength) return; // nothing removed
+
+  // Sort the remaining entries by date and sequence
+  record.balanceDetails.sort((a, b) => {
+    const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
+    if (dateDiff !== 0) return dateDiff;
+    return (a.entrySequence || 0) - (b.entrySequence || 0);
   });
 
-  if (!record) {
-    record = new OpeningClosingBalance({
-      schoolId,
-      academicYear,
-      ledgerId,
-      balanceDetails: [],
-      balanceType,
-    });
+  // Recalculate sequences for same-day entries
+  let currentDate = null;
+  let currentSequence = 0;
+
+  for (let i = 0; i < record.balanceDetails.length; i++) {
+    const detail = record.balanceDetails[i];
+    const detailDate = new Date(detail.entryDate).toDateString();
+
+    if (currentDate !== detailDate) {
+      currentDate = detailDate;
+      currentSequence = 1;
+    } else {
+      currentSequence++;
+    }
+
+    detail.entrySequence = currentSequence;
   }
 
-  // Find the latest balance detail before the entry date
-  const previousBalanceDetails = record.balanceDetails
-    .filter((detail) => new Date(detail.entryDate) < new Date(entryDate))
-    .sort((a, b) => {
-      const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
-      if (dateDiff !== 0) return dateDiff;
-      return (a.entrySequence || 0) - (b.entrySequence || 0);
-    });
+  // Re-sort after sequence correction
+  record.balanceDetails.sort((a, b) => {
+    const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
+    if (dateDiff !== 0) return dateDiff;
+    return (a.entrySequence || 0) - (b.entrySequence || 0);
+  });
 
-  if (previousBalanceDetails.length > 0) {
-    const lastBalanceDetail =
-      previousBalanceDetails[previousBalanceDetails.length - 1];
-    openingBalance = toTwoDecimals(lastBalanceDetail.closingBalance);
+  // Recalculate opening and closing balances
+  for (let i = 0; i < record.balanceDetails.length; i++) {
+    const detail = record.balanceDetails[i];
+    if (i === 0) {
+      // First entry uses ledger opening balance
+      const ledger = await Ledger.findById(ledgerId).session(session);
+      detail.openingBalance = toTwoDecimals(ledger?.openingBalance || 0);
+    } else {
+      detail.openingBalance = toTwoDecimals(
+        record.balanceDetails[i - 1].closingBalance
+      );
+    }
+    detail.closingBalance = toTwoDecimals(
+      detail.openingBalance + detail.debit - detail.credit
+    );
   }
 
-  return { record, openingBalance, balanceType };
+  await record.save({ session });
 }
 
 function aggregateAmountsByLedger(itemDetails) {
@@ -474,8 +411,8 @@ function aggregateAmountsByLedger(itemDetails) {
     if (ledgerMap.has(ledgerId)) {
       const existing = ledgerMap.get(ledgerId);
       ledgerMap.set(ledgerId, {
-        debitAmount: existing.debitAmount + debitAmount,
-        creditAmount: existing.creditAmount + creditAmount,
+        debitAmount: toTwoDecimals(existing.debitAmount + debitAmount),
+        creditAmount: toTwoDecimals(existing.creditAmount + creditAmount),
       });
     } else {
       ledgerMap.set(ledgerId, {
@@ -536,6 +473,10 @@ export async function updateById(req, res) {
       });
     }
 
+    const oldItemLedgerIds = existingJournal.itemDetails.map((item) =>
+      item.ledgerId?.toString()
+    );
+
     // Store old values for comparison
     const oldItemDetails = existingJournal.itemDetails;
     const oldEntryDate = existingJournal.entryDate;
@@ -589,42 +530,48 @@ export async function updateById(req, res) {
 
     await existingJournal.save({ session });
 
-    // ✅ FIXED: Instead of removing and re-adding, UPDATE existing entries
-    const allLedgerIds = new Set();
-
-    // Collect all affected ledger IDs
-    oldItemDetails.forEach((item) =>
-      allLedgerIds.add(item.ledgerId.toString())
-    );
-    updatedItemDetails.forEach((item) =>
-      allLedgerIds.add(item.ledgerId.toString())
+    // Get new ledger IDs
+    const newItemLedgerIds = updatedItemDetails.map((item) =>
+      item.ledgerId?.toString()
     );
 
-    // Step 1: Reset old ledger entries to zero (like Receipt does)
-    for (const ledgerId of allLedgerIds) {
-      const record = await OpeningClosingBalance.findOne({
-        schoolId,
-        academicYear,
-        ledgerId,
-      }).session(session);
+    // --- Step A: Reset old balances to zero first (like Receipt does) ---
+    const balanceRecords = await OpeningClosingBalance.find({
+      schoolId,
+      academicYear,
+      "balanceDetails.entryId": id,
+    }).session(session);
 
-      if (record) {
-        // Find and reset the specific journal entry
-        const journalEntry = record.balanceDetails.find(
-          (detail) => detail.entryId?.toString() === id.toString()
-        );
-
-        if (journalEntry) {
-          journalEntry.debit = 0;
-          journalEntry.credit = 0;
-          await record.save({ session });
+    for (const record of balanceRecords) {
+      for (const detail of record.balanceDetails) {
+        if (detail.entryId?.toString() === id.toString()) {
+          detail.debit = 0;
+          detail.credit = 0;
         }
+      }
+      await record.save({ session });
+    }
+
+    // --- Step B: Remove old entries if ledgers changed or removed (like Receipt) ---
+
+    // Remove entries from old ledgers that are no longer used
+    for (const oldLedgerId of oldItemLedgerIds) {
+      if (oldLedgerId && !newItemLedgerIds.includes(oldLedgerId)) {
+        await removeJournalEntryFromLedger(
+          schoolId,
+          academicYear,
+          id,
+          oldLedgerId,
+          session
+        );
       }
     }
 
-    // Step 2: Update with new amounts while preserving sequences
-    const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
+    // --- Step C: Apply new balances ---
     const ledgerIdsToUpdate = new Set();
+
+    // Aggregate amounts by ledgerId and update balances
+    const ledgerAmounts = aggregateAmountsByLedger(updatedItemDetails);
 
     for (const [ledgerId, amounts] of ledgerAmounts) {
       await updateOpeningClosingBalance(
@@ -640,7 +587,7 @@ export async function updateById(req, res) {
       ledgerIdsToUpdate.add(ledgerId);
     }
 
-    // Step 3: Recalculate all affected ledgers
+    // --- Step D: Recalculate all affected ledgers ---
     for (const ledgerId of ledgerIdsToUpdate) {
       await recalculateLedgerBalances(
         schoolId,
@@ -648,16 +595,259 @@ export async function updateById(req, res) {
         ledgerId,
         session
       );
-
       await recalculateAllBalancesAfterDate(
         schoolId,
         academicYear,
         ledgerId,
-        existingJournal.entryDate,
+        entryDate,
         session
       );
     }
 
+    // Get all unique ledger IDs from updatedItemDetails
+    const uniqueLedgerIds = [
+      ...new Set(updatedItemDetails.map((item) => item.ledgerId)),
+    ];
+
+    // Find ledgers with their Head of Account information
+    const ledgers = await Ledger.find({
+      _id: { $in: uniqueLedgerIds },
+    })
+      .populate("headOfAccountId")
+      .session(session);
+
+    // Initialize sums
+    let incomeBalance = 0;
+    let expensesBalance = 0;
+
+    // Calculate sums based on Head of Account
+    for (const item of updatedItemDetails) {
+      const ledger = ledgers.find(
+        (l) => l._id.toString() === item.ledgerId.toString()
+      );
+
+      if (ledger && ledger.headOfAccountId) {
+        const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
+        const debitAmount = parseFloat(item.debitAmount) || 0;
+        const creditAmount = parseFloat(item.creditAmount) || 0;
+
+        if (headOfAccountName.toLowerCase() === "income") {
+          incomeBalance += debitAmount - creditAmount;
+        } else if (headOfAccountName.toLowerCase() === "expenses") {
+          expensesBalance += debitAmount - creditAmount;
+        }
+      }
+    }
+
+    // Calculate total balance
+    const totalBalance = toTwoDecimals(incomeBalance - expensesBalance);
+
+    // Round to two decimals
+    incomeBalance = toTwoDecimals(incomeBalance);
+    expensesBalance = toTwoDecimals(expensesBalance);
+
+    // Find or create TotalNetdeficitNetSurplus record
+    let totalNetRecord = await TotalNetdeficitNetSurplus.findOne({
+      schoolId,
+      academicYear,
+    }).session(session);
+
+    if (!totalNetRecord) {
+      totalNetRecord = new TotalNetdeficitNetSurplus({
+        schoolId,
+        academicYear,
+        balanceDetails: [],
+      });
+    }
+
+    // FIXED: Check if entry exists by entryId ONLY (not by date)
+    const existingEntryIndex = totalNetRecord.balanceDetails.findIndex(
+      (detail) => detail.entryId?.toString() === id.toString()
+    );
+
+    if (existingEntryIndex !== -1) {
+      // Update existing entry - REPLACE values
+      totalNetRecord.balanceDetails[existingEntryIndex].incomeBalance =
+        incomeBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].expensesBalance =
+        expensesBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].totalBalance =
+        totalBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].entryDate = entryDate;
+    } else {
+      // Create new entry if it doesn't exist
+      totalNetRecord.balanceDetails.push({
+        entryDate,
+        entryId: existingJournal._id,
+        incomeBalance,
+        expensesBalance,
+        totalBalance,
+      });
+    }
+
+    // Sort balanceDetails by date
+    totalNetRecord.balanceDetails.sort(
+      (a, b) => new Date(a.entryDate) - new Date(b.entryDate)
+    );
+
+    await totalNetRecord.save({ session });
+
+    // =====Start Of Net Surplus/(Deficit)...Capital Fund=====
+
+    const netSurplusDeficitLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Net Surplus/(Deficit)",
+    }).session(session);
+
+    const capitalFundLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Capital Fund",
+    }).session(session);
+
+    if (!netSurplusDeficitLedger || !capitalFundLedger) {
+      throw new Error(
+        "Required ledgers (Net Surplus/(Deficit) or Capital Fund) not found"
+      );
+    }
+
+    // Initialize amounts for both ledgers
+    let netSurplusDebitAmount = 0;
+    let netSurplusCreditAmount = 0;
+    let capitalFundDebitAmount = 0;
+    let capitalFundCreditAmount = 0;
+
+    // Analyze each journal item to determine the correct posting (SAME LOGIC AS CREATE)
+    for (const item of updatedItemDetails) {
+      const ledger = ledgers.find(
+        (l) => l._id.toString() === item.ledgerId.toString()
+      );
+
+      if (ledger && ledger.headOfAccountId) {
+        const headOfAccountName =
+          ledger.headOfAccountId.headOfAccountName.toLowerCase();
+        const debitAmount = parseFloat(item.debitAmount) || 0;
+        const creditAmount = parseFloat(item.creditAmount) || 0;
+
+        // Scenario analysis based on your requirements (SAME AS CREATE)
+        if (headOfAccountName === "income") {
+          if (creditAmount > 0) {
+            // Income with credit amount → Net Surplus Debit, Capital Fund Credit
+            netSurplusDebitAmount += creditAmount;
+            capitalFundCreditAmount += creditAmount;
+          }
+          if (debitAmount > 0) {
+            // Income with debit amount → Net Surplus Credit, Capital Fund Debit
+            netSurplusCreditAmount += debitAmount;
+            capitalFundDebitAmount += debitAmount;
+          }
+        } else if (headOfAccountName === "expenses") {
+          if (creditAmount > 0) {
+            // Expenses with credit amount → Net Surplus Debit, Capital Fund Credit
+            netSurplusDebitAmount += creditAmount;
+            capitalFundCreditAmount += creditAmount;
+          }
+          if (debitAmount > 0) {
+            // Expenses with debit amount → Net Surplus Credit, Capital Fund Debit
+            netSurplusCreditAmount += debitAmount;
+            capitalFundDebitAmount += debitAmount;
+          }
+        }
+      }
+    }
+
+    // Round to two decimals
+    netSurplusDebitAmount = toTwoDecimals(netSurplusDebitAmount);
+    netSurplusCreditAmount = toTwoDecimals(netSurplusCreditAmount);
+    capitalFundDebitAmount = toTwoDecimals(capitalFundDebitAmount);
+    capitalFundCreditAmount = toTwoDecimals(capitalFundCreditAmount);
+
+    // Check if we need to completely remove entries (both debit and credit are 0)
+    const hasNetSurplusEntries =
+      netSurplusDebitAmount > 0 || netSurplusCreditAmount > 0;
+    const hasCapitalFundEntries =
+      capitalFundDebitAmount > 0 || capitalFundCreditAmount > 0;
+
+    // Handle Net Surplus/(Deficit) ledger
+    if (!hasNetSurplusEntries) {
+      // Remove the entry completely if no amounts
+      await removeJournalEntryFromLedger(
+        schoolId,
+        academicYear,
+        id,
+        netSurplusDeficitLedger._id,
+        session
+      );
+    } else {
+      // Update Net Surplus/(Deficit) ledger with correct debit/credit amounts
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        entryDate,
+        existingJournal._id,
+        netSurplusDebitAmount,
+        netSurplusCreditAmount,
+        session
+      );
+
+      // Recalculate balances
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        session
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        entryDate,
+        session
+      );
+    }
+
+    // Handle Capital Fund ledger
+    if (!hasCapitalFundEntries) {
+      // Remove the entry completely if no amounts
+      await removeJournalEntryFromLedger(
+        schoolId,
+        academicYear,
+        id,
+        capitalFundLedger._id,
+        session
+      );
+    } else {
+      // Update Capital Fund ledger with correct debit/credit amounts
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        entryDate,
+        existingJournal._id,
+        capitalFundDebitAmount,
+        capitalFundCreditAmount,
+        session
+      );
+
+      // Recalculate balances
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        session
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        entryDate,
+        session
+      );
+    }
+
+    // =====End of Net Surplus/(Deficit)...Capital Fund=====
     await session.commitTransaction();
     session.endSession();
 

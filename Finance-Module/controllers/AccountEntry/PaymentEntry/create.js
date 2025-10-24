@@ -600,6 +600,7 @@ async function create(req, res) {
       totalNetRecord = new TotalNetdeficitNetSurplus({
         schoolId,
         academicYear,
+        ledgerId: netSurplusDeficitLedger._id,
         balanceDetails: [],
       });
     }

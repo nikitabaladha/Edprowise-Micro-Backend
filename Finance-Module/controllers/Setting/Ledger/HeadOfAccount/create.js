@@ -5,6 +5,8 @@ async function create(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
+    console.log("SchoolId=========================================", schoolId);
+
     if (!schoolId) {
       return res.status(401).json({
         hasError: true,

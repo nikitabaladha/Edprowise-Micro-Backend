@@ -4,7 +4,7 @@ import Receipt from "../../../models/Receipt.js";
 import ReceiptValidator from "../../../validators/ReceiptValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
-import GroupLedger from "../../../models/GroupLedger.js";
+import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
 
 function toTwoDecimals(value) {
   if (value === null || value === undefined || isNaN(value)) return 0;
@@ -548,16 +548,35 @@ async function updateById(req, res) {
     existingReceipt.paymentMode = paymentMode;
     existingReceipt.chequeNumber = chequeNumber;
     existingReceipt.itemDetails = updatedItemDetails;
-    existingReceipt.TDSorTCS = TDSorTCS;
-    existingReceipt.TDSTCSRateChartId = TDSTCSRateChartId;
-    existingReceipt.TDSTCSRate = TDSTCSRate;
-    existingReceipt.TDSTCSRateWithAmount = parsedTDSTCSRateWithAmount;
+    // existingReceipt.TDSorTCS = TDSorTCS;
+    // existingReceipt.TDSTCSRateChartId = TDSTCSRateChartId;
+    // existingReceipt.TDSTCSRate = TDSTCSRate;
+    // existingReceipt.TDSTCSRateWithAmount = parsedTDSTCSRateWithAmount;
+
+    // Handle TDS/TCS fields properly
+    if (TDSorTCS) {
+      existingReceipt.TDSorTCS = TDSorTCS;
+      existingReceipt.TDSTCSRateChartId = TDSTCSRateChartId;
+      existingReceipt.TDSTCSRate = TDSTCSRate;
+      existingReceipt.TDSTCSRateWithAmount = parsedTDSTCSRateWithAmount;
+    } else {
+      // Reset TDS/TCS fields when TDSorTCS is not provided or is empty
+      existingReceipt.TDSorTCS = undefined;
+      existingReceipt.TDSTCSRateChartId = "";
+      existingReceipt.TDSTCSRate = 0;
+      existingReceipt.TDSTCSRateWithAmount = 0;
+      existingReceipt.TDSorTCSLedgerId = null;
+    }
+
     existingReceipt.subTotalAmount = subTotalAmount;
     existingReceipt.totalAmount = totalAmount;
     existingReceipt.ledgerIdWithPaymentMode = ledgerIdWithPaymentMode;
     existingReceipt.status = status;
 
-    if (paymentMode === "Online" && !existingReceipt.transactionNumber) {
+    if (
+      paymentMode === "Online Net Banking" &&
+      !existingReceipt.transactionNumber
+    ) {
       existingReceipt.transactionNumber = await generateTransactionNumber();
     }
 
@@ -737,7 +756,255 @@ async function updateById(req, res) {
       );
     }
 
+    // Get all unique ledger IDs from updatedItemDetails
+    const uniqueLedgerIds = [
+      ...new Set(updatedItemDetails.map((item) => item.ledgerId)),
+    ];
+
+    // Find ledgers with their Head of Account information
+    const ledgers = await Ledger.find({
+      _id: { $in: uniqueLedgerIds },
+    })
+      .populate("headOfAccountId")
+      .session(session);
+
+    // Initialize sums
+    let incomeBalance = 0;
+    let expensesBalance = 0;
+
+    // Calculate sums based on Head of Account
+    for (const item of updatedItemDetails) {
+      const ledger = ledgers.find(
+        (l) => l._id.toString() === item.ledgerId.toString()
+      );
+
+      if (ledger && ledger.headOfAccountId) {
+        const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
+        const amount = parseFloat(item.amount) || 0;
+
+        if (headOfAccountName.toLowerCase() === "income") {
+          incomeBalance += -amount;
+        } else if (headOfAccountName.toLowerCase() === "expenses") {
+          expensesBalance += -amount;
+        }
+      }
+    }
+
+    // Calculate total balance
+    const totalBalance = toTwoDecimals(incomeBalance - expensesBalance);
+
+    // Round to two decimals
+    incomeBalance = toTwoDecimals(incomeBalance);
+    expensesBalance = toTwoDecimals(expensesBalance);
+
+    // Find or create TotalNetdeficitNetSurplus record
+    let totalNetRecord = await TotalNetdeficitNetSurplus.findOne({
+      schoolId,
+      academicYear,
+    }).session(session);
+
+    if (!totalNetRecord) {
+      totalNetRecord = new TotalNetdeficitNetSurplus({
+        schoolId,
+        academicYear,
+        balanceDetails: [],
+      });
+    }
+
+    const existingEntryIndex = totalNetRecord.balanceDetails.findIndex(
+      (detail) => detail.entryId?.toString() === id.toString()
+    );
+
+    if (existingEntryIndex !== -1) {
+      // Update existing entry - REPLACE values
+      totalNetRecord.balanceDetails[existingEntryIndex].incomeBalance =
+        incomeBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].expensesBalance =
+        expensesBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].totalBalance =
+        totalBalance;
+      totalNetRecord.balanceDetails[existingEntryIndex].entryDate = entryDate;
+    } else {
+      // Create new entry if it doesn't exist
+      totalNetRecord.balanceDetails.push({
+        entryDate,
+        entryId: existingReceipt._id,
+        incomeBalance,
+        expensesBalance,
+        totalBalance,
+      });
+    }
+
+    // Sort balanceDetails by date
+    totalNetRecord.balanceDetails.sort(
+      (a, b) => new Date(a.entryDate) - new Date(b.entryDate)
+    );
+
+    await totalNetRecord.save({ session });
+
+    // ========= Net Surplus/(Deficit) Ledger and Capital Fund ===========
+
+    const netSurplusDeficitLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Net Surplus/(Deficit)",
+    }).session(session);
+
+    if (!netSurplusDeficitLedger) {
+      throw new Error("Net Surplus/(Deficit) ledger not found");
+    }
+
+    // Calculate amounts for Net Surplus/(Deficit)
+    let netSurplusDebitAmount = 0;
+    let hasIncome = false;
+    let hasExpenses = false;
+
+    // Calculate income and expenses totals
+    let incomeTotal = 0;
+    let expensesTotal = 0;
+
+    for (const item of updatedItemDetails) {
+      const ledger = ledgers.find(
+        (l) => l._id.toString() === item.ledgerId.toString()
+      );
+
+      if (ledger && ledger.headOfAccountId) {
+        const headOfAccountName = ledger.headOfAccountId.headOfAccountName;
+        const amount = parseFloat(item.amount) || 0;
+
+        if (headOfAccountName.toLowerCase() === "income") {
+          hasIncome = true;
+          incomeTotal += amount;
+        } else if (headOfAccountName.toLowerCase() === "expenses") {
+          hasExpenses = true;
+          expensesTotal += amount;
+        }
+      }
+    }
+
+    incomeTotal = toTwoDecimals(incomeTotal);
+    expensesTotal = toTwoDecimals(expensesTotal);
+
+    // Determine Net Surplus/(Deficit) amounts based on scenarios
+    if (hasIncome && hasExpenses) {
+      // Scenario 1: Both Income & Expenses
+      netSurplusDebitAmount = incomeTotal - expensesTotal;
+    } else if (hasIncome && !hasExpenses) {
+      // Scenario 2: Only Income
+      netSurplusDebitAmount = incomeTotal;
+    } else if (!hasIncome && hasExpenses) {
+      // Scenario 3: Only Expenses
+      netSurplusDebitAmount = expensesTotal;
+    }
+
+    netSurplusDebitAmount = toTwoDecimals(netSurplusDebitAmount);
+
+    // Check if we need to remove the Net Surplus/(Deficit) entry completely
+    if (netSurplusDebitAmount === 0) {
+      // Remove the entry completely if amount is 0 (no income/expenses)
+      await removeReceiptEntryFromLedger(
+        schoolId,
+        academicYear,
+        id,
+        netSurplusDeficitLedger._id,
+        session
+      );
+    } else {
+      // Update Net Surplus/(Deficit) ledger
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        entryDate,
+        existingReceipt._id,
+        netSurplusDebitAmount,
+        0,
+        session
+      );
+
+      // Recalculate balances
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        session
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        entryDate,
+        session
+      );
+    }
+
+    // ========= Capital Fund Ledger ===========
+    const capitalFundLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Capital Fund",
+    }).session(session);
+
+    if (!capitalFundLedger) {
+      throw new Error("Capital Fund ledger not found");
+    }
+
+    let capitalFundCreditAmount = 0;
+
+    if (hasIncome && hasExpenses) {
+      // Scenario 1: Credit Capital Fund with (income - expenses)
+      capitalFundCreditAmount = incomeTotal - expensesTotal;
+    } else if (hasIncome && !hasExpenses) {
+      // Scenario 2: Credit Capital Fund with income amount
+      capitalFundCreditAmount = incomeTotal;
+    } else if (!hasIncome && hasExpenses) {
+      // Scenario 3: Debit Capital Fund with expenses amount
+      capitalFundCreditAmount = expensesTotal;
+    }
+
+    capitalFundCreditAmount = toTwoDecimals(capitalFundCreditAmount);
+
+    // Check if we need to remove the Capital Fund entry completely
+    if (capitalFundCreditAmount === 0) {
+      // Remove the entry completely if amount is 0 (no income/expenses)
+      await removeReceiptEntryFromLedger(
+        schoolId,
+        academicYear,
+        id,
+        capitalFundLedger._id,
+        session
+      );
+    } else {
+      // Update Capital Fund ledger
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        entryDate,
+        existingReceipt._id,
+        0,
+        capitalFundCreditAmount,
+        session
+      );
+
+      // Recalculate balances
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        session
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        entryDate,
+        session
+      );
+    }
+
     await session.commitTransaction();
+    session.endSession();
 
     return res.status(200).json({
       hasError: false,

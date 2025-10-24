@@ -46,6 +46,11 @@ const LedgerSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    parentLedgerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Ledger",
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -63,5 +68,10 @@ LedgerSchema.index(
   },
   { unique: true }
 );
+
+// nikita
+// Nikita@1200
+// 1234567890
+// nikita1996@gmail.com
 
 export default mongoose.model("Ledger", LedgerSchema);

@@ -61,6 +61,7 @@ async function getAllBySchoolId(req, res) {
         groupLedgerName: ledger.groupLedgerId?.groupLedgerName ?? null,
         bSPLLedgerId: ledger.bSPLLedgerId?._id ?? null,
         bSPLLedgerName: ledger.bSPLLedgerId?.bSPLLedgerName ?? null,
+        parentLedgerId: ledger.parentLedgerId ?? null,
         totalDebit: totalDebit,
         createdAt: ledger.createdAt,
         updatedAt: ledger.updatedAt,

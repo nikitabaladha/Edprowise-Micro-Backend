@@ -433,183 +433,6 @@ async function removePaymentFromLedger(
   await record.save({ session });
 }
 
-async function propagateBalanceChangeToNextYear(
-  schoolId,
-  currentAcademicYear,
-  ledgerId,
-  session
-) {
-  try {
-    // Find the current ledger to get its details
-    const currentLedger = await Ledger.findOne({
-      schoolId,
-      academicYear: currentAcademicYear,
-      _id: ledgerId,
-    }).session(session);
-
-    if (!currentLedger) {
-      console.log(`Ledger ${ledgerId} not found in ${currentAcademicYear}`);
-      return;
-    }
-
-    // Calculate next academic year
-    const [yearPart1, yearPart2] = currentAcademicYear.split("-");
-    const nextAcademicYear = `${parseInt(yearPart1) + 1}-${
-      parseInt(yearPart2) + 1
-    }`;
-
-    // Find the next year's ledger that has the CURRENT ledger as parent
-    const nextYearLedger = await Ledger.findOne({
-      schoolId,
-      academicYear: nextAcademicYear,
-      parentLedgerId: currentLedger._id,
-    }).session(session);
-
-    if (!nextYearLedger) {
-      console.log(`No next year ledger found for ${currentLedger.ledgerName}`);
-      return; // No next year ledger found
-    }
-
-    // Get the current year's balance record for this ledger
-    const currentYearBalance = await OpeningClosingBalance.findOne({
-      schoolId,
-      academicYear: currentAcademicYear,
-      ledgerId: ledgerId,
-    }).session(session);
-
-    let newOpeningBalance = 0;
-
-    // FIXED: Handle both cases properly
-    if (currentYearBalance && currentYearBalance.balanceDetails.length > 0) {
-      // Case 1: There are balance details - use last closing balance
-      const lastEntry =
-        currentYearBalance.balanceDetails[
-          currentYearBalance.balanceDetails.length - 1
-        ];
-      newOpeningBalance = lastEntry.closingBalance;
-    } else {
-      // Case 2: No balance details exist - use the current ledger's opening balance
-      // This happens when all entries are removed or ledger has no transactions
-      newOpeningBalance = currentLedger.openingBalance || 0;
-    }
-
-    // Update the next year's ledger opening balance
-    await Ledger.findOneAndUpdate(
-      {
-        schoolId,
-        academicYear: nextAcademicYear,
-        _id: nextYearLedger._id,
-      },
-      {
-        $set: {
-          openingBalance: newOpeningBalance,
-          balanceType: newOpeningBalance < 0 ? "Credit" : "Debit",
-        },
-      },
-      { session }
-    );
-
-    // Update the OpeningClosingBalance for next year
-    let nextYearOpeningBalance = await OpeningClosingBalance.findOne({
-      schoolId,
-      academicYear: nextAcademicYear,
-      ledgerId: nextYearLedger._id,
-    }).session(session);
-
-    if (!nextYearOpeningBalance) {
-      // Create new OpeningClosingBalance record if it doesn't exist
-      nextYearOpeningBalance = new OpeningClosingBalance({
-        schoolId,
-        academicYear: nextAcademicYear,
-        ledgerId: nextYearLedger._id,
-        balanceDetails: [],
-        balanceType: newOpeningBalance < 0 ? "Credit" : "Debit",
-      });
-
-      // Create initial balance detail with the new opening balance
-      nextYearOpeningBalance.balanceDetails.push({
-        entryDate: new Date(),
-        openingBalance: newOpeningBalance,
-        debit: 0,
-        credit: 0,
-        closingBalance: newOpeningBalance,
-      });
-    } else {
-      // FIXED: Find and update the opening balance entry
-      // Look for an entry without entryId (opening balance entry)
-      let openingBalanceEntry = nextYearOpeningBalance.balanceDetails.find(
-        (detail) => !detail.entryId
-      );
-
-      if (
-        !openingBalanceEntry &&
-        nextYearOpeningBalance.balanceDetails.length > 0
-      ) {
-        // If no dedicated opening balance entry, use the first entry
-        openingBalanceEntry = nextYearOpeningBalance.balanceDetails[0];
-      }
-
-      if (openingBalanceEntry) {
-        const oldOpeningBalance = openingBalanceEntry.openingBalance;
-
-        // Only update if the opening balance has changed
-        if (oldOpeningBalance !== newOpeningBalance) {
-          openingBalanceEntry.openingBalance = newOpeningBalance;
-          openingBalanceEntry.closingBalance = toTwoDecimals(
-            newOpeningBalance +
-              openingBalanceEntry.debit -
-              openingBalanceEntry.credit
-          );
-
-          // Recalculate all subsequent entries
-          let currentBalance = openingBalanceEntry.closingBalance;
-          const startIndex =
-            nextYearOpeningBalance.balanceDetails.indexOf(openingBalanceEntry) +
-            1;
-
-          for (
-            let i = startIndex;
-            i < nextYearOpeningBalance.balanceDetails.length;
-            i++
-          ) {
-            const detail = nextYearOpeningBalance.balanceDetails[i];
-            detail.openingBalance = currentBalance;
-            detail.closingBalance = toTwoDecimals(
-              currentBalance + detail.debit - detail.credit
-            );
-            currentBalance = detail.closingBalance;
-          }
-        }
-      } else {
-        // If no entries exist at all, create an opening balance entry
-        nextYearOpeningBalance.balanceDetails.push({
-          entryDate: new Date(),
-          openingBalance: newOpeningBalance,
-          debit: 0,
-          credit: 0,
-          closingBalance: newOpeningBalance,
-        });
-      }
-    }
-
-    await nextYearOpeningBalance.save({ session });
-
-    // Recursively propagate to the next year if it exists
-    await propagateBalanceChangeToNextYear(
-      schoolId,
-      nextAcademicYear,
-      nextYearLedger._id,
-      session
-    );
-  } catch (propagationError) {
-    console.error(
-      `Error in propagateBalanceChangeToNextYear for ledger ${ledgerId}:`,
-      propagationError
-    );
-    throw propagationError;
-  }
-}
-
 async function updateById(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -805,6 +628,7 @@ async function updateById(req, res) {
 
     let newTDSorTCSLedgerId = null;
 
+    // FIX: Always update TDSTCSRateWithAmountBeforeGST regardless of the amount
     existingPaymentEntry.TDSTCSRateWithAmountBeforeGST =
       parsedTDSTCSRateWithAmountBeforeGST;
 
@@ -848,29 +672,11 @@ async function updateById(req, res) {
 
     // Remove old TDS/TCS ledger entry if removed or changed
     if (oldTDSorTCSLedgerId && oldTDSorTCSLedgerId !== newTDSorTCSLedgerId) {
-      await updateOpeningClosingBalance(
+      await removePaymentFromLedger(
         schoolId,
         academicYear,
+        id,
         oldTDSorTCSLedgerId,
-        entryDate,
-        existingPaymentEntry._id,
-        0, // Set debit to 0
-        0, // Set credit to 0
-        session
-      );
-
-      // Recalculate balances for old TDS/TCS ledger
-      await recalculateLedgerBalances(
-        schoolId,
-        academicYear,
-        oldTDSorTCSLedgerId,
-        session
-      );
-      await recalculateAllBalancesAfterDate(
-        schoolId,
-        academicYear,
-        oldTDSorTCSLedgerId,
-        entryDate,
         session
       );
     }
@@ -939,21 +745,6 @@ async function updateById(req, res) {
         );
       }
       ledgerIdsToUpdate.add(newTDSorTCSLedgerId);
-
-      // Recalculate balances for new TDS/TCS ledger
-      await recalculateLedgerBalances(
-        schoolId,
-        academicYear,
-        newTDSorTCSLedgerId,
-        session
-      );
-      await recalculateAllBalancesAfterDate(
-        schoolId,
-        academicYear,
-        newTDSorTCSLedgerId,
-        entryDate,
-        session
-      );
     }
 
     // 3. Payment Mode Ledger (Debit)
@@ -1083,6 +874,8 @@ async function updateById(req, res) {
     await totalNetRecord.save({ session });
 
     // ========= Net Surplus/(Deficit) Ledger and Capital Fund ===========
+
+    // this below thing to store data in Net Surplus/(Deficit) Ledger and Capital Fund works perfectly fine
 
     const netSurplusDeficitLedger = await Ledger.findOne({
       schoolId,
@@ -1243,64 +1036,6 @@ async function updateById(req, res) {
       );
     }
 
-    // --- Step E: Propagate changes to subsequent academic years ---
-    const affectedLedgerIds = new Set([...ledgerIdsToUpdate]);
-
-    // Also include Net Surplus/(Deficit) and Capital Fund if they were affected
-    if (netSurplusDeficitLedger) {
-      affectedLedgerIds.add(netSurplusDeficitLedger._id.toString());
-    }
-    if (capitalFundLedger) {
-      affectedLedgerIds.add(capitalFundLedger._id.toString());
-    }
-
-    // FIXED: Include ALL ledgers that need propagation (both current and old TDS/TCS)
-    const allLedgersToPropagate = new Set([...affectedLedgerIds]);
-
-    // Add old TDS/TCS ledger if it was changed (for propagation)
-    if (oldTDSorTCSLedgerId && oldTDSorTCSLedgerId !== newTDSorTCSLedgerId) {
-      allLedgersToPropagate.add(oldTDSorTCSLedgerId);
-    }
-
-    // Add new TDS/TCS ledger if it exists
-    if (newTDSorTCSLedgerId) {
-      allLedgersToPropagate.add(newTDSorTCSLedgerId);
-    }
-
-    // FIXED: CRITICAL - Also include ALL old item ledgers and payment mode ledgers
-    for (const oldLedgerId of oldItemLedgerIds) {
-      if (oldLedgerId) {
-        allLedgersToPropagate.add(oldLedgerId);
-      }
-    }
-
-    if (oldPaymentModeLedgerId) {
-      allLedgersToPropagate.add(oldPaymentModeLedgerId);
-    }
-
-    console.log(
-      `All ledger IDs for propagation:`,
-      Array.from(allLedgersToPropagate)
-    );
-
-    // Propagate changes for each affected ledger
-    for (const ledgerId of allLedgersToPropagate) {
-      try {
-        await propagateBalanceChangeToNextYear(
-          schoolId,
-          academicYear,
-          ledgerId,
-          session
-        );
-      } catch (propagationError) {
-        console.error(
-          `Error propagating changes for ledger ${ledgerId}:`,
-          propagationError
-        );
-        // Don't throw here - we want to continue with other ledgers
-      }
-    }
-
     await session.commitTransaction();
     session.endSession();
 
@@ -1335,3 +1070,46 @@ async function updateById(req, res) {
 }
 
 export default updateById;
+
+// see for exmaple i have three ledgers and there opening Balance is for 2025-2026
+// ledger abc connected with TDS having opening Balance -1000
+// ledger lmn connected with TCS having opening Balance 1000
+// ledger pqr connected with item.ledgerId opening Balance 0
+// ledger def connected with item.ledgerId opening Balance 0
+// ledger xyz connected with ledgerIdwithPayment mode Opening Balance 1000
+// ledger stu connected with ledgerIdwithPayment mode Opening Balance 1000
+
+// now for example if user do entry and
+// for ledger abc connected with TDS having closing balance become -1010
+// for ledger pqr connected with item.ledgerId closing balance become 100
+// for ledger xyz connected with ledgerIdwithPayment mode closing Blance become 910
+
+// see for exmaple i have three ledgers and there opening Balance is for 2026-2027
+// ledger abc connected with TDS having opening Balance -1000
+// ledger pqr connected with item.ledgerId opening Balance 0
+// ledger xyz connected with ledgerIdwithPayment mode Opening Balance 1000
+
+// now for next year example if user do entry and
+// ledger old parent-abc connected with TDS having opening Balance -1010
+// ledger old parent-pqr connected with item.ledgerId opening Balance 100
+// ledger old parent-xyz connected with ledgerIdwithPayment mode Opening Balance 910
+
+// now for example if user change entry for year 2025-2026 and
+// this time he change Tds to Tcs
+// for ledger abc connected with TDS having closing balance become again 1000
+// but ledger lmn connected with TCS having closing balance become 1010
+
+// this time he change item.ledgerId
+// for ledger pqr connected with item.ledgerId closing balance become 0
+// but ledger def connected with item.ledgerId having closing balance become 100
+
+// this time he change ledgerId with payment mode
+// for ledger xyz connected with ledgerId with payment mode closing balance again become 1000
+// but ledger stu connected with ledgerId with payment mode having closing balance become 910
+
+// so are you geting what i am trying to say? see if enrty from 2025-2026 vanishes entirely then
+// then openingBalance stored in ledgerTable for 2025-2026 becomes openingBalance of newYear
+// if not vanish entirely then whatever the last closing balance of that 2025-2026
+// becomes the openingBalance of new year 2026-2027 openingBalnace
+
+// but currently you are entirely removing the openingBalance for next year which is not correct

@@ -4,6 +4,7 @@ import updateHeadOfAccount from "./updateById.js";
 import deleteHeadOfAccount from "./deleteById.js";
 
 import findHeadOfAccountByName from "./findHeadOfAccountByName.js";
+import deleteAllHeadOfAccountBySchoolAndAcademicYear from "./deleteAllBySchoolAndAcademicYear.js";
 
 export {
   createHeadOfAccount,
@@ -11,4 +12,5 @@ export {
   updateHeadOfAccount,
   deleteHeadOfAccount,
   findHeadOfAccountByName,
+  deleteAllHeadOfAccountBySchoolAndAcademicYear,
 };

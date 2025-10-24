@@ -142,7 +142,6 @@ const copyLedgers = async (
       paymentMode: prevLedger.paymentMode,
       ledgerCode: prevLedger.ledgerCode,
       academicYear: newAcademicYear,
-      parentLedgerId: prevLedger._id,
     });
   }
 

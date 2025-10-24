@@ -5,6 +5,7 @@ import updateBSPLLedgerById from "./updateById.js";
 import deleteBSPLLedgerById from "./deleteById.js";
 
 import findBSPLLedgerByName from "./findBSPLLedgerByName.js";
+import deleteAllBSPLLedgerBySchoolAndAcademicYear from "./deleteAllBySchoolAndAcademicYear.js";
 
 export {
   createBSPLLedger,
@@ -13,4 +14,5 @@ export {
   updateBSPLLedgerById,
   deleteBSPLLedgerById,
   findBSPLLedgerByName,
+  deleteAllBSPLLedgerBySchoolAndAcademicYear,
 };

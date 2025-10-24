@@ -94,9 +94,9 @@ async function getAllBySchoolId(req, res) {
           itemName: item.itemName,
           ledgerId: item.ledgerId || null,
           amountBeforeGST: item.amountBeforeGST,
-          GSTAmount: item.GSTAmount,
-          amountAfterGST: item.amountAfterGST,
-          creditAmount: item.creditAmount || null,
+          GSTAmount: item?.GSTAmount,
+          amountAfterGST: item?.amountAfterGST,
+          creditAmount: item?.creditAmount,
           ledgerName: ledger?.ledgerName || null,
           groupLedgerId: ledger?.groupLedgerId || null,
           groupLedgerName: groupLedger?.groupLedgerName || null,
@@ -190,11 +190,11 @@ async function getAllBySchoolId(req, res) {
         itemDetails: itemsWithLedgerNames,
         customizeEntry: entry.customizeEntry,
 
-        subTotalAmountAfterGST: entry.subTotalAmountAfterGST,
-        subTotalOfCredit: entry.subTotalOfCredit,
+        subTotalAmountAfterGST: entry?.subTotalAmountAfterGST,
+        subTotalOfCredit: entry?.subTotalOfCredit,
 
-        totalAmountAfterGST: entry.totalAmountAfterGST,
-        totalCreditAmount: entry.totalCreditAmount,
+        totalAmountAfterGST: entry?.totalAmountAfterGST,
+        totalCreditAmount: entry?.totalCreditAmount,
 
         // Vendor fields
         vendorCode: entry.vendorCode,
@@ -221,7 +221,7 @@ async function getAllBySchoolId(req, res) {
 
         TDSTCSRateChartId: entry.TDSTCSRateChartId,
         TDSTCSRate: entry.TDSTCSRate,
-        totalAmountBeforeGST: entry.totalAmountBeforeGST,
+        totalAmountBeforeGST: entry?.totalAmountBeforeGST,
         totalGSTAmount: entry.totalGSTAmount,
         invoiceImage: entry.invoiceImage,
         chequeImage: entry.chequeImage || null,

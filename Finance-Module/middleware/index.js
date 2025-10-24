@@ -14,6 +14,8 @@ const roleBasedMiddleware = (...allowedRoles) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.user = decoded;
 
+      console.log("Decoded token:==================", decoded);
+
       if (!allowedRoles.includes(req.user.role)) {
         return res.status(403).json({
           hasError: true,
