@@ -3,7 +3,6 @@ import Contra from "../../../models/Contra.js";
 import ContraValidator from "../../../validators/ContraValidator.js";
 import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
-import GroupLedger from "../../../models/GroupLedger.js";
 
 function toTwoDecimals(value) {
   if (value === null || value === undefined || isNaN(value)) return 0;
@@ -591,6 +590,247 @@ export async function create(req, res) {
         entryDate
       );
     }
+
+    // =====Start Of Net Surplus/(Deficit)...Capital Fund=====
+
+    // Get all unique ledger IDs from itemDetails (both ledgerId and ledgerIdOfCashAccount)
+    const uniqueLedgerIds = [
+      ...new Set(
+        updatedItemDetails
+          .flatMap((item) => [item.ledgerId, item.ledgerIdOfCashAccount])
+          .filter((id) => id) // Remove null/undefined
+      ),
+    ];
+
+    // Find ledgers with their Head of Account information
+    const ledgers = await Ledger.find({
+      _id: { $in: uniqueLedgerIds },
+    })
+      .populate("headOfAccountId")
+      .session(session);
+
+    // Find the required ledgers
+    const netSurplusDeficitLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Net Surplus/(Deficit)",
+    }).session(session);
+
+    const capitalFundLedger = await Ledger.findOne({
+      schoolId,
+      academicYear,
+      ledgerName: "Capital Fund",
+    }).session(session);
+
+    if (!netSurplusDeficitLedger || !capitalFundLedger) {
+      throw new Error(
+        "Required ledgers (Net Surplus/(Deficit) or Capital Fund) not found"
+      );
+    }
+
+    // Initialize amounts for both ledgers
+    let netSurplusDebitAmount = 0;
+    let netSurplusCreditAmount = 0;
+    let capitalFundDebitAmount = 0;
+    let capitalFundCreditAmount = 0;
+
+    // Process based on contra entry type
+    if (contraEntryName === "Cash Deposited") {
+      // For Cash Deposited: ledgerId is debited, ledgerIdOfCashAccount is credited
+      for (const item of updatedItemDetails) {
+        // Process main ledger (ledgerId) - DEBIT side
+        const mainLedger = ledgers.find(
+          (l) => l._id.toString() === item.ledgerId.toString()
+        );
+        if (mainLedger && mainLedger.headOfAccountId) {
+          const headOfAccountName =
+            mainLedger.headOfAccountId.headOfAccountName.toLowerCase();
+          const debitAmount = parseFloat(item.debitAmount) || 0;
+
+          if (headOfAccountName === "income") {
+            // Income ledger with debit amount → Net Surplus Credit, Capital Fund Debit
+            netSurplusCreditAmount += debitAmount;
+            capitalFundDebitAmount += debitAmount;
+          } else if (headOfAccountName === "expenses") {
+            // Expenses ledger with debit amount → Net Surplus Credit, Capital Fund Debit
+            netSurplusCreditAmount += debitAmount;
+            capitalFundDebitAmount += debitAmount;
+          }
+        }
+
+        // Process cash account (ledgerIdOfCashAccount) - CREDIT side
+        if (item.ledgerIdOfCashAccount) {
+          const cashLedger = ledgers.find(
+            (l) => l._id.toString() === item.ledgerIdOfCashAccount.toString()
+          );
+          if (cashLedger && cashLedger.headOfAccountId) {
+            const headOfAccountName =
+              cashLedger.headOfAccountId.headOfAccountName.toLowerCase();
+            const creditAmount = parseFloat(item.creditAmount) || 0;
+
+            if (headOfAccountName === "income") {
+              // Income ledger with credit amount → Net Surplus Debit, Capital Fund Credit
+              netSurplusDebitAmount += creditAmount;
+              capitalFundCreditAmount += creditAmount;
+            } else if (headOfAccountName === "expenses") {
+              // Expenses ledger with credit amount → Net Surplus Debit, Capital Fund Credit
+              netSurplusDebitAmount += creditAmount;
+              capitalFundCreditAmount += creditAmount;
+            }
+          }
+        }
+      }
+    } else if (contraEntryName === "Cash Withdrawn") {
+      // For Cash Withdrawn: ledgerId is credited, ledgerIdOfCashAccount is debited
+      for (const item of updatedItemDetails) {
+        // Process main ledger (ledgerId) - CREDIT side
+        const mainLedger = ledgers.find(
+          (l) => l._id.toString() === item.ledgerId.toString()
+        );
+        if (mainLedger && mainLedger.headOfAccountId) {
+          const headOfAccountName =
+            mainLedger.headOfAccountId.headOfAccountName.toLowerCase();
+          const creditAmount = parseFloat(item.creditAmount) || 0;
+
+          if (headOfAccountName === "income") {
+            // Income ledger with credit amount → Net Surplus Debit, Capital Fund Credit
+            netSurplusDebitAmount += creditAmount;
+            capitalFundCreditAmount += creditAmount;
+          } else if (headOfAccountName === "expenses") {
+            // Expenses ledger with credit amount → Net Surplus Debit, Capital Fund Credit
+            netSurplusDebitAmount += creditAmount;
+            capitalFundCreditAmount += creditAmount;
+          }
+        }
+
+        // Process cash account (ledgerIdOfCashAccount) - DEBIT side
+        if (item.ledgerIdOfCashAccount) {
+          const cashLedger = ledgers.find(
+            (l) => l._id.toString() === item.ledgerIdOfCashAccount.toString()
+          );
+          if (cashLedger && cashLedger.headOfAccountId) {
+            const headOfAccountName =
+              cashLedger.headOfAccountId.headOfAccountName.toLowerCase();
+            const debitAmount = parseFloat(item.debitAmount) || 0;
+
+            if (headOfAccountName === "income") {
+              // Income ledger with debit amount → Net Surplus Credit, Capital Fund Debit
+              netSurplusCreditAmount += debitAmount;
+              capitalFundDebitAmount += debitAmount;
+            } else if (headOfAccountName === "expenses") {
+              // Expenses ledger with debit amount → Net Surplus Credit, Capital Fund Debit
+              netSurplusCreditAmount += debitAmount;
+              capitalFundDebitAmount += debitAmount;
+            }
+          }
+        }
+      }
+    } else if (contraEntryName === "Bank Transfer") {
+      // For Bank Transfer: Process normally like journal entries
+      for (const item of updatedItemDetails) {
+        const ledger = ledgers.find(
+          (l) => l._id.toString() === item.ledgerId.toString()
+        );
+
+        if (ledger && ledger.headOfAccountId) {
+          const headOfAccountName =
+            ledger.headOfAccountId.headOfAccountName.toLowerCase();
+          const debitAmount = parseFloat(item.debitAmount) || 0;
+          const creditAmount = parseFloat(item.creditAmount) || 0;
+
+          // Scenario analysis based on your requirements
+          if (headOfAccountName === "income") {
+            if (creditAmount > 0) {
+              // Income with credit amount → Net Surplus Debit, Capital Fund Credit
+              netSurplusDebitAmount += creditAmount;
+              capitalFundCreditAmount += creditAmount;
+            }
+            if (debitAmount > 0) {
+              // Income with debit amount → Net Surplus Credit, Capital Fund Debit
+              netSurplusCreditAmount += debitAmount;
+              capitalFundDebitAmount += debitAmount;
+            }
+          } else if (headOfAccountName === "expenses") {
+            if (creditAmount > 0) {
+              // Expenses with credit amount → Net Surplus Debit, Capital Fund Credit
+              netSurplusDebitAmount += creditAmount;
+              capitalFundCreditAmount += creditAmount;
+            }
+            if (debitAmount > 0) {
+              // Expenses with debit amount → Net Surplus Credit, Capital Fund Debit
+              netSurplusCreditAmount += debitAmount;
+              capitalFundDebitAmount += debitAmount;
+            }
+          }
+        }
+      }
+    }
+
+    // Round to two decimals
+    netSurplusDebitAmount = toTwoDecimals(netSurplusDebitAmount);
+    netSurplusCreditAmount = toTwoDecimals(netSurplusCreditAmount);
+    capitalFundDebitAmount = toTwoDecimals(capitalFundDebitAmount);
+    capitalFundCreditAmount = toTwoDecimals(capitalFundCreditAmount);
+
+    // Update Net Surplus/(Deficit) ledger
+    if (netSurplusDebitAmount > 0 || netSurplusCreditAmount > 0) {
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        entryDate,
+        newContra._id,
+        netSurplusDebitAmount,
+        netSurplusCreditAmount,
+        session
+      );
+
+      // Recalculate balances
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        session
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        netSurplusDeficitLedger._id,
+        entryDate,
+        session
+      );
+    }
+
+    // Update Capital Fund ledger
+    if (capitalFundDebitAmount > 0 || capitalFundCreditAmount > 0) {
+      await updateOpeningClosingBalance(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        entryDate,
+        newContra._id,
+        capitalFundDebitAmount,
+        capitalFundCreditAmount,
+        session
+      );
+
+      // Recalculate balances
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        session
+      );
+      await recalculateAllBalancesAfterDate(
+        schoolId,
+        academicYear,
+        capitalFundLedger._id,
+        entryDate,
+        session
+      );
+    }
+
+    // =====End of Net Surplus/(Deficit)...Capital Fund=====
 
     await session.commitTransaction();
     session.endSession();

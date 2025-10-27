@@ -22,13 +22,14 @@ async function getOrCreateOpeningBalanceRecord(
   schoolId,
   academicYear,
   ledgerId,
-  entryDate
+  entryDate,
+  session // Added session parameter
 ) {
   const ledger = await Ledger.findOne({
     schoolId,
     academicYear,
     _id: ledgerId,
-  });
+  }).session(session); // Added session
 
   let openingBalance = 0;
   let balanceType = "Debit";
@@ -42,7 +43,7 @@ async function getOrCreateOpeningBalanceRecord(
     schoolId,
     academicYear,
     ledgerId,
-  });
+  }).session(session); // Added session
 
   if (!record) {
     record = new OpeningClosingBalance({
@@ -74,7 +75,8 @@ async function updateOpeningClosingBalance(
   entryDate,
   receiptEntryId,
   debitAmount = 0,
-  creditAmount = 0
+  creditAmount = 0,
+  session // Added session parameter
 ) {
   debitAmount = toTwoDecimals(debitAmount);
   creditAmount = toTwoDecimals(creditAmount);
@@ -84,7 +86,8 @@ async function updateOpeningClosingBalance(
       schoolId,
       academicYear,
       ledgerId,
-      entryDate
+      entryDate,
+      session // Pass session
     );
 
   // --- FIX: Determine effective opening balance ---
@@ -149,16 +152,21 @@ async function updateOpeningClosingBalance(
       : a._id.toString().localeCompare(b._id.toString());
   });
 
-  await record.save();
+  await record.save({ session }); // Added session
   return record;
 }
 
-async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
+async function recalculateLedgerBalances(
+  schoolId,
+  academicYear,
+  ledgerId,
+  session // Added session parameter
+) {
   const record = await OpeningClosingBalance.findOne({
     schoolId,
     academicYear,
     ledgerId,
-  });
+  }).session(session); // Added session
 
   if (!record || record.balanceDetails.length === 0) {
     return;
@@ -168,7 +176,7 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
     schoolId,
     academicYear,
     _id: ledgerId,
-  });
+  }).session(session); // Added session
 
   const balanceType = ledger?.balanceType || "Debit";
 
@@ -210,20 +218,21 @@ async function recalculateLedgerBalances(schoolId, academicYear, ledgerId) {
     currentBalance = detail.closingBalance;
   }
 
-  await record.save();
+  await record.save({ session }); // Added session
 }
 
 async function recalculateAllBalancesAfterDate(
   schoolId,
   academicYear,
   ledgerId,
-  date
+  date,
+  session // Added session parameter
 ) {
   const record = await OpeningClosingBalance.findOne({
     schoolId,
     academicYear,
     ledgerId,
-  });
+  }).session(session); // Added session
 
   if (!record || record.balanceDetails.length === 0) {
     return;
@@ -255,7 +264,7 @@ async function recalculateAllBalancesAfterDate(
       schoolId,
       academicYear,
       _id: ledgerId,
-    });
+    }).session(session); // Added session
 
     const balanceType = ledger?.balanceType || "Debit";
 
@@ -268,7 +277,7 @@ async function recalculateAllBalancesAfterDate(
     currentBalance = detail.closingBalance;
   }
 
-  await record.save();
+  await record.save({ session }); // Added session
 }
 
 function aggregateAmountsByLedger(itemDetails) {
@@ -294,6 +303,183 @@ function aggregateAmountsByLedger(itemDetails) {
   });
 
   return ledgerMap;
+}
+
+async function propagateBalanceChangeToNextYear(
+  schoolId,
+  currentAcademicYear,
+  ledgerId,
+  session
+) {
+  try {
+    // Find the current ledger to get its details
+    const currentLedger = await Ledger.findOne({
+      schoolId,
+      academicYear: currentAcademicYear,
+      _id: ledgerId,
+    }).session(session);
+
+    if (!currentLedger) {
+      console.log(`Ledger ${ledgerId} not found in ${currentAcademicYear}`);
+      return;
+    }
+
+    // Calculate next academic year
+    const [yearPart1, yearPart2] = currentAcademicYear.split("-");
+    const nextAcademicYear = `${parseInt(yearPart1) + 1}-${
+      parseInt(yearPart2) + 1
+    }`;
+
+    // Find the next year's ledger that has the CURRENT ledger as parent
+    const nextYearLedger = await Ledger.findOne({
+      schoolId,
+      academicYear: nextAcademicYear,
+      parentLedgerId: currentLedger._id,
+    }).session(session);
+
+    if (!nextYearLedger) {
+      console.log(`No next year ledger found for ${currentLedger.ledgerName}`);
+      return; // No next year ledger found
+    }
+
+    // Get the current year's balance record for this ledger
+    const currentYearBalance = await OpeningClosingBalance.findOne({
+      schoolId,
+      academicYear: currentAcademicYear,
+      ledgerId: ledgerId,
+    }).session(session);
+
+    let newOpeningBalance = 0;
+
+    // FIXED: Handle both cases properly
+    if (currentYearBalance && currentYearBalance.balanceDetails.length > 0) {
+      // Case 1: There are balance details - use last closing balance
+      const lastEntry =
+        currentYearBalance.balanceDetails[
+          currentYearBalance.balanceDetails.length - 1
+        ];
+      newOpeningBalance = lastEntry.closingBalance;
+    } else {
+      // Case 2: No balance details exist - use the current ledger's opening balance
+      // This happens when all entries are removed or ledger has no transactions
+      newOpeningBalance = currentLedger.openingBalance || 0;
+    }
+
+    // Update the next year's ledger opening balance
+    await Ledger.findOneAndUpdate(
+      {
+        schoolId,
+        academicYear: nextAcademicYear,
+        _id: nextYearLedger._id,
+      },
+      {
+        $set: {
+          openingBalance: newOpeningBalance,
+          balanceType: newOpeningBalance < 0 ? "Credit" : "Debit",
+        },
+      },
+      { session }
+    );
+
+    // Update the OpeningClosingBalance for next year
+    let nextYearOpeningBalance = await OpeningClosingBalance.findOne({
+      schoolId,
+      academicYear: nextAcademicYear,
+      ledgerId: nextYearLedger._id,
+    }).session(session);
+
+    if (!nextYearOpeningBalance) {
+      // Create new OpeningClosingBalance record if it doesn't exist
+      nextYearOpeningBalance = new OpeningClosingBalance({
+        schoolId,
+        academicYear: nextAcademicYear,
+        ledgerId: nextYearLedger._id,
+        balanceDetails: [],
+        balanceType: newOpeningBalance < 0 ? "Credit" : "Debit",
+      });
+
+      // Create initial balance detail with the new opening balance
+      nextYearOpeningBalance.balanceDetails.push({
+        entryDate: new Date(),
+        openingBalance: newOpeningBalance,
+        debit: 0,
+        credit: 0,
+        closingBalance: newOpeningBalance,
+      });
+    } else {
+      // FIXED: Find and update the opening balance entry
+      // Look for an entry without entryId (opening balance entry)
+      let openingBalanceEntry = nextYearOpeningBalance.balanceDetails.find(
+        (detail) => !detail.entryId
+      );
+
+      if (
+        !openingBalanceEntry &&
+        nextYearOpeningBalance.balanceDetails.length > 0
+      ) {
+        // If no dedicated opening balance entry, use the first entry
+        openingBalanceEntry = nextYearOpeningBalance.balanceDetails[0];
+      }
+
+      if (openingBalanceEntry) {
+        const oldOpeningBalance = openingBalanceEntry.openingBalance;
+
+        // Only update if the opening balance has changed
+        if (oldOpeningBalance !== newOpeningBalance) {
+          openingBalanceEntry.openingBalance = newOpeningBalance;
+          openingBalanceEntry.closingBalance = toTwoDecimals(
+            newOpeningBalance +
+              openingBalanceEntry.debit -
+              openingBalanceEntry.credit
+          );
+
+          // Recalculate all subsequent entries
+          let currentBalance = openingBalanceEntry.closingBalance;
+          const startIndex =
+            nextYearOpeningBalance.balanceDetails.indexOf(openingBalanceEntry) +
+            1;
+
+          for (
+            let i = startIndex;
+            i < nextYearOpeningBalance.balanceDetails.length;
+            i++
+          ) {
+            const detail = nextYearOpeningBalance.balanceDetails[i];
+            detail.openingBalance = currentBalance;
+            detail.closingBalance = toTwoDecimals(
+              currentBalance + detail.debit - detail.credit
+            );
+            currentBalance = detail.closingBalance;
+          }
+        }
+      } else {
+        // If no entries exist at all, create an opening balance entry
+        nextYearOpeningBalance.balanceDetails.push({
+          entryDate: new Date(),
+          openingBalance: newOpeningBalance,
+          debit: 0,
+          credit: 0,
+          closingBalance: newOpeningBalance,
+        });
+      }
+    }
+
+    await nextYearOpeningBalance.save({ session });
+
+    // Recursively propagate to the next year if it exists
+    await propagateBalanceChangeToNextYear(
+      schoolId,
+      nextAcademicYear,
+      nextYearLedger._id,
+      session
+    );
+  } catch (propagationError) {
+    console.error(
+      `Error in propagateBalanceChangeToNextYear for ledger ${ledgerId}:`,
+      propagationError
+    );
+    throw propagationError;
+  }
 }
 
 async function create(req, res) {
@@ -419,21 +605,28 @@ async function create(req, res) {
         entryDate,
         newReceipt._id,
         amounts.debitAmount, // debit
-        amounts.amount // credit
+        amounts.amount, // credit
+        session // Added session
       );
       ledgerIdsToUpdate.add(ledgerId);
     }
 
     // --- Recalculate all ledgers that were updated ---
     for (const ledgerId of ledgerIdsToUpdate) {
-      await recalculateLedgerBalances(schoolId, academicYear, ledgerId);
+      await recalculateLedgerBalances(
+        schoolId,
+        academicYear,
+        ledgerId,
+        session // Added session
+      );
 
       // Also recalculate all entries after this date to handle backdated entries
       await recalculateAllBalancesAfterDate(
         schoolId,
         academicYear,
         ledgerId,
-        entryDate
+        entryDate,
+        session // Added session
       );
     }
 
@@ -445,7 +638,9 @@ async function create(req, res) {
     // Find ledgers with their Head of Account information
     const ledgers = await Ledger.find({
       _id: { $in: uniqueLedgerIds },
-    }).populate("headOfAccountId");
+    })
+      .populate("headOfAccountId")
+      .session(session); // Added session
 
     // Initialize sums
     let incomeBalance = 0;
@@ -601,21 +796,27 @@ async function create(req, res) {
         entryDate,
         newReceipt._id,
         netSurplusDebitAmount,
-        netSurplusCreditAmount
+        netSurplusCreditAmount,
+        session // Added session
       );
 
       // Recalculate balances
       await recalculateLedgerBalances(
         schoolId,
         academicYear,
-        netSurplusDeficitLedger._id
+        netSurplusDeficitLedger._id,
+        session // Added session
       );
       await recalculateAllBalancesAfterDate(
         schoolId,
         academicYear,
         netSurplusDeficitLedger._id,
-        entryDate
+        entryDate,
+        session // Added session
       );
+
+      // ADDED: Add to ledgerIdsToUpdate for propagation
+      ledgerIdsToUpdate.add(netSurplusDeficitLedger._id.toString());
     }
 
     // Update Capital Fund ledger
@@ -627,24 +828,48 @@ async function create(req, res) {
         entryDate,
         newReceipt._id,
         capitalFundDebitAmount,
-        capitalFundCreditAmount
+        capitalFundCreditAmount,
+        session // Added session
       );
 
       // Recalculate balances
       await recalculateLedgerBalances(
         schoolId,
         academicYear,
-        capitalFundLedger._id
+        capitalFundLedger._id,
+        session // Added session
       );
       await recalculateAllBalancesAfterDate(
         schoolId,
         academicYear,
         capitalFundLedger._id,
-        entryDate
+        entryDate,
+        session // Added session
       );
+
+      // ADDED: Add to ledgerIdsToUpdate for propagation
+      ledgerIdsToUpdate.add(capitalFundLedger._id.toString());
     }
 
     // =====End of Net Surplus/(Deficit)...Capital Fund=====
+
+    // ADDED: Propagation to next academic years (same as your update API)
+    for (const ledgerId of ledgerIdsToUpdate) {
+      try {
+        await propagateBalanceChangeToNextYear(
+          schoolId,
+          academicYear,
+          ledgerId,
+          session
+        );
+      } catch (propagationError) {
+        console.error(
+          `Error propagating changes for ledger ${ledgerId}:`,
+          propagationError
+        );
+        // Don't throw here - we want to continue with other ledgers
+      }
+    }
 
     await session.commitTransaction();
     session.endSession();

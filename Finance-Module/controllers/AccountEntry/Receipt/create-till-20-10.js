@@ -387,7 +387,9 @@ async function create(req, res) {
     );
 
     const transactionNumber =
-      paymentMode === "Online" ? await generateTransactionNumber() : null;
+      paymentMode === "Online Net Banking"
+        ? await generateTransactionNumber()
+        : null;
 
     let TDSorTCSLedgerId = null;
 
@@ -611,8 +613,6 @@ async function create(req, res) {
 
     // ========= Net Surplus/(Deficit) Ledger ===========
 
-    // here for Net Surplus/(Deficit) Ledger whatever is store it as -ve value
-    // exmple if amount is 100 then store it as -100 in Net Surplus/(Deficit)
     const netSurplusDeficitLedger = await Ledger.findOne({
       schoolId,
       academicYear,
@@ -624,7 +624,7 @@ async function create(req, res) {
     }
 
     // Calculate amounts for Net Surplus/(Deficit)
-    let netSurplusCreditAmount = 0;
+    let netSurplusDebitAmount = 0;
     let hasIncome = false;
     let hasExpenses = false;
 
@@ -657,27 +657,27 @@ async function create(req, res) {
     // Determine Net Surplus/(Deficit) amounts based on scenarios
     if (hasIncome && hasExpenses) {
       // Scenario 1: Both Income & Expenses
-      netSurplusCreditAmount = incomeTotal - expensesTotal;
+      netSurplusDebitAmount = incomeTotal - expensesTotal;
     } else if (hasIncome && !hasExpenses) {
       // Scenario 2: Only Income
-      netSurplusCreditAmount = incomeTotal;
+      netSurplusDebitAmount = incomeTotal;
     } else if (!hasIncome && hasExpenses) {
       // Scenario 3: Only Expenses
-      netSurplusCreditAmount = expensesTotal;
+      netSurplusDebitAmount = expensesTotal;
     }
 
-    const negativeNetAmount = toTwoDecimals(netSurplusCreditAmount);
+    netSurplusDebitAmount = toTwoDecimals(netSurplusDebitAmount);
 
     // Update Net Surplus/(Deficit) ledger
-    if (netSurplusCreditAmount !== 0) {
+    if (netSurplusDebitAmount !== 0) {
       await updateOpeningClosingBalance(
         schoolId,
         academicYear,
         netSurplusDeficitLedger._id,
         entryDate,
         newReceipt._id,
-        0,
-        negativeNetAmount
+        netSurplusDebitAmount,
+        0
       );
 
       // Recalculate balances
@@ -695,8 +695,6 @@ async function create(req, res) {
     }
 
     // ========= Capital Fund Ledger ===========
-    // here for Capital Fund Ledger whatever is store it as value
-    // exmple if amount is 100 then store it as 100 in Capital Fund
 
     const capitalFundLedger = await Ledger.findOne({
       schoolId,
@@ -708,30 +706,30 @@ async function create(req, res) {
       throw new Error("Capital Fund ledger not found");
     }
 
-    let capitalFundDebitAmount = 0;
+    let capitalFundCreditAmount = 0;
 
     if (hasIncome && hasExpenses) {
       // Scenario 1: Credit Capital Fund with (income - expenses)
-      capitalFundDebitAmount = incomeTotal - expensesTotal;
+      capitalFundCreditAmount = incomeTotal - expensesTotal;
     } else if (hasIncome && !hasExpenses) {
       // Scenario 2: Credit Capital Fund with income amount
-      capitalFundDebitAmount = incomeTotal;
+      capitalFundCreditAmount = incomeTotal;
     } else if (!hasIncome && hasExpenses) {
       // Scenario 3: Debit Capital Fund with expenses amount
-      capitalFundDebitAmount = expensesTotal;
+      capitalFundCreditAmount = expensesTotal;
     }
 
-    capitalFundDebitAmount = toTwoDecimals(capitalFundDebitAmount);
+    capitalFundCreditAmount = toTwoDecimals(capitalFundCreditAmount);
 
-    if (capitalFundDebitAmount !== 0) {
+    if (capitalFundCreditAmount !== 0) {
       await updateOpeningClosingBalance(
         schoolId,
         academicYear,
         capitalFundLedger._id,
         entryDate,
         newReceipt._id,
-        capitalFundDebitAmount,
-        0
+        0,
+        capitalFundCreditAmount
       );
 
       // Recalculate balances

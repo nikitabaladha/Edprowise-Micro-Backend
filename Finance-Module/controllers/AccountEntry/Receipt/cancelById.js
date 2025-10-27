@@ -4,6 +4,11 @@ import OpeningClosingBalance from "../../../models/OpeningClosingBalance.js";
 import Ledger from "../../../models/Ledger.js";
 import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
 
+function toTwoDecimals(value) {
+  if (value === null || value === undefined || isNaN(value)) return 0;
+  return Math.round(Number(value) * 100) / 100;
+}
+
 async function removeReceiptFromLedger(
   schoolId,
   academicYear,
@@ -66,12 +71,15 @@ async function removeReceiptFromLedger(
     if (i === 0) {
       // First entry uses ledger opening balance
       const ledger = await Ledger.findById(ledgerId).session(session);
-      detail.openingBalance = ledger?.openingBalance || 0;
+      detail.openingBalance = toTwoDecimals(ledger?.openingBalance || 0);
     } else {
-      detail.openingBalance = record.balanceDetails[i - 1].closingBalance;
+      detail.openingBalance = toTwoDecimals(
+        record.balanceDetails[i - 1].closingBalance
+      );
     }
-    detail.closingBalance =
-      detail.openingBalance + detail.debit - detail.credit;
+    detail.closingBalance = toTwoDecimals(
+      detail.openingBalance + detail.debit - detail.credit
+    );
   }
 
   await record.save({ session });
@@ -134,13 +142,13 @@ async function recalculateLedgerBalances(
   });
 
   // Now recalculate balances
-  let currentBalance = record.balanceDetails[0].openingBalance;
+  let currentBalance = toTwoDecimals(record.balanceDetails[0].openingBalance);
 
   for (let i = 0; i < record.balanceDetails.length; i++) {
     const detail = record.balanceDetails[i];
 
     if (i === 0) {
-      currentBalance = detail.openingBalance;
+      currentBalance = toTwoDecimals(detail.openingBalance);
     } else {
       const previousDetail = record.balanceDetails[i - 1];
       const currentDate = new Date(detail.entryDate).toDateString();
@@ -150,13 +158,15 @@ async function recalculateLedgerBalances(
         currentDate !== previousDate ||
         detail.entrySequence - previousDetail.entrySequence === 1
       ) {
-        detail.openingBalance = previousDetail.closingBalance;
+        detail.openingBalance = toTwoDecimals(previousDetail.closingBalance);
       }
-      currentBalance = detail.openingBalance;
+      currentBalance = toTwoDecimals(detail.openingBalance);
     }
 
-    detail.closingBalance = currentBalance + detail.debit - detail.credit;
-    currentBalance = detail.closingBalance;
+    detail.closingBalance = toTwoDecimals(
+      currentBalance + detail.debit - detail.credit
+    );
+    currentBalance = toTwoDecimals(detail.closingBalance);
   }
 
   await record.save({ session });
@@ -203,12 +213,191 @@ async function recalculateAllBalancesAfterDate(
 
   for (let i = startIndex; i < record.balanceDetails.length; i++) {
     const detail = record.balanceDetails[i];
-    detail.openingBalance = currentBalance;
-    detail.closingBalance = currentBalance + detail.debit - detail.credit;
+    detail.openingBalance = toTwoDecimals(currentBalance);
+    detail.closingBalance = toTwoDecimals(
+      currentBalance + detail.debit - detail.credit
+    );
     currentBalance = detail.closingBalance;
   }
 
   await record.save({ session });
+}
+
+async function propagateBalanceChangeToNextYear(
+  schoolId,
+  currentAcademicYear,
+  ledgerId,
+  session
+) {
+  try {
+    // Find the current ledger to get its details
+    const currentLedger = await Ledger.findOne({
+      schoolId,
+      academicYear: currentAcademicYear,
+      _id: ledgerId,
+    }).session(session);
+
+    if (!currentLedger) {
+      console.log(`Ledger ${ledgerId} not found in ${currentAcademicYear}`);
+      return;
+    }
+
+    // Calculate next academic year
+    const [yearPart1, yearPart2] = currentAcademicYear.split("-");
+    const nextAcademicYear = `${parseInt(yearPart1) + 1}-${
+      parseInt(yearPart2) + 1
+    }`;
+
+    // Find the next year's ledger that has the CURRENT ledger as parent
+    const nextYearLedger = await Ledger.findOne({
+      schoolId,
+      academicYear: nextAcademicYear,
+      parentLedgerId: currentLedger._id,
+    }).session(session);
+
+    if (!nextYearLedger) {
+      console.log(`No next year ledger found for ${currentLedger.ledgerName}`);
+      return; // No next year ledger found
+    }
+
+    // Get the current year's balance record for this ledger
+    const currentYearBalance = await OpeningClosingBalance.findOne({
+      schoolId,
+      academicYear: currentAcademicYear,
+      ledgerId: ledgerId,
+    }).session(session);
+
+    let newOpeningBalance = 0;
+
+    // FIXED: Handle both cases properly
+    if (currentYearBalance && currentYearBalance.balanceDetails.length > 0) {
+      // Case 1: There are balance details - use last closing balance
+      const lastEntry =
+        currentYearBalance.balanceDetails[
+          currentYearBalance.balanceDetails.length - 1
+        ];
+      newOpeningBalance = lastEntry.closingBalance;
+    } else {
+      // Case 2: No balance details exist - use the current ledger's opening balance
+      // This happens when all entries are removed or ledger has no transactions
+      newOpeningBalance = currentLedger.openingBalance || 0;
+    }
+
+    // Update the next year's ledger opening balance
+    await Ledger.findOneAndUpdate(
+      {
+        schoolId,
+        academicYear: nextAcademicYear,
+        _id: nextYearLedger._id,
+      },
+      {
+        $set: {
+          openingBalance: newOpeningBalance,
+          balanceType: newOpeningBalance < 0 ? "Credit" : "Debit",
+        },
+      },
+      { session }
+    );
+
+    // Update the OpeningClosingBalance for next year
+    let nextYearOpeningBalance = await OpeningClosingBalance.findOne({
+      schoolId,
+      academicYear: nextAcademicYear,
+      ledgerId: nextYearLedger._id,
+    }).session(session);
+
+    if (!nextYearOpeningBalance) {
+      // Create new OpeningClosingBalance record if it doesn't exist
+      nextYearOpeningBalance = new OpeningClosingBalance({
+        schoolId,
+        academicYear: nextAcademicYear,
+        ledgerId: nextYearLedger._id,
+        balanceDetails: [],
+        balanceType: newOpeningBalance < 0 ? "Credit" : "Debit",
+      });
+
+      // Create initial balance detail with the new opening balance
+      nextYearOpeningBalance.balanceDetails.push({
+        entryDate: new Date(),
+        openingBalance: newOpeningBalance,
+        debit: 0,
+        credit: 0,
+        closingBalance: newOpeningBalance,
+      });
+    } else {
+      // FIXED: Find and update the opening balance entry
+      // Look for an entry without entryId (opening balance entry)
+      let openingBalanceEntry = nextYearOpeningBalance.balanceDetails.find(
+        (detail) => !detail.entryId
+      );
+
+      if (
+        !openingBalanceEntry &&
+        nextYearOpeningBalance.balanceDetails.length > 0
+      ) {
+        // If no dedicated opening balance entry, use the first entry
+        openingBalanceEntry = nextYearOpeningBalance.balanceDetails[0];
+      }
+
+      if (openingBalanceEntry) {
+        const oldOpeningBalance = openingBalanceEntry.openingBalance;
+
+        // Only update if the opening balance has changed
+        if (oldOpeningBalance !== newOpeningBalance) {
+          openingBalanceEntry.openingBalance = newOpeningBalance;
+          openingBalanceEntry.closingBalance = toTwoDecimals(
+            newOpeningBalance +
+              openingBalanceEntry.debit -
+              openingBalanceEntry.credit
+          );
+
+          // Recalculate all subsequent entries
+          let currentBalance = openingBalanceEntry.closingBalance;
+          const startIndex =
+            nextYearOpeningBalance.balanceDetails.indexOf(openingBalanceEntry) +
+            1;
+
+          for (
+            let i = startIndex;
+            i < nextYearOpeningBalance.balanceDetails.length;
+            i++
+          ) {
+            const detail = nextYearOpeningBalance.balanceDetails[i];
+            detail.openingBalance = currentBalance;
+            detail.closingBalance = toTwoDecimals(
+              currentBalance + detail.debit - detail.credit
+            );
+            currentBalance = detail.closingBalance;
+          }
+        }
+      } else {
+        // If no entries exist at all, create an opening balance entry
+        nextYearOpeningBalance.balanceDetails.push({
+          entryDate: new Date(),
+          openingBalance: newOpeningBalance,
+          debit: 0,
+          credit: 0,
+          closingBalance: newOpeningBalance,
+        });
+      }
+    }
+
+    await nextYearOpeningBalance.save({ session });
+
+    // Recursively propagate to the next year if it exists
+    await propagateBalanceChangeToNextYear(
+      schoolId,
+      nextAcademicYear,
+      nextYearLedger._id,
+      session
+    );
+  } catch (propagationError) {
+    console.error(
+      `Error in propagateBalanceChangeToNextYear for ledger ${ledgerId}:`,
+      propagationError
+    );
+    throw propagationError;
+  }
 }
 
 async function cancelById(req, res) {
@@ -430,6 +619,42 @@ async function cancelById(req, res) {
       );
     }
 
+    // ========= NEW: Propagate changes to subsequent academic years =========
+
+    // Include all affected ledgers for propagation
+    const allLedgersToPropagate = new Set([...ledgerIdsToUpdate]);
+
+    // Also include Net Surplus/(Deficit) and Capital Fund if they were affected
+    if (netSurplusDeficitLedger) {
+      allLedgersToPropagate.add(netSurplusDeficitLedger._id.toString());
+    }
+    if (capitalFundLedger) {
+      allLedgersToPropagate.add(capitalFundLedger._id.toString());
+    }
+
+    console.log(
+      `All ledger IDs for propagation in receipt cancel:`,
+      Array.from(allLedgersToPropagate)
+    );
+
+    // Propagate changes for each affected ledger
+    for (const ledgerId of allLedgersToPropagate) {
+      try {
+        await propagateBalanceChangeToNextYear(
+          schoolId,
+          academicYear,
+          ledgerId,
+          session
+        );
+      } catch (propagationError) {
+        console.error(
+          `Error propagating changes for ledger ${ledgerId} during receipt cancel:`,
+          propagationError
+        );
+        // Don't throw here - we want to continue with other ledgers
+      }
+    }
+
     await session.commitTransaction();
     session.endSession();
 
@@ -449,4 +674,5 @@ async function cancelById(req, res) {
     });
   }
 }
+
 export default cancelById;

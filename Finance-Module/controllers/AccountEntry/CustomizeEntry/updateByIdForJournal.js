@@ -603,7 +603,6 @@ async function propagateBalanceChangeToNextYear(
 }
 
 export async function updateById(req, res) {
-  // First, do all validations BEFORE starting the transaction
   const schoolId = req.user?.schoolId;
   const { id, academicYear } = req.params;
 

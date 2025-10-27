@@ -5,11 +5,6 @@ import Ledger from "../../../models/Ledger.js";
 import GroupLedger from "../../../models/GroupLedger.js";
 import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus.js";
 
-function toTwoDecimals(value) {
-  if (value === null || value === undefined || isNaN(value)) return 0;
-  return Math.round(Number(value) * 100) / 100;
-}
-
 // Helper function to remove contra entry from balances
 async function removeContraEntryFromBalances(
   schoolId,
@@ -26,65 +21,9 @@ async function removeContraEntryFromBalances(
 
   for (const record of balanceRecords) {
     // Remove the entry from balance details
-    const originalLength = record.balanceDetails.length;
     record.balanceDetails = record.balanceDetails.filter(
       (detail) => detail.entryId?.toString() !== contraEntryId.toString()
     );
-
-    if (record.balanceDetails.length === originalLength) continue; // nothing removed
-
-    // Sort the remaining entries by date and sequence
-    record.balanceDetails.sort((a, b) => {
-      const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
-      if (dateDiff !== 0) return dateDiff;
-      return (a.entrySequence || 0) - (b.entrySequence || 0);
-    });
-
-    // Recalculate sequences for same-day entries
-    let currentDate = null;
-    let currentSequence = 0;
-
-    for (let i = 0; i < record.balanceDetails.length; i++) {
-      const detail = record.balanceDetails[i];
-      const detailDate = new Date(detail.entryDate).toDateString();
-
-      if (currentDate !== detailDate) {
-        currentDate = detailDate;
-        currentSequence = 1;
-      } else {
-        currentSequence++;
-      }
-
-      detail.entrySequence = currentSequence;
-    }
-
-    // Re-sort after sequence correction
-    record.balanceDetails.sort((a, b) => {
-      const dateDiff = new Date(a.entryDate) - new Date(b.entryDate);
-      if (dateDiff !== 0) return dateDiff;
-      return (a.entrySequence || 0) - (b.entrySequence || 0);
-    });
-
-    // Recalculate opening and closing balances - FIXED: Use toTwoDecimals
-    for (let i = 0; i < record.balanceDetails.length; i++) {
-      const detail = record.balanceDetails[i];
-      if (i === 0) {
-        // First entry uses ledger opening balance
-        const ledger = await Ledger.findOne({
-          schoolId,
-          academicYear,
-          _id: record.ledgerId,
-        }).session(session);
-        detail.openingBalance = toTwoDecimals(ledger?.openingBalance || 0);
-      } else {
-        detail.openingBalance = toTwoDecimals(
-          record.balanceDetails[i - 1].closingBalance
-        );
-      }
-      detail.closingBalance = toTwoDecimals(
-        detail.openingBalance + detail.debit - detail.credit
-      );
-    }
 
     await record.save({ session });
   }
@@ -239,7 +178,7 @@ async function recalculateLedgerBalances(
   });
 
   // Find the initial opening balance from the ledger
-  let currentBalance = toTwoDecimals(ledger?.openingBalance || 0);
+  let currentBalance = ledger?.openingBalance || 0;
 
   // Process each balance detail in chronological order
   for (let i = 0; i < record.balanceDetails.length; i++) {
@@ -248,18 +187,21 @@ async function recalculateLedgerBalances(
     // Set the opening balance for this entry
     detail.openingBalance = currentBalance;
 
-    // Calculate the closing balance
-    detail.closingBalance = toTwoDecimals(
-      currentBalance + detail.debit - detail.credit
-    );
+    // Calculate the closing balance based on the balance type
+    if (balanceType === "Debit") {
+      detail.closingBalance = currentBalance + detail.debit - detail.credit;
+    } else {
+      detail.closingBalance = currentBalance + detail.debit - detail.credit;
+    }
 
     // Update current balance for the next entry
-    currentBalance = toTwoDecimals(detail.closingBalance);
+    currentBalance = detail.closingBalance;
   }
 
   await record.save({ session });
 }
 
+// Helper function to recalculate all affected ledgers for contra entries - IMPROVED
 async function recalculateAllAffectedLedgers(
   schoolId,
   academicYear,
@@ -359,183 +301,6 @@ async function recalculateAllBalancesAfterDate(
   }
 
   await record.save({ session });
-}
-
-async function propagateBalanceChangeToNextYear(
-  schoolId,
-  currentAcademicYear,
-  ledgerId,
-  session
-) {
-  try {
-    // Find the current ledger to get its details
-    const currentLedger = await Ledger.findOne({
-      schoolId,
-      academicYear: currentAcademicYear,
-      _id: ledgerId,
-    }).session(session);
-
-    if (!currentLedger) {
-      console.log(`Ledger ${ledgerId} not found in ${currentAcademicYear}`);
-      return;
-    }
-
-    // Calculate next academic year
-    const [yearPart1, yearPart2] = currentAcademicYear.split("-");
-    const nextAcademicYear = `${parseInt(yearPart1) + 1}-${
-      parseInt(yearPart2) + 1
-    }`;
-
-    // Find the next year's ledger that has the CURRENT ledger as parent
-    const nextYearLedger = await Ledger.findOne({
-      schoolId,
-      academicYear: nextAcademicYear,
-      parentLedgerId: currentLedger._id,
-    }).session(session);
-
-    if (!nextYearLedger) {
-      console.log(`No next year ledger found for ${currentLedger.ledgerName}`);
-      return; // No next year ledger found
-    }
-
-    // Get the current year's balance record for this ledger
-    const currentYearBalance = await OpeningClosingBalance.findOne({
-      schoolId,
-      academicYear: currentAcademicYear,
-      ledgerId: ledgerId,
-    }).session(session);
-
-    let newOpeningBalance = 0;
-
-    // FIXED: Handle both cases properly
-    if (currentYearBalance && currentYearBalance.balanceDetails.length > 0) {
-      // Case 1: There are balance details - use last closing balance
-      const lastEntry =
-        currentYearBalance.balanceDetails[
-          currentYearBalance.balanceDetails.length - 1
-        ];
-      newOpeningBalance = lastEntry.closingBalance;
-    } else {
-      // Case 2: No balance details exist - use the current ledger's opening balance
-      // This happens when all entries are removed or ledger has no transactions
-      newOpeningBalance = currentLedger.openingBalance || 0;
-    }
-
-    // Update the next year's ledger opening balance
-    await Ledger.findOneAndUpdate(
-      {
-        schoolId,
-        academicYear: nextAcademicYear,
-        _id: nextYearLedger._id,
-      },
-      {
-        $set: {
-          openingBalance: newOpeningBalance,
-          balanceType: newOpeningBalance < 0 ? "Credit" : "Debit",
-        },
-      },
-      { session }
-    );
-
-    // Update the OpeningClosingBalance for next year
-    let nextYearOpeningBalance = await OpeningClosingBalance.findOne({
-      schoolId,
-      academicYear: nextAcademicYear,
-      ledgerId: nextYearLedger._id,
-    }).session(session);
-
-    if (!nextYearOpeningBalance) {
-      // Create new OpeningClosingBalance record if it doesn't exist
-      nextYearOpeningBalance = new OpeningClosingBalance({
-        schoolId,
-        academicYear: nextAcademicYear,
-        ledgerId: nextYearLedger._id,
-        balanceDetails: [],
-        balanceType: newOpeningBalance < 0 ? "Credit" : "Debit",
-      });
-
-      // Create initial balance detail with the new opening balance
-      nextYearOpeningBalance.balanceDetails.push({
-        entryDate: new Date(),
-        openingBalance: newOpeningBalance,
-        debit: 0,
-        credit: 0,
-        closingBalance: newOpeningBalance,
-      });
-    } else {
-      // FIXED: Find and update the opening balance entry
-      // Look for an entry without entryId (opening balance entry)
-      let openingBalanceEntry = nextYearOpeningBalance.balanceDetails.find(
-        (detail) => !detail.entryId
-      );
-
-      if (
-        !openingBalanceEntry &&
-        nextYearOpeningBalance.balanceDetails.length > 0
-      ) {
-        // If no dedicated opening balance entry, use the first entry
-        openingBalanceEntry = nextYearOpeningBalance.balanceDetails[0];
-      }
-
-      if (openingBalanceEntry) {
-        const oldOpeningBalance = openingBalanceEntry.openingBalance;
-
-        // Only update if the opening balance has changed
-        if (oldOpeningBalance !== newOpeningBalance) {
-          openingBalanceEntry.openingBalance = newOpeningBalance;
-          openingBalanceEntry.closingBalance = toTwoDecimals(
-            newOpeningBalance +
-              openingBalanceEntry.debit -
-              openingBalanceEntry.credit
-          );
-
-          // Recalculate all subsequent entries
-          let currentBalance = openingBalanceEntry.closingBalance;
-          const startIndex =
-            nextYearOpeningBalance.balanceDetails.indexOf(openingBalanceEntry) +
-            1;
-
-          for (
-            let i = startIndex;
-            i < nextYearOpeningBalance.balanceDetails.length;
-            i++
-          ) {
-            const detail = nextYearOpeningBalance.balanceDetails[i];
-            detail.openingBalance = currentBalance;
-            detail.closingBalance = toTwoDecimals(
-              currentBalance + detail.debit - detail.credit
-            );
-            currentBalance = detail.closingBalance;
-          }
-        }
-      } else {
-        // If no entries exist at all, create an opening balance entry
-        nextYearOpeningBalance.balanceDetails.push({
-          entryDate: new Date(),
-          openingBalance: newOpeningBalance,
-          debit: 0,
-          credit: 0,
-          closingBalance: newOpeningBalance,
-        });
-      }
-    }
-
-    await nextYearOpeningBalance.save({ session });
-
-    // Recursively propagate to the next year if it exists
-    await propagateBalanceChangeToNextYear(
-      schoolId,
-      nextAcademicYear,
-      nextYearLedger._id,
-      session
-    );
-  } catch (propagationError) {
-    console.error(
-      `Error in propagateBalanceChangeToNextYear for ledger ${ledgerId}:`,
-      propagationError
-    );
-    throw propagationError;
-  }
 }
 
 async function cancelById(req, res) {
@@ -844,63 +609,6 @@ async function cancelById(req, res) {
         existingContra.entryDate,
         session
       );
-
-      // Store all ledger IDs that were affected by this contra
-      const ledgerIdsToUpdate = new Set();
-
-      // 1. Add main ledgers from item details
-      const ledgerAmounts = aggregateAmountsByLedger(itemDetails);
-      for (const [ledgerId] of ledgerAmounts) {
-        ledgerIdsToUpdate.add(ledgerId);
-      }
-
-      // 2. Add cash account ledgers if applicable
-      if (
-        ["Cash Deposited", "Cash Withdrawn", "Bank Transfer", ""].includes(
-          contraEntryName
-        )
-      ) {
-        const cashAccountAmounts = aggregateCashAccountAmounts(itemDetails);
-        for (const [cashAccountId] of cashAccountAmounts) {
-          ledgerIdsToUpdate.add(cashAccountId);
-        }
-      }
-
-      // 3. Add TDS/TCS ledger if applicable
-      if (TDSorTCS && TDSTCSRateAmount > 0 && TDSorTCSLedgerId) {
-        ledgerIdsToUpdate.add(TDSorTCSLedgerId.toString());
-      }
-
-      // 4. Also include Net Surplus/(Deficit) and Capital Fund if they were affected
-      if (netSurplusDeficitLedger) {
-        ledgerIdsToUpdate.add(netSurplusDeficitLedger._id.toString());
-      }
-      if (capitalFundLedger) {
-        ledgerIdsToUpdate.add(capitalFundLedger._id.toString());
-      }
-
-      console.log(
-        `All ledger IDs for propagation in contra cancel:`,
-        Array.from(ledgerIdsToUpdate)
-      );
-
-      // Propagate changes for each affected ledger
-      for (const ledgerId of ledgerIdsToUpdate) {
-        try {
-          await propagateBalanceChangeToNextYear(
-            schoolId,
-            academicYear,
-            ledgerId,
-            session
-          );
-        } catch (propagationError) {
-          console.error(
-            `Error propagating changes for ledger ${ledgerId} during contra cancel:`,
-            propagationError
-          );
-          // Don't throw here - we want to continue with other ledgers
-        }
-      }
 
       // =====End of Net Surplus/(Deficit)...Capital Fund=====
       return res.status(200).json({
