@@ -8,6 +8,7 @@ import updateDraftContraById from "./updateDraftById.js";
 import dreaftContra from "./draft.js";
 
 import getAllLedgerByNameWithTDSorTCS from "./getAllByNameWithTDSTCS.js";
+import deleteContraEntryById from "./deleteById.js";
 
 export {
   createContra,
@@ -18,4 +19,5 @@ export {
   updateDraftContraById,
   updateApprovalStatusById,
   getAllLedgerByNameWithTDSorTCS,
+  deleteContraEntryById,
 };

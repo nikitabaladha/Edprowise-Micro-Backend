@@ -13,6 +13,7 @@ import {
   dreaftJournal,
   updateDraftJournalById,
   updateApprovalStatusById,
+  deleteJournalEntryById,
 } from "../controllers/AccountEntry/Journal/index.js";
 
 router.post(
@@ -65,6 +66,12 @@ router.get(
   "/get-journal-with-ledger-by-tds-tcs/:id/:academicYear",
   roleBasedMiddleware("School"),
   getAllLedgerByNameWithTDSorTCS
+);
+
+router.delete(
+  "/delete-journal-entry/:id/:academicYear",
+  roleBasedMiddleware("School"),
+  deleteJournalEntryById
 );
 
 export default router;

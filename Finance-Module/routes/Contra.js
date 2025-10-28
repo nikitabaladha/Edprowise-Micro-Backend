@@ -14,6 +14,7 @@ import {
   updateDraftContraById,
   getAllLedgerByNameWithTDSorTCS,
   updateApprovalStatusById,
+  deleteContraEntryById,
 } from "../controllers/AccountEntry/Contra/index.js";
 
 router.post(
@@ -66,6 +67,12 @@ router.get(
   "/get-contra-with-ledger-by-tds-tcs/:id/:academicYear",
   roleBasedMiddleware("School"),
   getAllLedgerByNameWithTDSorTCS
+);
+
+router.delete(
+  "/delete-contra-entry/:id/:academicYear",
+  roleBasedMiddleware("School"),
+  deleteContraEntryById
 );
 
 export default router;

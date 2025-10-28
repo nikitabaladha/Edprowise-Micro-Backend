@@ -14,6 +14,7 @@ import {
   updateDraftPaymentEntryById,
   getAllLedgerByNameWithTDSorTCS,
   updateApprovalStatusById,
+  deletePaymentEntryById,
 } from "../controllers/AccountEntry/PaymentEntry/index.js";
 
 router.post(
@@ -66,6 +67,12 @@ router.get(
   "/get-payment-entry-with-ledger-by-tds-tcs/:id/:academicYear",
   roleBasedMiddleware("School"),
   getAllLedgerByNameWithTDSorTCS
+);
+
+router.delete(
+  "/delete-payment-entry/:id/:academicYear",
+  roleBasedMiddleware("School"),
+  deletePaymentEntryById
 );
 
 export default router;

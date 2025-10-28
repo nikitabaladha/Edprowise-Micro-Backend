@@ -9,6 +9,8 @@ import dreaftPaymentEntry from "./draft.js";
 
 import getAllLedgerByNameWithTDSorTCS from "./getAllByNameWithTDSTCS.js";
 
+import deletePaymentEntryById from "./deleteById.js";
+
 export {
   createPaymentEntry,
   getAllPaymentEntryBySchoolId,
@@ -18,4 +20,5 @@ export {
   updateDraftPaymentEntryById,
   getAllLedgerByNameWithTDSorTCS,
   updateApprovalStatusById,
+  deletePaymentEntryById,
 };

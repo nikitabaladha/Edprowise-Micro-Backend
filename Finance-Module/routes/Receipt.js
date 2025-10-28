@@ -14,6 +14,7 @@ import {
   dreaftReceipt,
   updateDraftReceiptById,
   getAllLedgerByNameWithTDSorTCS,
+  deleteReceiptEntryById,
 } from "../controllers/AccountEntry/Receipt/index.js";
 
 router.post(
@@ -66,6 +67,12 @@ router.get(
   "/get-receipt-with-ledger-by-tds-tcs/:id/:academicYear",
   roleBasedMiddleware("School"),
   getAllLedgerByNameWithTDSorTCS
+);
+
+router.delete(
+  "/delete-receipt-entry/:id/:academicYear",
+  roleBasedMiddleware("School"),
+  deleteReceiptEntryById
 );
 
 export default router;

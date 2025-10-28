@@ -9,6 +9,8 @@ import dreaftReceipt from "./draft.js";
 
 import getAllLedgerByNameWithTDSorTCS from "./getAllByNameWithTDSTCS.js";
 
+import deleteReceiptEntryById from "./deleteById.js";
+
 export {
   createReceipt,
   getAllReceiptBySchoolId,
@@ -18,4 +20,5 @@ export {
   updateDraftReceiptById,
   updateApprovalStatusById,
   getAllLedgerByNameWithTDSorTCS,
+  deleteReceiptEntryById,
 };

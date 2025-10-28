@@ -8,6 +8,7 @@ import updateDraftJournalById from "./updateDraftById.js";
 import dreaftJournal from "./draft.js";
 
 import getAllLedgerByNameWithTDSorTCS from "./getAllByNameWithTDSTCS.js";
+import deleteJournalEntryById from "./deleteById.js";
 
 export {
   createJournal,
@@ -18,4 +19,5 @@ export {
   dreaftJournal,
   updateDraftJournalById,
   updateApprovalStatusById,
+  deleteJournalEntryById,
 };
