@@ -1,11 +1,5 @@
 import Journal from "../../../models/Journal.js";
 
-async function generateJournalVoucherNumber(schoolId, academicYear) {
-  const count = await Journal.countDocuments({ schoolId, academicYear });
-  const nextNumber = count + 1;
-  return `JVN/${academicYear}/${nextNumber}`;
-}
-
 export async function draft(req, res) {
   try {
     const schoolId = req.user?.schoolId;
@@ -25,11 +19,6 @@ export async function draft(req, res) {
       status,
       academicYear,
     } = req.body;
-
-    const JournalVoucherNumber = await generateJournalVoucherNumber(
-      schoolId,
-      academicYear
-    );
 
     const { documentImage } = req.files || {};
 
@@ -63,7 +52,6 @@ export async function draft(req, res) {
 
     const newJournal = new Journal({
       schoolId,
-      journalVoucherNumber: JournalVoucherNumber,
       entryDate,
       documentDate,
       narration,

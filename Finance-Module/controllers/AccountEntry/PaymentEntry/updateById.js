@@ -11,6 +11,32 @@ function toTwoDecimals(value) {
   return Math.round(Number(value) * 100) / 100;
 }
 
+async function generatePaymentVoucherNumber(schoolId, academicYear) {
+  // Find the highest existing voucher number
+  const lastEntry = await PaymentEntry.findOne(
+    {
+      schoolId,
+      academicYear,
+      status: "Posted",
+      paymentVoucherNumber: { $exists: true, $ne: null },
+    },
+    { paymentVoucherNumber: 1 },
+    { sort: { paymentVoucherNumber: -1 } }
+  );
+
+  let nextNumber = 1;
+
+  if (lastEntry && lastEntry.paymentVoucherNumber) {
+    // Extract the number from the voucher string (e.g., "PVN/2025-2026/3" → 3)
+    const matches = lastEntry.paymentVoucherNumber.match(/\/(\d+)$/);
+    if (matches && matches[1]) {
+      nextNumber = parseInt(matches[1]) + 1;
+    }
+  }
+
+  return `PVN/${academicYear}/${nextNumber}`;
+}
+
 async function generateTransactionNumber() {
   const now = moment();
   const dateTimeStr = now.format("DDMMYYYYHHmmss");
@@ -691,6 +717,19 @@ async function updateById(req, res) {
     const oldTDSTCSRateWithAmount = existingPaymentEntry.TDSTCSRateWithAmount;
     const oldLedgerIdWithPaymentMode =
       existingPaymentEntry.ledgerIdWithPaymentMode;
+    const oldStatus = existingPaymentEntry.status;
+
+    let paymentVoucherNumber = existingPaymentEntry.paymentVoucherNumber;
+    if (
+      status === "Posted" &&
+      !paymentVoucherNumber &&
+      oldStatus !== "Posted"
+    ) {
+      paymentVoucherNumber = await generatePaymentVoucherNumber(
+        schoolId,
+        academicYear
+      );
+    }
 
     // Handle uploaded files
     const { invoiceImage, chequeImage } = req.files || {};
@@ -766,6 +805,7 @@ async function updateById(req, res) {
     existingPaymentEntry.totalGSTAmount = totalGSTAmount;
     existingPaymentEntry.totalAmountAfterGST = totalAmountAfterGST;
     existingPaymentEntry.ledgerIdWithPaymentMode = ledgerIdWithPaymentMode;
+    existingPaymentEntry.paymentVoucherNumber = paymentVoucherNumber;
     existingPaymentEntry.status = status;
 
     if (

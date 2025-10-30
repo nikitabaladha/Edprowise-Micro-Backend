@@ -11,6 +11,31 @@ function toTwoDecimals(value) {
   return Math.round(Number(value) * 100) / 100;
 }
 
+async function generateReceiptVoucherNumber(schoolId, academicYear) {
+  // Find the highest existing voucher number
+  const lastEntry = await Receipt.findOne(
+    {
+      schoolId,
+      academicYear,
+      status: "Posted",
+      receiptVoucherNumber: { $exists: true, $ne: null },
+    },
+    { receiptVoucherNumber: 1 },
+    { sort: { receiptVoucherNumber: -1 } }
+  );
+
+  let nextNumber = 1;
+
+  if (lastEntry && lastEntry.receiptVoucherNumber) {
+    const matches = lastEntry.receiptVoucherNumber.match(/\/(\d+)$/);
+    if (matches && matches[1]) {
+      nextNumber = parseInt(matches[1]) + 1;
+    }
+  }
+
+  return `RVN/${academicYear}/${nextNumber}`;
+}
+
 async function generateTransactionNumber() {
   const now = moment();
   const dateTimeStr = now.format("DDMMYYYYHHmmss");
@@ -683,6 +708,19 @@ async function updateById(req, res) {
     const oldTDSorTCS = existingReceipt.TDSorTCS;
     const oldTDSTCSRateWithAmount = existingReceipt.TDSTCSRateWithAmount;
     const oldLedgerIdWithPaymentMode = existingReceipt.ledgerIdWithPaymentMode;
+    const oldStatus = existingReceipt.status;
+
+    let receiptVoucherNumber = existingReceipt.receiptVoucherNumber;
+    if (
+      status === "Posted" &&
+      !receiptVoucherNumber &&
+      oldStatus !== "Posted"
+    ) {
+      receiptVoucherNumber = await generateReceiptVoucherNumber(
+        schoolId,
+        academicYear
+      );
+    }
 
     // Handle uploaded files
     const { receiptImage, chequeImageForReceipt } = req.files || {};
@@ -726,11 +764,6 @@ async function updateById(req, res) {
     existingReceipt.paymentMode = paymentMode;
     existingReceipt.chequeNumber = chequeNumber;
     existingReceipt.itemDetails = updatedItemDetails;
-    // existingReceipt.TDSorTCS = TDSorTCS;
-    // existingReceipt.TDSTCSRateChartId = TDSTCSRateChartId;
-    // existingReceipt.TDSTCSRate = TDSTCSRate;
-    // existingReceipt.TDSTCSRateWithAmount = parsedTDSTCSRateWithAmount;
-
     // Handle TDS/TCS fields properly
     if (TDSorTCS) {
       existingReceipt.TDSorTCS = TDSorTCS;
@@ -749,6 +782,7 @@ async function updateById(req, res) {
     existingReceipt.subTotalAmount = subTotalAmount;
     existingReceipt.totalAmount = totalAmount;
     existingReceipt.ledgerIdWithPaymentMode = ledgerIdWithPaymentMode;
+    existingReceipt.receiptVoucherNumber = receiptVoucherNumber;
     existingReceipt.status = status;
 
     if (
@@ -846,14 +880,6 @@ async function updateById(req, res) {
         entryDate,
         session
       );
-
-      // await removeReceiptEntryFromLedger(
-      //   schoolId,
-      //   academicYear,
-      //   id,
-      //   oldTDSorTCSLedgerId,
-      //   session
-      // );
     }
 
     // Remove old payment mode ledger entry if changed

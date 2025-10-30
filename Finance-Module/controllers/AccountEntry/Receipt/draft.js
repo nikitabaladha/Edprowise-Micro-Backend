@@ -3,12 +3,6 @@ import moment from "moment";
 import Receipt from "../../../models/Receipt.js";
 import Ledger from "../../../models/Ledger.js";
 
-async function generateReceiptVoucherNumber(schoolId, academicYear) {
-  const count = await Receipt.countDocuments({ schoolId, academicYear });
-  const nextNumber = count + 1;
-  return `RVN/${academicYear}/${nextNumber}`;
-}
-
 async function generateTransactionNumber() {
   const now = moment();
   const dateTimeStr = now.format("DDMMYYYYHHmmss");
@@ -60,11 +54,6 @@ async function draft(req, res) {
       });
     }
 
-    const receiptVoucherNumber = await generateReceiptVoucherNumber(
-      schoolId,
-      academicYear
-    );
-
     const { receiptImage, chequeImage } = req.files || {};
 
     const receiptImagePath = receiptImage?.[0]?.mimetype?.startsWith("image/")
@@ -113,7 +102,6 @@ async function draft(req, res) {
     const newReceipt = new Receipt({
       schoolId,
       academicYear,
-      receiptVoucherNumber,
       entryDate,
       receiptDate,
       narration,

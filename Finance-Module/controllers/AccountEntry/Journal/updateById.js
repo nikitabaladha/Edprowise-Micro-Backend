@@ -10,6 +10,32 @@ function toTwoDecimals(value) {
   return Math.round(Number(value) * 100) / 100;
 }
 
+async function generateJournalVoucherNumber(schoolId, academicYear) {
+  // Find the highest existing voucher number
+  const lastEntry = await Journal.findOne(
+    {
+      schoolId,
+      academicYear,
+      status: "Posted",
+      journalVoucherNumber: { $exists: true, $ne: null },
+    },
+    { journalVoucherNumber: 1 },
+    { sort: { journalVoucherNumber: -1 } }
+  );
+
+  let nextNumber = 1;
+
+  if (lastEntry && lastEntry.journalVoucherNumber) {
+    // Extract the number from the voucher string (e.g., "PVN/2025-2026/3" → 3)
+    const matches = lastEntry.journalVoucherNumber.match(/\/(\d+)$/);
+    if (matches && matches[1]) {
+      nextNumber = parseInt(matches[1]) + 1;
+    }
+  }
+
+  return `JVN/${academicYear}/${nextNumber}`;
+}
+
 async function getOrCreateOpeningBalanceRecord(
   schoolId,
   academicYear,
@@ -677,6 +703,19 @@ export async function updateById(req, res) {
     // Store old values for comparison
     const oldItemDetails = existingJournal.itemDetails;
     const oldEntryDate = existingJournal.entryDate;
+    const oldStatus = existingJournal.status;
+
+    let journalVoucherNumber = existingJournal.journalVoucherNumber;
+    if (
+      status === "Posted" &&
+      !journalVoucherNumber &&
+      oldStatus !== "Posted"
+    ) {
+      journalVoucherNumber = await generateJournalVoucherNumber(
+        schoolId,
+        academicYear
+      );
+    }
 
     // Handle uploaded files
     const { documentImage } = req.files || {};
@@ -697,7 +736,8 @@ export async function updateById(req, res) {
     existingJournal.totalAmountOfDebit = totalAmountOfDebit;
     existingJournal.totalAmountOfCredit = totalAmountOfCredit;
     existingJournal.narration = narration || existingJournal.narration;
-    existingJournal.status = status || existingJournal.status;
+    existingJournal.journalVoucherNumber = journalVoucherNumber;
+    existingJournal.status = status;
 
     await existingJournal.save({ session });
 

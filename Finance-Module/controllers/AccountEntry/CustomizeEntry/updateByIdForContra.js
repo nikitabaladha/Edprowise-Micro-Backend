@@ -773,7 +773,7 @@ export async function updateById(req, res) {
     existingContra.totalAmountOfDebit = totalAmountOfDebit;
     existingContra.totalAmountOfCredit = totalAmountOfCredit;
     existingContra.contraVoucherNumber = contraVoucherNumber;
-    existingContra.status = status || existingContra.status;
+    existingJournal.status = status;
 
     await existingContra.save({ session });
 

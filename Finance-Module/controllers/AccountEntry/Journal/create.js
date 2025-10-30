@@ -11,8 +11,28 @@ function toTwoDecimals(value) {
 }
 
 async function generateJournalVoucherNumber(schoolId, academicYear) {
-  const count = await Journal.countDocuments({ schoolId, academicYear });
-  const nextNumber = count + 1;
+  // Find the highest existing voucher number
+  const lastEntry = await Journal.findOne(
+    {
+      schoolId,
+      academicYear,
+      status: "Posted",
+      journalVoucherNumber: { $exists: true, $ne: null },
+    },
+    { journalVoucherNumber: 1 },
+    { sort: { journalVoucherNumber: -1 } }
+  );
+
+  let nextNumber = 1;
+
+  if (lastEntry && lastEntry.journalVoucherNumber) {
+    // Extract the number from the voucher string (e.g., "PVN/2025-2026/3" → 3)
+    const matches = lastEntry.journalVoucherNumber.match(/\/(\d+)$/);
+    if (matches && matches[1]) {
+      nextNumber = parseInt(matches[1]) + 1;
+    }
+  }
+
   return `JVN/${academicYear}/${nextNumber}`;
 }
 
@@ -518,10 +538,15 @@ export async function create(req, res) {
 
     const { documentImage } = req.files || {};
 
-    const JournalVoucherNumber = await generateJournalVoucherNumber(
-      schoolId,
-      academicYear
-    );
+    let journalVoucherNumber = null;
+
+    // Only generate voucher number if status is "Posted" from the beginning
+    if (status === "Posted") {
+      journalVoucherNumber = await generateJournalVoucherNumber(
+        schoolId,
+        academicYear
+      );
+    }
 
     const documentImagePath = documentImage?.[0]?.mimetype.startsWith("image/")
       ? "/Images/FinanceModule/DocumentImageForJournal"
@@ -559,7 +584,7 @@ export async function create(req, res) {
 
     const newJournal = new Journal({
       schoolId,
-      journalVoucherNumber: JournalVoucherNumber,
+      journalVoucherNumber,
       entryDate,
       documentDate,
       narration,

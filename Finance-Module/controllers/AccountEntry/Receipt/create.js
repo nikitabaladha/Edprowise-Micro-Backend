@@ -12,8 +12,27 @@ function toTwoDecimals(value) {
 }
 
 async function generateReceiptVoucherNumber(schoolId, academicYear) {
-  const count = await Receipt.countDocuments({ schoolId, academicYear });
-  const nextNumber = count + 1;
+  // Find the highest existing voucher number
+  const lastEntry = await Receipt.findOne(
+    {
+      schoolId,
+      academicYear,
+      status: "Posted",
+      receiptVoucherNumber: { $exists: true, $ne: null },
+    },
+    { receiptVoucherNumber: 1 },
+    { sort: { receiptVoucherNumber: -1 } }
+  );
+
+  let nextNumber = 1;
+
+  if (lastEntry && lastEntry.receiptVoucherNumber) {
+    const matches = lastEntry.receiptVoucherNumber.match(/\/(\d+)$/);
+    if (matches && matches[1]) {
+      nextNumber = parseInt(matches[1]) + 1;
+    }
+  }
+
   return `RVN/${academicYear}/${nextNumber}`;
 }
 
@@ -533,10 +552,15 @@ async function create(req, res) {
       totalAmount,
     } = req.body;
 
-    const receiptVoucherNumber = await generateReceiptVoucherNumber(
-      schoolId,
-      academicYear
-    );
+    let receiptVoucherNumber = null;
+
+    // Only generate voucher number if status is "Posted" from the beginning
+    if (status === "Posted") {
+      receiptVoucherNumber = await generateReceiptVoucherNumber(
+        schoolId,
+        academicYear
+      );
+    }
 
     const { receiptImage, chequeImageForReceipt } = req.files || {};
 

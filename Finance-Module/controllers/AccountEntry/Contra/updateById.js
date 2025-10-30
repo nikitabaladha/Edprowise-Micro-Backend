@@ -9,6 +9,31 @@ function toTwoDecimals(value) {
   return Math.round(Number(value) * 100) / 100;
 }
 
+async function generateContraVoucherNumber(schoolId, academicYear) {
+  // Find the highest existing voucher number
+  const lastEntry = await Contra.findOne(
+    {
+      schoolId,
+      academicYear,
+      status: "Posted",
+      contraVoucherNumber: { $exists: true, $ne: null },
+    },
+    { contraVoucherNumber: 1 },
+    { sort: { contraVoucherNumber: -1 } }
+  );
+
+  let nextNumber = 1;
+
+  if (lastEntry && lastEntry.contraVoucherNumber) {
+    const matches = lastEntry.contraVoucherNumber.match(/\/(\d+)$/);
+    if (matches && matches[1]) {
+      nextNumber = parseInt(matches[1]) + 1;
+    }
+  }
+
+  return `CVN/${academicYear}/${nextNumber}`;
+}
+
 async function getOrCreateOpeningBalanceRecord(
   schoolId,
   academicYear,
@@ -554,6 +579,15 @@ export const updateById = async (req, res) => {
       .filter((item) => item.ledgerIdOfCashAccount)
       .map((item) => item.ledgerIdOfCashAccount.toString());
     const oldTDSorTCSId = existingContra.TDSorTCSLedgerId?.toString();
+    const oldStatus = existingContra.status;
+
+    let contraVoucherNumber = existingContra.contraVoucherNumber;
+    if (status === "Posted" && !contraVoucherNumber && oldStatus !== "Posted") {
+      contraVoucherNumber = await generateContraVoucherNumber(
+        schoolId,
+        academicYear
+      );
+    }
 
     // Step A: Reset old debit/credit
     const balanceRecords = await OpeningClosingBalance.find({
@@ -581,12 +615,9 @@ export const updateById = async (req, res) => {
       existingContra.dateOfCashDepositedWithdrawlDate;
     existingContra.narration = narration || existingContra.narration;
     existingContra.chequeNumber = chequeNumber || existingContra.chequeNumber;
-
     existingContra.itemDetails = updatedItemDetails;
-
     existingContra.subTotalOfDebit = subTotalOfDebit;
     existingContra.subTotalOfCredit = subTotalOfCredit;
-
     existingContra.TDSorTCS = TDSorTCS || "";
     existingContra.TDSTCSRateAmount = tdsTcsAmount;
 
@@ -616,7 +647,8 @@ export const updateById = async (req, res) => {
 
     existingContra.totalAmountOfDebit = totalAmountOfDebit;
     existingContra.totalAmountOfCredit = totalAmountOfCredit;
-    existingContra.status = status || existingContra.status;
+    existingContra.contraVoucherNumber = contraVoucherNumber;
+    existingContra.status = status;
 
     await existingContra.save({ session });
 

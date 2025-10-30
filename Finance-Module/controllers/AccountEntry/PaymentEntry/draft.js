@@ -1,12 +1,6 @@
 import moment from "moment";
 import PaymentEntry from "../../../models/PaymentEntry.js";
 
-async function generatePaymentVoucherNumber(schoolId, academicYear) {
-  const count = await PaymentEntry.countDocuments({ schoolId, academicYear });
-  const nextNumber = count + 1;
-  return `PVN/${academicYear}/${nextNumber}`;
-}
-
 async function generateTransactionNumber() {
   const now = moment();
   const dateTimeStr = now.format("DDMMYYYYHHmmss");
@@ -63,11 +57,6 @@ async function draft(req, res) {
       });
     }
 
-    const paymentVoucherNumber = await generatePaymentVoucherNumber(
-      schoolId,
-      academicYear
-    );
-
     const { invoiceImage, chequeImage } = req.files || {};
 
     const invoiceImagePath = invoiceImage?.[0]?.mimetype?.startsWith("image/")
@@ -121,7 +110,6 @@ async function draft(req, res) {
     const newPaymentEntry = new PaymentEntry({
       schoolId,
       academicYear,
-      paymentVoucherNumber,
       vendorCode,
       vendorId,
       entryDate,

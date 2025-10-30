@@ -1,11 +1,5 @@
 import Contra from "../../../models/Contra.js";
 
-async function generateContraVoucherNumber(schoolId, academicYear) {
-  const count = await Contra.countDocuments({ schoolId, academicYear });
-  const nextNumber = count + 1;
-  return `CVN/${academicYear}/${nextNumber}`;
-}
-
 export async function draft(req, res) {
   try {
     const schoolId = req.user?.schoolId;
@@ -30,21 +24,7 @@ export async function draft(req, res) {
       academicYear,
     } = req.body;
 
-    const ContraVoucherNumber = await generateContraVoucherNumber(
-      schoolId,
-      academicYear
-    );
-
     const { chequeImageForContra } = req.files || {};
-
-    // if (["Cash Withdrawn", "Bank Transfer"].includes(contraEntryName)) {
-    //   if (!chequeImageForContra?.[0]) {
-    //     return res.status(400).json({
-    //       hasError: true,
-    //       message: "Cheque image is required for this Contra entry type.",
-    //     });
-    //   }
-    // }
 
     let chequeImageForContraFullPath = "";
     if (chequeImageForContra?.[0]) {
@@ -74,36 +54,8 @@ export async function draft(req, res) {
       subTotalOfDebit + (parseFloat(TDSTCSRateAmount) || 0);
     const totalAmountOfCredit = subTotalOfCredit;
 
-    // if (totalAmountOfDebit !== totalAmountOfCredit) {
-    //   return res.status(400).json({
-    //     hasError: true,
-    //     message: "Total Debit and Credit amounts must be equal.",
-    //   });
-    // }
-
-    // if (["Cash Deposited", "Cash Withdrawn"].includes(contraEntryName)) {
-    //   const missingCashAccount = updatedItemDetails.some(
-    //     (item) => !item.ledgerIdOfCashAccount
-    //   );
-    //   if (missingCashAccount) {
-    //     return res.status(400).json({
-    //       hasError: true,
-    //       message:
-    //         "ledgerIdOfCashAccount is required for Cash Deposited or Cash Withdrawn entries.",
-    //     });
-    //   }
-
-    //   if (!TDSorTCS || !["TDS", "TCS"].includes(TDSorTCS)) {
-    //     return res.status(400).json({
-    //       hasError: true,
-    //       message: "TDS or TCS Required and must be valid.",
-    //     });
-    //   }
-    // }
-
     const newContra = new Contra({
       schoolId,
-      contraVoucherNumber: ContraVoucherNumber,
       contraEntryName,
       entryDate,
       dateOfCashDepositedWithdrawlDate,
