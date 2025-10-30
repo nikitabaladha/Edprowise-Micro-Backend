@@ -305,9 +305,6 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
       );
     });
 
-    // here if which ever groupLedgerName has closing balance  "0" i dont want it here
-    // i want if there is negative or positive value not "0" value
-
     result.assets.forEach((asset) => {
       asset.groupLedgers = asset.groupLedgers.filter(
         (groupLedger) => groupLedger.closingBalance !== 0

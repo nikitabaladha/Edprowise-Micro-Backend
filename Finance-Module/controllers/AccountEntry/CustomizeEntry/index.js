@@ -20,6 +20,11 @@ import updateDraftForReceipt from "./updateDraftReceiptById.js";
 import updateDraftForContra from "./updateDraftContraById.js";
 import updateDraftForJournal from "./updateDraftJournalById.js";
 
+import copyForPayment from "./copyForPayment.js";
+import copyForReceipt from "./copyForReceipt.js";
+import copyForContra from "./copyForContra.js";
+import copyForJournal from "./copyForJournal.js";
+
 export {
   createForPayment,
   createForReceipt,
@@ -38,4 +43,8 @@ export {
   updateDraftForReceipt,
   updateDraftForContra,
   updateDraftForJournal,
+  copyForPayment,
+  copyForReceipt,
+  copyForContra,
+  copyForJournal,
 };

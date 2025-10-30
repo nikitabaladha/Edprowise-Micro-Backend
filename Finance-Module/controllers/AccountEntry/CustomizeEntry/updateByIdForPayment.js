@@ -7,6 +7,32 @@ import TotalNetdeficitNetSurplus from "../../../models/TotalNetdeficitNetSurplus
 
 import { hasBankOrCashLedger } from "../../CommonFunction/CommonFunction.js";
 
+async function generatePaymentVoucherNumber(schoolId, academicYear) {
+  // Find the highest existing voucher number
+  const lastEntry = await PaymentEntry.findOne(
+    {
+      schoolId,
+      academicYear,
+      status: "Posted",
+      paymentVoucherNumber: { $exists: true, $ne: null },
+    },
+    { paymentVoucherNumber: 1 },
+    { sort: { paymentVoucherNumber: -1 } }
+  );
+
+  let nextNumber = 1;
+
+  if (lastEntry && lastEntry.paymentVoucherNumber) {
+    // Extract the number from the voucher string (e.g., "PVN/2025-2026/3" → 3)
+    const matches = lastEntry.paymentVoucherNumber.match(/\/(\d+)$/);
+    if (matches && matches[1]) {
+      nextNumber = parseInt(matches[1]) + 1;
+    }
+  }
+
+  return `PVN/${academicYear}/${nextNumber}`;
+}
+
 function toTwoDecimals(value) {
   if (value === null || value === undefined || isNaN(value)) return 0;
   return Math.round(Number(value) * 100) / 100;
@@ -679,6 +705,19 @@ async function updateById(req, res) {
     // Store old values for comparison
     const oldEntryDate = existingPaymentEntry.entryDate;
     const oldItemDetails = existingPaymentEntry.itemDetails;
+    const oldStatus = existingPaymentEntry.status;
+
+    let paymentVoucherNumber = existingPaymentEntry.paymentVoucherNumber;
+    if (
+      status === "Posted" &&
+      !paymentVoucherNumber &&
+      oldStatus !== "Posted"
+    ) {
+      paymentVoucherNumber = await generatePaymentVoucherNumber(
+        schoolId,
+        academicYear
+      );
+    }
 
     // Handle uploaded files
     const { invoiceImage } = req.files || {};
@@ -720,7 +759,7 @@ async function updateById(req, res) {
     existingPaymentEntry.subTotalOfCredit = subTotalOfCredit;
     existingPaymentEntry.totalAmountAfterGST = totalAmountAfterGST;
     existingPaymentEntry.totalCreditAmount = totalCreditAmount;
-
+    existingPaymentEntry.paymentVoucherNumber = paymentVoucherNumber;
     existingPaymentEntry.status = status;
 
     await existingPaymentEntry.save({ session });
@@ -1110,3 +1149,90 @@ async function updateById(req, res) {
 }
 
 export default updateById;
+
+// see for example i have data like
+// _id
+// 69032e237af00e2ec3e8db18
+// schoolId
+// "SID144732"
+// academicYear
+// "2025-2026"
+// paymentVoucherNumber
+// "PVN/2025-2026/1"
+// customizeEntry
+// true
+// entryDate
+// 2025-10-30T00:00:00.000+00:00
+// invoiceDate
+// 2025-10-30T00:00:00.000+00:00
+// narration
+// "Test"
+// itemDetails
+// Array (2)
+// subTotalAmountAfterGST
+// 100
+// subTotalOfCredit
+// 100
+// totalAmountAfterGST
+// 100
+// totalCreditAmount
+// 100
+// invoiceImage
+// null
+// status
+// "Posted"
+// approvalStatus
+// "Pending"
+// createdAt
+// 2025-10-30T09:21:39.557+00:00
+// updatedAt
+// 2025-10-30T09:21:39.557+00:00
+// __v
+// 0
+
+// then i draft by copy that
+
+// _id
+// 69032ed449e4a5a9b9897861
+// schoolId
+// "SID144732"
+// academicYear
+// "2025-2026"
+// customizeEntry
+// true
+// entryDate
+// 2025-10-30T00:00:00.000+00:00
+// invoiceDate
+// 2025-10-30T00:00:00.000+00:00
+// narration
+// "Test"
+
+// itemDetails
+// Array (2)
+// subTotalAmountAfterGST
+// 100
+// subTotalOfCredit
+// 100
+// totalAmountAfterGST
+// 100
+// totalCreditAmount
+// 100
+// invoiceImage
+// null
+// status
+// "Draft"
+// approvalStatus
+// "Pending"
+// createdAt
+// 2025-10-30T09:24:36.430+00:00
+// updatedAt
+// 2025-10-30T09:24:36.430+00:00
+// __v
+// 0
+
+// so the copied data will not have
+// paymentVoucherNumber
+
+// now if that Draf data is updated and "Posted"
+// then it makes status "Posted" but the generated paymentVoucherNumber is "PVN/2025-2026/3" insted
+// of "PVN/2025-2026/2" why like this so tell me what to do for that pert

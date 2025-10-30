@@ -216,6 +216,7 @@ async function getAllExpenseBookBySchoolId(req, res) {
 
         TDSorTCSGroupLedgerName,
         TDSorTCSLedgerName,
+        customizeEntry: entry.customizeEntry,
 
         // Item details
         itemDetails: itemsWithLedgerNames,
@@ -368,6 +369,7 @@ async function getAllExpenseBookBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
       };
 
       formattedData.push(entryData);
@@ -612,6 +614,7 @@ async function getAllExpenseBookBySchoolId(req, res) {
 
         // Item details
         itemDetails: itemsWithLedgerNames,
+        customizeEntry: entry.customizeEntry,
       };
 
       formattedData.push(entryData);

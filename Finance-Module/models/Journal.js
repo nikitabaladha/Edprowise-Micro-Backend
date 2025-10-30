@@ -16,7 +16,7 @@ const JournalSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    journalVoucherNumber: { type: String, required: true },
+    journalVoucherNumber: { type: String },
     customizeEntry: {
       type: Boolean,
       required: true,

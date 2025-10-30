@@ -1,6 +1,6 @@
 import PaymentEntry from "../../../models/PaymentEntry.js";
 
-export async function draftForPayment(req, res) {
+export async function copyForPayment(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
@@ -16,22 +16,14 @@ export async function draftForPayment(req, res) {
       invoiceDate,
       narration,
       itemDetails,
-      status,
       totalAmountAfterGST,
       totalCreditAmount,
-      customizeEntry,
       academicYear,
+      invoiceImage,
     } = req.body;
 
-    const { invoiceImage } = req.files || {};
-
-    const invoiceImageFullPath = invoiceImage?.[0]
-      ? `${
-          invoiceImage[0].mimetype.startsWith("image/")
-            ? "/Images/FinanceModule/InvoiceImage"
-            : "/Documents/FinanceModule/InvoiceImage"
-        }/${invoiceImage[0].filename}`
-      : null;
+    // Use the existing invoiceImage path from the copied entry
+    const invoiceImageFullPath = invoiceImage || null;
 
     const updatedItemDetails = itemDetails.map((item) => ({
       ...item,
@@ -59,9 +51,9 @@ export async function draftForPayment(req, res) {
       subTotalOfCredit,
       totalAmountAfterGST,
       totalCreditAmount,
-      customizeEntry,
+      customizeEntry: true,
       invoiceImage: invoiceImageFullPath,
-      status,
+      status: "Draft",
       academicYear,
     });
 
@@ -69,11 +61,11 @@ export async function draftForPayment(req, res) {
 
     return res.status(201).json({
       hasError: false,
-      message: "Payment drafted successfully!",
+      message: "Payment copied as draft successfully!",
       data: newPaymentEntry,
     });
   } catch (error) {
-    console.error("Error creating Payment:", error);
+    console.error("Error copying Payment:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error.",
@@ -81,4 +73,4 @@ export async function draftForPayment(req, res) {
   }
 }
 
-export default draftForPayment;
+export default copyForPayment;

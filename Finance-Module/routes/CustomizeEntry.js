@@ -25,6 +25,10 @@ import {
   updateDraftForReceipt,
   updateDraftForContra,
   updateDraftForJournal,
+  copyForPayment,
+  copyForReceipt,
+  copyForContra,
+  copyForJournal,
 } from "../controllers/AccountEntry/CustomizeEntry/index.js";
 
 router.post(
@@ -42,6 +46,13 @@ router.post(
 );
 
 router.post(
+  "/copy-customize-entry-for-payment",
+  uploadForPayment,
+  roleBasedMiddleware("School"),
+  copyForPayment
+);
+
+router.post(
   "/customize-entry-for-receipt",
   uploadForReceipt,
   roleBasedMiddleware("School"),
@@ -53,6 +64,13 @@ router.post(
   uploadForReceipt,
   roleBasedMiddleware("School"),
   draftForReceipt
+);
+
+router.post(
+  "/copy-customize-entry-for-receipt",
+  uploadForReceipt,
+  roleBasedMiddleware("School"),
+  copyForReceipt
 );
 
 router.post(
@@ -70,6 +88,13 @@ router.post(
 );
 
 router.post(
+  "/copy-customize-entry-for-contra",
+  uploadForContra,
+  roleBasedMiddleware("School"),
+  copyForContra
+);
+
+router.post(
   "/customize-entry-for-journal",
   uploadForJournal,
   roleBasedMiddleware("School"),
@@ -81,6 +106,13 @@ router.post(
   uploadForJournal,
   roleBasedMiddleware("School"),
   draftForJournal
+);
+
+router.post(
+  "/copy-customize-entry-for-journal",
+  uploadForJournal,
+  roleBasedMiddleware("School"),
+  copyForJournal
 );
 
 router.get(

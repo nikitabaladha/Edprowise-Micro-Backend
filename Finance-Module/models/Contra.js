@@ -21,7 +21,7 @@ const ContraSchema = new mongoose.Schema(
       enum: ["Cash Deposited", "Cash Withdrawn", "Bank Transfer", ""],
       default: "",
     },
-    contraVoucherNumber: { type: String, required: true },
+    contraVoucherNumber: { type: String },
     customizeEntry: {
       type: Boolean,
       required: true,

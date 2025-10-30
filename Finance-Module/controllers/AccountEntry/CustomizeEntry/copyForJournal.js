@@ -1,6 +1,6 @@
-import Contra from "../../../models/Contra.js";
+import Journal from "../../../models/Journal.js";
 
-export async function draftForContra(req, res) {
+export async function copyForJournal(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
@@ -13,24 +13,14 @@ export async function draftForContra(req, res) {
 
     const {
       entryDate,
-      dateOfCashDepositedWithdrawlDate,
+      documentDate,
       narration,
       itemDetails,
-      status,
       academicYear,
-      contraEntryName,
-      customizeEntry,
+      documentImage,
     } = req.body;
 
-    const { chequeImageForContra } = req.files || {};
-
-    let chequeImageForContraFullPath = "";
-    if (chequeImageForContra?.[0]) {
-      const basePath = chequeImageForContra[0].mimetype.startsWith("image/")
-        ? "/Images/FinanceModule/chequeImageForContra"
-        : "/Documents/FinanceModule/chequeImageForContra";
-      chequeImageForContraFullPath = `${basePath}/${chequeImageForContra[0].filename}`;
-    }
+    const documentImageFullPath = documentImage || null;
 
     const updatedItemDetails = itemDetails.map((item) => ({
       ...item,
@@ -48,35 +38,35 @@ export async function draftForContra(req, res) {
       0
     );
 
-    const totalAmountOfDebit = subTotalOfDebit;
-    const totalAmountOfCredit = subTotalOfCredit;
+    const totalAmountOfDebit = subTotalOfDebit || 0;
 
-    const newContra = new Contra({
+    const totalAmountOfCredit = subTotalOfCredit || 0;
+
+    const newJournal = new Journal({
       schoolId,
       entryDate,
-      dateOfCashDepositedWithdrawlDate,
+      documentDate,
       narration,
       itemDetails: updatedItemDetails,
       subTotalOfCredit: subTotalOfCredit,
       subTotalOfDebit: subTotalOfDebit,
       totalAmountOfDebit,
       totalAmountOfCredit,
-      chequeImageForContra: chequeImageForContraFullPath,
-      status,
+      documentImage: documentImageFullPath,
       academicYear,
-      contraEntryName: contraEntryName || "",
-      customizeEntry,
+      customizeEntry: true,
+      status: "Draft",
     });
 
-    await newContra.save();
+    await newJournal.save();
 
     return res.status(201).json({
       hasError: false,
-      message: "Contra drafted successfully!",
-      data: newContra,
+      message: "Journal drafted successfully!",
+      data: newJournal,
     });
   } catch (error) {
-    console.error("Error creating Contra:", error);
+    console.error("Error creating Journal:", error);
     return res.status(500).json({
       hasError: true,
       message: "Internal server error.",
@@ -84,4 +74,4 @@ export async function draftForContra(req, res) {
   }
 }
 
-export default draftForContra;
+export default copyForJournal;

@@ -12,6 +12,31 @@ function toTwoDecimals(value) {
   return Math.round(Number(value) * 100) / 100;
 }
 
+async function generateContraVoucherNumber(schoolId, academicYear) {
+  // Find the highest existing voucher number
+  const lastEntry = await Contra.findOne(
+    {
+      schoolId,
+      academicYear,
+      status: "Posted",
+      contraVoucherNumber: { $exists: true, $ne: null },
+    },
+    { contraVoucherNumber: 1 },
+    { sort: { contraVoucherNumber: -1 } }
+  );
+
+  let nextNumber = 1;
+
+  if (lastEntry && lastEntry.contraVoucherNumber) {
+    const matches = lastEntry.contraVoucherNumber.match(/\/(\d+)$/);
+    if (matches && matches[1]) {
+      nextNumber = parseInt(matches[1]) + 1;
+    }
+  }
+
+  return `CVN/${academicYear}/${nextNumber}`;
+}
+
 async function getOrCreateOpeningBalanceRecord(
   schoolId,
   academicYear,
@@ -715,6 +740,15 @@ export async function updateById(req, res) {
     // Store old data for comparison and cleanup
     const oldItemDetails = existingContra.itemDetails;
     const oldEntryDate = existingContra.entryDate;
+    const oldStatus = existingContra.status;
+
+    let contraVoucherNumber = existingContra.contraVoucherNumber;
+    if (status === "Posted" && !contraVoucherNumber && oldStatus !== "Posted") {
+      contraVoucherNumber = await generateContraVoucherNumber(
+        schoolId,
+        academicYear
+      );
+    }
 
     const { chequeImageForContra } = req.files || {};
 
@@ -738,6 +772,7 @@ export async function updateById(req, res) {
     existingContra.subTotalOfCredit = subTotalOfCredit;
     existingContra.totalAmountOfDebit = totalAmountOfDebit;
     existingContra.totalAmountOfCredit = totalAmountOfCredit;
+    existingContra.contraVoucherNumber = contraVoucherNumber;
     existingContra.status = status || existingContra.status;
 
     await existingContra.save({ session });

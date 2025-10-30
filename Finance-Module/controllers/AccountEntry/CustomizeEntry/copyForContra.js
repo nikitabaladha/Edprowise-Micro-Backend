@@ -1,6 +1,6 @@
 import Contra from "../../../models/Contra.js";
 
-export async function draftForContra(req, res) {
+export async function copyForContra(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
@@ -16,21 +16,12 @@ export async function draftForContra(req, res) {
       dateOfCashDepositedWithdrawlDate,
       narration,
       itemDetails,
-      status,
       academicYear,
       contraEntryName,
-      customizeEntry,
+      chequeImageForContra,
     } = req.body;
 
-    const { chequeImageForContra } = req.files || {};
-
-    let chequeImageForContraFullPath = "";
-    if (chequeImageForContra?.[0]) {
-      const basePath = chequeImageForContra[0].mimetype.startsWith("image/")
-        ? "/Images/FinanceModule/chequeImageForContra"
-        : "/Documents/FinanceModule/chequeImageForContra";
-      chequeImageForContraFullPath = `${basePath}/${chequeImageForContra[0].filename}`;
-    }
+    const chequeImageForContraFullPath = chequeImageForContra || null;
 
     const updatedItemDetails = itemDetails.map((item) => ({
       ...item,
@@ -62,10 +53,10 @@ export async function draftForContra(req, res) {
       totalAmountOfDebit,
       totalAmountOfCredit,
       chequeImageForContra: chequeImageForContraFullPath,
-      status,
+      status: "Draft",
       academicYear,
       contraEntryName: contraEntryName || "",
-      customizeEntry,
+      customizeEntry: true,
     });
 
     await newContra.save();
@@ -84,4 +75,4 @@ export async function draftForContra(req, res) {
   }
 }
 
-export default draftForContra;
+export default copyForContra;

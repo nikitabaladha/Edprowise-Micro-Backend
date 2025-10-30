@@ -1,6 +1,6 @@
 import Receipt from "../../../models/Receipt.js";
 
-export async function draftForReceipt(req, res) {
+export async function copyForReceipt(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
@@ -16,23 +16,13 @@ export async function draftForReceipt(req, res) {
       receiptDate,
       narration,
       itemDetails,
-      status,
       academicYear,
       totalAmount,
       totalDebitAmount,
-      customizeEntry,
+      receiptImage,
     } = req.body;
 
-    const { receiptImage } = req.files || {};
-
-    let receiptImageFullPath = null;
-    if (receiptImage?.[0]) {
-      const receiptImagePath = receiptImage[0].mimetype.startsWith("image/")
-        ? "/Images/FinanceModule/ReceiptImage"
-        : "/Documents/FinanceModule/ReceiptImage";
-
-      receiptImageFullPath = `${receiptImagePath}/${receiptImage[0].filename}`;
-    }
+    const receiptImageFullPath = receiptImage || null;
 
     const updatedItemDetails = itemDetails.map((item) => ({
       ...item,
@@ -61,9 +51,9 @@ export async function draftForReceipt(req, res) {
       totalAmount,
       totalDebitAmount,
       receiptImage: receiptImageFullPath,
-      status,
+      status: "Draft",
       academicYear,
-      customizeEntry,
+      customizeEntry: true,
     });
 
     await newReceipt.save();
@@ -82,4 +72,4 @@ export async function draftForReceipt(req, res) {
   }
 }
 
-export default draftForReceipt;
+export default copyForReceipt;

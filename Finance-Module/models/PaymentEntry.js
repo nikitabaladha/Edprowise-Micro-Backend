@@ -16,7 +16,7 @@ const PaymentEntrySchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    paymentVoucherNumber: { type: String, required: true },
+    paymentVoucherNumber: { type: String },
     customizeEntry: {
       type: Boolean,
       required: true,

@@ -12,6 +12,31 @@ function toTwoDecimals(value) {
   return Math.round(Number(value) * 100) / 100;
 }
 
+async function generateReceiptVoucherNumber(schoolId, academicYear) {
+  // Find the highest existing voucher number
+  const lastEntry = await Receipt.findOne(
+    {
+      schoolId,
+      academicYear,
+      status: "Posted",
+      receiptVoucherNumber: { $exists: true, $ne: null },
+    },
+    { receiptVoucherNumber: 1 },
+    { sort: { receiptVoucherNumber: -1 } }
+  );
+
+  let nextNumber = 1;
+
+  if (lastEntry && lastEntry.receiptVoucherNumber) {
+    const matches = lastEntry.receiptVoucherNumber.match(/\/(\d+)$/);
+    if (matches && matches[1]) {
+      nextNumber = parseInt(matches[1]) + 1;
+    }
+  }
+
+  return `RVN/${academicYear}/${nextNumber}`;
+}
+
 async function getOrCreateOpeningBalanceRecord(
   schoolId,
   academicYear,
@@ -678,6 +703,19 @@ async function updateById(req, res) {
     // Store old values for comparison
     const oldEntryDate = existingReceipt.entryDate;
     const oldItemDetails = existingReceipt.itemDetails;
+    const oldStatus = existingReceipt.status;
+
+    let receiptVoucherNumber = existingReceipt.receiptVoucherNumber;
+    if (
+      status === "Posted" &&
+      !receiptVoucherNumber &&
+      oldStatus !== "Posted"
+    ) {
+      receiptVoucherNumber = await generateReceiptVoucherNumber(
+        schoolId,
+        academicYear
+      );
+    }
 
     // Handle uploaded files
     const { receiptImage } = req.files || {};
@@ -719,7 +757,7 @@ async function updateById(req, res) {
     existingReceipt.subTotalOfDebit = subTotalOfDebit;
     existingReceipt.totalAmount = totalAmount;
     existingReceipt.totalDebitAmount = totalDebitAmount;
-
+    existingReceipt.receiptVoucherNumber = receiptVoucherNumber;
     existingReceipt.status = status;
 
     await existingReceipt.save({ session });

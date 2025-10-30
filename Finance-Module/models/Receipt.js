@@ -16,7 +16,7 @@ const ReceiptSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    receiptVoucherNumber: { type: String, required: true },
+    receiptVoucherNumber: { type: String },
     customizeEntry: {
       type: Boolean,
       required: true,

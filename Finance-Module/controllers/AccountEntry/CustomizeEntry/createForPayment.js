@@ -13,8 +13,28 @@ function toTwoDecimals(value) {
 }
 
 async function generatePaymentVoucherNumber(schoolId, academicYear) {
-  const count = await PaymentEntry.countDocuments({ schoolId, academicYear });
-  const nextNumber = count + 1;
+  // Find the highest existing voucher number
+  const lastEntry = await PaymentEntry.findOne(
+    {
+      schoolId,
+      academicYear,
+      status: "Posted",
+      paymentVoucherNumber: { $exists: true, $ne: null },
+    },
+    { paymentVoucherNumber: 1 },
+    { sort: { paymentVoucherNumber: -1 } }
+  );
+
+  let nextNumber = 1;
+
+  if (lastEntry && lastEntry.paymentVoucherNumber) {
+    // Extract the number from the voucher string (e.g., "PVN/2025-2026/3" → 3)
+    const matches = lastEntry.paymentVoucherNumber.match(/\/(\d+)$/);
+    if (matches && matches[1]) {
+      nextNumber = parseInt(matches[1]) + 1;
+    }
+  }
+
   return `PVN/${academicYear}/${nextNumber}`;
 }
 
@@ -536,10 +556,15 @@ async function create(req, res) {
       });
     }
 
-    const paymentVoucherNumber = await generatePaymentVoucherNumber(
-      schoolId,
-      academicYear
-    );
+    let paymentVoucherNumber = null;
+
+    // Only generate voucher number if status is "Posted" from the beginning
+    if (status === "Posted") {
+      paymentVoucherNumber = await generatePaymentVoucherNumber(
+        schoolId,
+        academicYear
+      );
+    }
 
     const { invoiceImage } = req.files || {};
 

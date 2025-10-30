@@ -77,23 +77,23 @@ async function getAllBySchoolId(req, res) {
 
       const entryData = {
         accountingEntry: "Payment",
-        _id: entry._id,
-        schoolId: entry.schoolId,
-        academicYear: entry.academicYear,
-        entryDate: entry.entryDate,
-        invoiceDate: entry.invoiceDate,
-        narration: entry.narration,
-        invoiceImage: entry.invoiceImage,
-        status: entry.status || null,
-        paymentVoucherNumber: entry.paymentVoucherNumber || null,
+        _id: entry?._id,
+        schoolId: entry?.schoolId,
+        academicYear: entry?.academicYear,
+        entryDate: entry?.entryDate,
+        invoiceDate: entry?.invoiceDate,
+        narration: entry?.narration,
+        invoiceImage: entry?.invoiceImage,
+        status: entry?.status || null,
+        paymentVoucherNumber: entry?.paymentVoucherNumber || null,
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
 
-        subTotalAmountAfterGST: entry.subTotalAmountAfterGST,
-        subTotalOfCredit: entry.subTotalOfCredit,
+        subTotalAmountAfterGST: entry?.subTotalAmountAfterGST,
+        subTotalOfCredit: entry?.subTotalOfCredit,
 
-        totalAmountAfterGST: entry.totalAmountAfterGST,
-        totalCreditAmount: entry.totalCreditAmount,
+        totalAmountAfterGST: entry?.totalAmountAfterGST,
+        totalCreditAmount: entry?.totalCreditAmount,
 
         // Item details
         itemDetails: itemsWithLedgerNames,

@@ -13,8 +13,27 @@ function toTwoDecimals(value) {
 }
 
 async function generateContraVoucherNumber(schoolId, academicYear) {
-  const count = await Contra.countDocuments({ schoolId, academicYear });
-  const nextNumber = count + 1;
+  // Find the highest existing voucher number
+  const lastEntry = await Contra.findOne(
+    {
+      schoolId,
+      academicYear,
+      status: "Posted",
+      contraVoucherNumber: { $exists: true, $ne: null },
+    },
+    { contraVoucherNumber: 1 },
+    { sort: { contraVoucherNumber: -1 } }
+  );
+
+  let nextNumber = 1;
+
+  if (lastEntry && lastEntry.contraVoucherNumber) {
+    const matches = lastEntry.contraVoucherNumber.match(/\/(\d+)$/);
+    if (matches && matches[1]) {
+      nextNumber = parseInt(matches[1]) + 1;
+    }
+  }
+
   return `CVN/${academicYear}/${nextNumber}`;
 }
 
@@ -541,10 +560,15 @@ export async function create(req, res) {
       });
     }
 
-    const ContraVoucherNumber = await generateContraVoucherNumber(
-      schoolId,
-      academicYear
-    );
+    let contraVoucherNumber = null;
+
+    // Only generate voucher number if status is "Posted" from the beginning
+    if (status === "Posted") {
+      contraVoucherNumber = await generateContraVoucherNumber(
+        schoolId,
+        academicYear
+      );
+    }
 
     const { chequeImageForContra } = req.files || {};
 
@@ -599,7 +623,7 @@ export async function create(req, res) {
 
     const newContra = new Contra({
       schoolId,
-      contraVoucherNumber: ContraVoucherNumber,
+      contraVoucherNumber,
       entryDate,
       dateOfCashDepositedWithdrawlDate,
       narration,
