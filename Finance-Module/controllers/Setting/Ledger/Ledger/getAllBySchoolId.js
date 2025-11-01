@@ -51,6 +51,7 @@ async function getAllBySchoolId(req, res) {
       return {
         _id: ledger._id,
         schoolId: ledger.schoolId,
+        academicYear: ledger.academicYear,
         ledgerName: ledger.ledgerName,
         ledgerCode: ledger.ledgerCode,
         openingBalance: ledger.openingBalance,

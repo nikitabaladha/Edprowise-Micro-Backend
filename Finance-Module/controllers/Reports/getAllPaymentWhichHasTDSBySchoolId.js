@@ -130,6 +130,7 @@ async function getAllPaymentWhichHasTDSBySchoolId(req, res) {
         // PaymentEntry fields
         _id: entry._id,
         schoolId: entry.schoolId,
+        academicYear: entry.academicYear,
         vendorCode: entry.vendorCode,
         vendorId: entry.vendorId,
         entryDate: entry.entryDate,
