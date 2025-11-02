@@ -4,7 +4,7 @@ async function getAllByTDSOrTCS(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
-    const { TDSorTCS, academicYear } = req.params;
+    const { TDSorTCS, financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -23,7 +23,7 @@ async function getAllByTDSOrTCS(req, res) {
     const charts = await TDSTCSRateChart.find({
       schoolId,
       TDSorTCS,
-      academicYear,
+      financialYear,
     }).sort({
       createdAt: -1,
     });

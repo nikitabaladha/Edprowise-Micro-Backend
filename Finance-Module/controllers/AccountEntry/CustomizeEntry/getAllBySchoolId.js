@@ -9,7 +9,7 @@ import mongoose from "mongoose";
 async function getAllBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { academicYear } = req.params;
+    const { financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -20,7 +20,7 @@ async function getAllBySchoolId(req, res) {
 
     const paymentEntries = await PaymentEntry.find({
       schoolId,
-      academicYear,
+      financialYear,
       customizeEntry: true,
     })
       .sort({ createdAt: -1 })
@@ -28,7 +28,7 @@ async function getAllBySchoolId(req, res) {
 
     const receipts = await Receipt.find({
       schoolId,
-      academicYear,
+      financialYear,
       customizeEntry: true,
     })
       .sort({ createdAt: -1 })
@@ -36,7 +36,7 @@ async function getAllBySchoolId(req, res) {
 
     const JournalEntries = await Journal.find({
       schoolId,
-      academicYear,
+      financialYear,
       customizeEntry: true,
     })
       .sort({ createdAt: -1 })
@@ -44,7 +44,7 @@ async function getAllBySchoolId(req, res) {
 
     const ContraEntries = await Contra.find({
       schoolId,
-      academicYear,
+      financialYear,
       customizeEntry: true,
     })
       .sort({ createdAt: -1 })
@@ -79,7 +79,7 @@ async function getAllBySchoolId(req, res) {
         accountingEntry: "Payment",
         _id: entry?._id,
         schoolId: entry?.schoolId,
-        academicYear: entry?.academicYear,
+        financialYear: entry?.financialYear,
         entryDate: entry?.entryDate,
         invoiceDate: entry?.invoiceDate,
         narration: entry?.narration,
@@ -129,7 +129,7 @@ async function getAllBySchoolId(req, res) {
         accountingEntry: "Receipt",
         _id: entry._id,
         schoolId: entry.schoolId,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
         entryDate: entry.entryDate,
         receiptDate: entry.receiptDate,
         narration: entry.narration,
@@ -179,7 +179,7 @@ async function getAllBySchoolId(req, res) {
         accountingEntry: "Journal",
         _id: entry._id,
         schoolId: entry.schoolId,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
         entryDate: entry.entryDate,
         documentDate: entry.documentDate,
         documentImage: entry.documentImage || null,
@@ -230,7 +230,7 @@ async function getAllBySchoolId(req, res) {
         accountingEntry: "Contra",
         _id: entry._id,
         schoolId: entry.schoolId,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
         entryDate: entry.entryDate,
         dateOfCashDepositedWithdrawlDate:
           entry.dateOfCashDepositedWithdrawlDate,

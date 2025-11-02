@@ -6,13 +6,13 @@ import OpeningClosingBalance from "../../models/OpeningClosingBalance.js";
 
 const copyLedgers = async (
   schoolId,
-  newAcademicYear,
-  prevAcademicYear,
+  newFinancialYear,
+  prevFinancialYear,
   session
 ) => {
   const previousLedgers = await Ledger.find({
     schoolId,
-    academicYear: prevAcademicYear,
+    financialYear: prevFinancialYear,
   }).session(session);
 
   if (previousLedgers.length === 0) {
@@ -34,17 +34,17 @@ const copyLedgers = async (
       HeadOfAccount.find({
         _id: { $in: prevHeadOfAccountIds },
         schoolId,
-        academicYear: prevAcademicYear,
+        financialYear: prevFinancialYear,
       }).session(session),
       GroupLedger.find({
         _id: { $in: prevGroupLedgerIds },
         schoolId,
-        academicYear: prevAcademicYear,
+        financialYear: prevFinancialYear,
       }).session(session),
       BSPLLedger.find({
         _id: { $in: prevBSPLLedgerIds },
         schoolId,
-        academicYear: prevAcademicYear,
+        financialYear: prevFinancialYear,
       }).session(session),
     ]);
 
@@ -52,15 +52,15 @@ const copyLedgers = async (
     await Promise.all([
       HeadOfAccount.find({
         schoolId,
-        academicYear: newAcademicYear,
+        financialYear: newFinancialYear,
       }).session(session),
       GroupLedger.find({
         schoolId,
-        academicYear: newAcademicYear,
+        financialYear: newFinancialYear,
       }).session(session),
       BSPLLedger.find({
         schoolId,
-        academicYear: newAcademicYear,
+        financialYear: newFinancialYear,
       }).session(session),
     ]);
 
@@ -82,7 +82,7 @@ const copyLedgers = async (
   const prevLedgerIds = previousLedgers.map((l) => l._id);
   const prevOpeningClosingBalances = await OpeningClosingBalance.find({
     schoolId,
-    academicYear: prevAcademicYear,
+    financialYear: prevFinancialYear,
     ledgerId: { $in: prevLedgerIds },
   }).session(session);
 
@@ -141,7 +141,7 @@ const copyLedgers = async (
       balanceType: balanceType,
       paymentMode: prevLedger.paymentMode,
       ledgerCode: prevLedger.ledgerCode,
-      academicYear: newAcademicYear,
+      financialYear: newFinancialYear,
       parentLedgerId: prevLedger._id,
     });
   }

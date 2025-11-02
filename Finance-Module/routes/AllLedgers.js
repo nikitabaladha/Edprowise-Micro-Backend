@@ -15,19 +15,19 @@ import {
 } from "../controllers/AccountEntry/AllLedgers/index.js";
 
 router.get(
-  "/get-all-entry/:academicYear",
+  "/get-all-entry/:financialYear",
   roleBasedMiddleware("School"),
   getAllBySchoolId
 );
 
 router.get(
-  "/get-all-disapproved-entry/:academicYear",
+  "/get-all-disapproved-entry/:financialYear",
   roleBasedMiddleware("School"),
   getAllDisapprovedEntriesBySchoolId
 );
 
 router.get(
-  "/get-all-month-with-debit-credit/:academicYear",
+  "/get-all-month-with-debit-credit/:financialYear",
   roleBasedMiddleware("School"),
   getAllMonthWithdebitCredit
 );
@@ -39,25 +39,25 @@ router.get(
 );
 
 router.get(
-  "/get-only-payment-entry/:academicYear",
+  "/get-only-payment-entry/:financialYear",
   roleBasedMiddleware("School"),
   getAllPaymentEntryBySchoolId
 );
 
 router.get(
-  "/get-only-receipt/:academicYear",
+  "/get-only-receipt/:financialYear",
   roleBasedMiddleware("School"),
   getAllReceiptBySchoolId
 );
 
 router.get(
-  "/get-only-contra/:academicYear",
+  "/get-only-contra/:financialYear",
   roleBasedMiddleware("School"),
   getAllContraBySchoolId
 );
 
 router.get(
-  "/get-only-journal/:academicYear",
+  "/get-only-journal/:financialYear",
   roleBasedMiddleware("School"),
   getAllJournalBySchoolId
 );

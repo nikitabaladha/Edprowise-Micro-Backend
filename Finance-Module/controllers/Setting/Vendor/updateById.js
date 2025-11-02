@@ -4,7 +4,7 @@ import Ledger from "../../../models/Ledger.js";
 
 async function updateById(req, res) {
   try {
-    const { id, academicYear } = req.params;
+    const { id, financialYear } = req.params;
 
     const schoolId = req.user?.schoolId;
 
@@ -42,7 +42,7 @@ async function updateById(req, res) {
     const existingVendor = await Vendor.findOne({
       _id: id,
       schoolId,
-      academicYear,
+      financialYear,
     });
     if (!existingVendor) {
       return res.status(404).json({

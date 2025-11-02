@@ -2,20 +2,20 @@ import AuthorisedSignature from "../../models/AuthorisedSignature.js";
 
 const copyAuthorisedSignatures = async (
   schoolId,
-  newAcademicYear,
-  prevAcademicYear,
+  newFinancialYear,
+  prevFinancialYear,
   session
 ) => {
   const previousAuthorisedSignatures = await AuthorisedSignature.find({
     schoolId,
-    academicYear: prevAcademicYear,
+    financialYear: prevFinancialYear,
   }).session(session);
 
   const newAuthorisedSignatures = previousAuthorisedSignatures.map(
     (signature) => ({
       schoolId: signature.schoolId,
       authorisedSignatureImage: signature.authorisedSignatureImage,
-      academicYear: newAcademicYear,
+      financialYear: newFinancialYear,
     })
   );
 

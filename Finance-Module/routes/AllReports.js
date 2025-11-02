@@ -13,31 +13,31 @@ import {
 } from "../controllers/Reports/index.js";
 
 router.get(
-  "/get-all-cash-book-entry/:academicYear",
+  "/get-all-cash-book-entry/:financialYear",
   roleBasedMiddleware("School"),
   getAllCashBookBySchoolId
 );
 
 router.get(
-  "/get-all-bank-book-entry/:academicYear",
+  "/get-all-bank-book-entry/:financialYear",
   roleBasedMiddleware("School"),
   getAllBankBookBySchoolId
 );
 
 router.get(
-  "/get-all-income-book-entry/:academicYear",
+  "/get-all-income-book-entry/:financialYear",
   roleBasedMiddleware("School"),
   getAllIncomeBookBySchoolId
 );
 
 router.get(
-  "/get-all-expenses-book-entry/:academicYear",
+  "/get-all-expenses-book-entry/:financialYear",
   roleBasedMiddleware("School"),
   getAllExpensesBookBySchoolId
 );
 
 router.get(
-  "/get-all-journal-without-bank-cash-entry/:academicYear",
+  "/get-all-journal-without-bank-cash-entry/:financialYear",
   roleBasedMiddleware("School"),
   getAllJournalWIthoutBankCashBySchoolId
 );

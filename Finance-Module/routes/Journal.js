@@ -24,7 +24,7 @@ router.post(
 );
 
 router.get(
-  "/get-all-Journal/:academicYear",
+  "/get-all-Journal/:financialYear",
   roleBasedMiddleware("School"),
   getAllJournalBySchoolId
 );
@@ -37,39 +37,39 @@ router.post(
 );
 
 router.put(
-  "/update-Journal/:id/:academicYear",
+  "/update-Journal/:id/:financialYear",
   upload,
   roleBasedMiddleware("School"),
   updateJournalById
 );
 
 router.put(
-  "/update-approval-status-for-journal/:id/:academicYear",
+  "/update-approval-status-for-journal/:id/:financialYear",
   roleBasedMiddleware("School"),
   updateApprovalStatusById
 );
 
 router.put(
-  "/update-draft-Journal/:id/:academicYear",
+  "/update-draft-Journal/:id/:financialYear",
   upload,
   roleBasedMiddleware("School"),
   updateDraftJournalById
 );
 
 router.put(
-  "/cancel-Journal/:id/:academicYear",
+  "/cancel-Journal/:id/:financialYear",
   roleBasedMiddleware("School"),
   cancelJournalById
 );
 
 router.get(
-  "/get-journal-with-ledger-by-tds-tcs/:id/:academicYear",
+  "/get-journal-with-ledger-by-tds-tcs/:id/:financialYear",
   roleBasedMiddleware("School"),
   getAllLedgerByNameWithTDSorTCS
 );
 
 router.delete(
-  "/delete-journal-entry/:id/:academicYear",
+  "/delete-journal-entry/:id/:financialYear",
   roleBasedMiddleware("School"),
   deleteJournalEntryById
 );

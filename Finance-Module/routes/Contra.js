@@ -25,7 +25,7 @@ router.post(
 );
 
 router.get(
-  "/get-all-contra/:academicYear",
+  "/get-all-contra/:financialYear",
   roleBasedMiddleware("School"),
   getAllContraBySchoolId
 );
@@ -38,39 +38,39 @@ router.post(
 );
 
 router.put(
-  "/update-contra/:id/:academicYear",
+  "/update-contra/:id/:financialYear",
   upload,
   roleBasedMiddleware("School"),
   updateContraById
 );
 
 router.put(
-  "/update-approval-status-for-contra/:id/:academicYear",
+  "/update-approval-status-for-contra/:id/:financialYear",
   roleBasedMiddleware("School"),
   updateApprovalStatusById
 );
 
 router.put(
-  "/update-draft-contra/:id/:academicYear",
+  "/update-draft-contra/:id/:financialYear",
   upload,
   roleBasedMiddleware("School"),
   updateDraftContraById
 );
 
 router.put(
-  "/cancel-contra/:id/:academicYear",
+  "/cancel-contra/:id/:financialYear",
   roleBasedMiddleware("School"),
   cancelContraById
 );
 
 router.get(
-  "/get-contra-with-ledger-by-tds-tcs/:id/:academicYear",
+  "/get-contra-with-ledger-by-tds-tcs/:id/:financialYear",
   roleBasedMiddleware("School"),
   getAllLedgerByNameWithTDSorTCS
 );
 
 router.delete(
-  "/delete-contra-entry/:id/:academicYear",
+  "/delete-contra-entry/:id/:financialYear",
   roleBasedMiddleware("School"),
   deleteContraEntryById
 );

@@ -5,7 +5,7 @@ async function getAllByName(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
-    const { academicYear } = req.params;
+    const { financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -16,7 +16,7 @@ async function getAllByName(req, res) {
 
     const groupLedgers = await GroupLedger.find({
       schoolId,
-      academicYear,
+      financialYear,
       groupLedgerName: { $in: ["Bank", "Cash"] },
     });
     console.log("GroupLedgers found:", groupLedgers);
@@ -25,7 +25,7 @@ async function getAllByName(req, res) {
 
     const ledgers = await Ledger.find({
       schoolId,
-      academicYear,
+      financialYear,
       groupLedgerId: { $in: groupLedgerIds },
     }).sort({ createdAt: -1 });
 

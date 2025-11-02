@@ -3,7 +3,7 @@ import DepreciationMaster from "../../../models/DepreciationMaster.js";
 async function getAllBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { academicYear } = req.params;
+    const { financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -14,7 +14,7 @@ async function getAllBySchoolId(req, res) {
 
     const depreciationRaw = await DepreciationMaster.find({
       schoolId,
-      academicYear,
+      financialYear,
     })
       .populate({
         path: "ledgerId",
@@ -30,7 +30,7 @@ async function getAllBySchoolId(req, res) {
     const depreciation = depreciationRaw.map((item) => ({
       _id: item._id,
       schoolId: item.schoolId,
-      academicYear: item.academicYear,
+      financialYear: item.financialYear,
       rateAsPerIncomeTaxAct: item.rateAsPerIncomeTaxAct,
       rateAsPerICAI: item.rateAsPerICAI,
       createdAt: item.createdAt,

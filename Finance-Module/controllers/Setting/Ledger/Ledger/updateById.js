@@ -7,7 +7,7 @@ async function updateById(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
-    const { id, academicYear } = req.params;
+    const { id, financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -34,7 +34,7 @@ async function updateById(req, res) {
     const existingLedger = await Ledger.findOne({
       _id: id,
       schoolId,
-      academicYear,
+      financialYear,
     });
     if (!existingLedger) {
       return res.status(404).json({
@@ -89,14 +89,14 @@ async function updateById(req, res) {
     if (existingLedger.ledgerName.toLowerCase() === "net surplus/(deficit)") {
       const existingTotalNetRecord = await TotalNetdeficitNetSurplus.findOne({
         schoolId,
-        academicYear,
+        financialYear,
       });
 
       if (!existingTotalNetRecord) {
         // If not found, create new
         const newTotalNetRecord = new TotalNetdeficitNetSurplus({
           schoolId,
-          academicYear,
+          financialYear,
           ledgerId: existingLedger._id,
           balanceDetails: [],
         });

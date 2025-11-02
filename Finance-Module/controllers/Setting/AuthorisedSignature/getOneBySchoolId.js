@@ -4,7 +4,7 @@ async function getOneBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
-    const { academicYear } = req.params;
+    const { financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -15,7 +15,7 @@ async function getOneBySchoolId(req, res) {
 
     const signature = await AuthorisedSignature.findOne({
       schoolId,
-      academicYear,
+      financialYear,
     });
 
     if (!signature) {

@@ -7,7 +7,7 @@ async function updateById(req, res) {
 
   try {
     const schoolId = req.user?.schoolId;
-    const { id, academicYear } = req.params;
+    const { id, financialYear } = req.params;
 
     if (!schoolId) {
       await session.abortTransaction();
@@ -84,7 +84,7 @@ async function updateById(req, res) {
     const existingContraEntry = await ContraEntry.findOne({
       _id: id,
       schoolId,
-      academicYear,
+      financialYear,
     }).session(session);
 
     if (!existingContraEntry) {

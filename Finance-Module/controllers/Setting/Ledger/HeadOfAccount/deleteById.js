@@ -2,7 +2,7 @@ import HeadOfAccount from "../../../../models/HeadOfAccount.js";
 
 async function deleteHeadOfAccount(req, res) {
   try {
-    const { id, academicYear } = req.params;
+    const { id, financialYear } = req.params;
 
     const existingHead = await HeadOfAccount.findById(id);
     if (!existingHead) {
@@ -12,7 +12,7 @@ async function deleteHeadOfAccount(req, res) {
       });
     }
 
-    await HeadOfAccount.findByIdAndDelete({ _id: id, academicYear });
+    await HeadOfAccount.findByIdAndDelete({ _id: id, financialYear });
 
     return res.status(200).json({
       hasError: false,

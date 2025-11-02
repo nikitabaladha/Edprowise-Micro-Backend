@@ -17,7 +17,7 @@ export async function draft(req, res) {
       narration,
       itemDetails,
       status,
-      academicYear,
+      financialYear,
     } = req.body;
 
     const { documentImage } = req.files || {};
@@ -62,7 +62,7 @@ export async function draft(req, res) {
       totalAmountOfCredit,
       documentImage: documentImageFullPath,
       status,
-      academicYear,
+      financialYear,
     });
 
     await newJournal.save();

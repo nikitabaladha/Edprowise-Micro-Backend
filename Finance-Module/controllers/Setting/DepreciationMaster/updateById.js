@@ -3,7 +3,7 @@ import DepreciationMasterValidator from "../../../validators/DepreciationMasterV
 
 async function updateById(req, res) {
   try {
-    const { id, academicYear } = req.params;
+    const { id, financialYear } = req.params;
     const schoolId = req.user?.schoolId;
 
     if (!schoolId) {
@@ -40,7 +40,7 @@ async function updateById(req, res) {
     const existingDepreciation = await DepreciationMaster.findOne({
       _id: id,
       schoolId,
-      academicYear,
+      financialYear,
     });
 
     if (!existingDepreciation) {

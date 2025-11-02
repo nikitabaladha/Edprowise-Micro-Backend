@@ -3,7 +3,7 @@ import AuditorDocument from "../../models/AuditorDocument.js";
 export async function getAll(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { academicYear, ledgerId } = req.query;
+    const { financialYear, ledgerId } = req.query;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -13,7 +13,7 @@ export async function getAll(req, res) {
     }
 
     const query = { schoolId };
-    if (academicYear) query.academicYear = academicYear;
+    if (financialYear) query.financialYear = financialYear;
     if (ledgerId) query.ledgerId = ledgerId;
 
     const documents = await AuditorDocument.find(query).sort({ createdAt: -1 });

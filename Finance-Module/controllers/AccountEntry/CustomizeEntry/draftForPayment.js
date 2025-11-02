@@ -20,7 +20,7 @@ export async function draftForPayment(req, res) {
       totalAmountAfterGST,
       totalCreditAmount,
       customizeEntry,
-      academicYear,
+      financialYear,
     } = req.body;
 
     const { invoiceImage } = req.files || {};
@@ -62,7 +62,7 @@ export async function draftForPayment(req, res) {
       customizeEntry,
       invoiceImage: invoiceImageFullPath,
       status,
-      academicYear,
+      financialYear,
     });
 
     await newPaymentEntry.save();

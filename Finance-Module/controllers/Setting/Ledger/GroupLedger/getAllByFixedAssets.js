@@ -11,9 +11,9 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    const { academicYear } = req.params;
+    const { financialYear } = req.params;
 
-    const ledgers = await GroupLedger.find({ schoolId, academicYear })
+    const ledgers = await GroupLedger.find({ schoolId, financialYear })
       .populate({
         path: "bSPLLedgerId",
         match: { bSPLLedgerName: "Fixed Assets" },

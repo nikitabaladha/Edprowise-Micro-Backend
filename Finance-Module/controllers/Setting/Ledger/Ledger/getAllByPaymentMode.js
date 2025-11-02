@@ -4,7 +4,7 @@ async function getAllByPaymentMode(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
-    const { paymentMode, academicYear } = req.params;
+    const { paymentMode, financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -29,7 +29,7 @@ async function getAllByPaymentMode(req, res) {
 
     const ledgers = await Ledger.find({
       schoolId,
-      academicYear,
+      financialYear,
       paymentMode,
     }).sort({ createdAt: -1 });
 

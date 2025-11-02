@@ -43,11 +43,11 @@ async function draft(req, res) {
       status,
       TDSTCSRateWithAmount,
       ledgerIdWithPaymentMode,
-      academicYear,
+      financialYear,
       totalAmount,
     } = req.body;
 
-    if (!academicYear || academicYear.trim() === "") {
+    if (!financialYear || financialYear.trim() === "") {
       return res.status(400).json({
         hasError: true,
         message: "Academic year is required.",
@@ -94,14 +94,14 @@ async function draft(req, res) {
     if (TDSorTCS === "TDS") {
       const tdsLedger = await Ledger.findOne({
         schoolId,
-        academicYear,
+        financialYear,
         ledgerName: "TDS on Receipts",
       });
       if (tdsLedger) TDSorTCSLedgerId = tdsLedger._id;
     }
     const newReceipt = new Receipt({
       schoolId,
-      academicYear,
+      financialYear,
       entryDate,
       receiptDate,
       narration,

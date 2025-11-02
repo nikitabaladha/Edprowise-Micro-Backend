@@ -10,7 +10,7 @@ const AuthorisedSignatureSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    academicYear: {
+    financialYear: {
       type: String,
       required: true,
     },
@@ -21,7 +21,7 @@ const AuthorisedSignatureSchema = new mongoose.Schema(
 );
 
 AuthorisedSignatureSchema.index(
-  { schoolId: 1, academicYear: 1 },
+  { schoolId: 1, financialYear: 1 },
   { unique: true }
 );
 

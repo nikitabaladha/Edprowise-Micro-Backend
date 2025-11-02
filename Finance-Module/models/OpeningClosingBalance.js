@@ -13,7 +13,7 @@ const OpeningClosingBalanceSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    academicYear: {
+    financialYear: {
       type: String,
       required: true,
     },
@@ -60,7 +60,7 @@ OpeningClosingBalanceSchema.index(
   {
     schoolId: 1,
     ledgerId: 1,
-    academicYear: 1,
+    financialYear: 1,
   },
   { unique: true }
 );

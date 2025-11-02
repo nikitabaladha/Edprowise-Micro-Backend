@@ -116,62 +116,62 @@ router.post(
 );
 
 router.get(
-  "/get-all-customize-entry/:academicYear",
+  "/get-all-customize-entry/:financialYear",
   roleBasedMiddleware("School"),
   getAllCustomizeEntriesBySchoolId
 );
 
 router.put(
-  "/update-customize-entry-for-payment/:id/:academicYear",
+  "/update-customize-entry-for-payment/:id/:financialYear",
   uploadForPayment,
   roleBasedMiddleware("School"),
   updateByIdForPayment
 );
 
 router.put(
-  "/draft-update-customize-entry-for-payment/:id/:academicYear",
+  "/draft-update-customize-entry-for-payment/:id/:financialYear",
   uploadForPayment,
   roleBasedMiddleware("School"),
   updateDraftPayment
 );
 
 router.put(
-  "/update-customize-entry-for-receipt/:id/:academicYear",
+  "/update-customize-entry-for-receipt/:id/:financialYear",
   uploadForReceipt,
   roleBasedMiddleware("School"),
   updateByIdForReceipt
 );
 
 router.put(
-  "/draft-update-customize-entry-for-receipt/:id/:academicYear",
+  "/draft-update-customize-entry-for-receipt/:id/:financialYear",
   uploadForReceipt,
   roleBasedMiddleware("School"),
   updateDraftForReceipt
 );
 
 router.put(
-  "/update-customize-entry-for-contra/:id/:academicYear",
+  "/update-customize-entry-for-contra/:id/:financialYear",
   uploadForContra,
   roleBasedMiddleware("School"),
   updateByIdForContra
 );
 
 router.put(
-  "/draft-update-customize-entry-for-contra/:id/:academicYear",
+  "/draft-update-customize-entry-for-contra/:id/:financialYear",
   uploadForContra,
   roleBasedMiddleware("School"),
   updateDraftForContra
 );
 
 router.put(
-  "/update-customize-entry-for-journal/:id/:academicYear",
+  "/update-customize-entry-for-journal/:id/:financialYear",
   uploadForJournal,
   roleBasedMiddleware("School"),
   updateByIdForJournal
 );
 
 router.put(
-  "/draft-update-customize-entry-for-journal/:id/:academicYear",
+  "/draft-update-customize-entry-for-journal/:id/:financialYear",
   uploadForJournal,
   roleBasedMiddleware("School"),
   updateDraftForJournal

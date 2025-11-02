@@ -1,12 +1,12 @@
 import Joi from "joi";
 
-const academicYearCreate = Joi.string().required().messages({
+const financialYearCreate = Joi.string().required().messages({
   "string.base": "Academic Year must be a string.",
   "string.empty": "Academic Year cannot be empty.",
   "any.required": "Academic Year is required.",
 });
 
-const academicYearUpdate = Joi.string().allow("").optional().messages({
+const financialYearUpdate = Joi.string().allow("").optional().messages({
   "string.base": "Academic Year must be a string.",
   "string.empty": "Academic Year cannot be empty.",
 });
@@ -52,7 +52,7 @@ const DepreciationMasterValidator = Joi.object({
   groupLedgerId,
   chargeDepreciation,
   entryAutomation,
-  academicYear: academicYearCreate,
+  financialYear: financialYearCreate,
 });
 
 const DepreciationMasterValidatorUpdate = Joi.object({
@@ -62,7 +62,7 @@ const DepreciationMasterValidatorUpdate = Joi.object({
   groupLedgerId,
   chargeDepreciation,
   entryAutomation,
-  academicYear: academicYearUpdate,
+  financialYear: financialYearUpdate,
 });
 
 export default {

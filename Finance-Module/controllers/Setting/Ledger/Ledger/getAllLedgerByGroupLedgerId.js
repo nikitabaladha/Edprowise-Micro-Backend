@@ -3,7 +3,7 @@ import Ledger from "../../../../models/Ledger.js";
 async function getAllByGroupLedgerId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { groupLedgerId, academicYear } = req.params;
+    const { groupLedgerId, financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -22,7 +22,7 @@ async function getAllByGroupLedgerId(req, res) {
     const ledgers = await Ledger.find({
       schoolId,
       groupLedgerId,
-      academicYear,
+      financialYear,
     }).sort({
       createdAt: -1,
     });

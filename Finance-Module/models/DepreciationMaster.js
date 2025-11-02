@@ -40,8 +40,7 @@ const DepreciationMasterSchema = new mongoose.Schema(
       enum: ["Monthly", ""],
       default: "",
     },
-
-    academicYear: {
+    financialYear: {
       type: String,
       required: true,
     },
@@ -56,7 +55,7 @@ DepreciationMasterSchema.index(
     schoolId: 1,
     groupLedgerId: 1,
     ledgerId: 1,
-    academicYear: 1,
+    financialYear: 1,
   },
   { unique: true }
 );

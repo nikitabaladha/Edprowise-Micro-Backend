@@ -1,12 +1,12 @@
 import Joi from "joi";
 
-const academicYearCreate = Joi.string().required().messages({
+const financialYearCreate = Joi.string().required().messages({
   "string.base": "Academic Year must be a string.",
   "string.empty": "Academic Year cannot be empty.",
   "any.required": "Academic Year is required.",
 });
 
-const academicYearUpdate = Joi.string().allow("").optional().messages({
+const financialYearUpdate = Joi.string().allow("").optional().messages({
   "string.base": "Academic Year must be a string.",
   "string.empty": "Academic Year cannot be empty.",
 });
@@ -124,7 +124,7 @@ const VendorValidator = Joi.object({
   accountType,
   openingBalance,
   paymentTerms,
-  academicYear: academicYearCreate,
+  financialYear: financialYearCreate,
 });
 
 const VendorValidatorUpdate = Joi.object({
@@ -143,7 +143,7 @@ const VendorValidatorUpdate = Joi.object({
   openingBalance,
   documentImage,
   paymentTerms,
-  academicYear: academicYearUpdate,
+  financialYear: financialYearUpdate,
 });
 
 export default {

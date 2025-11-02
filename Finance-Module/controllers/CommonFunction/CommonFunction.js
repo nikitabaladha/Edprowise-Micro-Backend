@@ -2,7 +2,11 @@
 
 import mongoose from "mongoose";
 
-export async function hasBankOrCashLedger(schoolId, academicYear, itemDetails) {
+export async function hasBankOrCashLedger(
+  schoolId,
+  financialYear,
+  itemDetails
+) {
   try {
     // Extract all ledger IDs from itemDetails
     const ledgerIds = itemDetails
@@ -17,7 +21,7 @@ export async function hasBankOrCashLedger(schoolId, academicYear, itemDetails) {
       .find({
         _id: { $in: ledgerIds },
         schoolId,
-        academicYear,
+        financialYear,
       })
       .populate({
         path: "groupLedgerId",

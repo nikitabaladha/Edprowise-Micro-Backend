@@ -15,33 +15,33 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
       });
     }
 
-    const { startDate, endDate, academicYear } = req.query;
+    const { startDate, endDate, financialYear } = req.query;
 
     // Validate required parameters
-    if (!academicYear) {
+    if (!financialYear) {
       return res.status(400).json({
         hasError: true,
-        message: "academicYear is a required parameter.",
+        message: "financialYear is a required parameter.",
       });
     }
 
     // Parse date range or use academic year range
-    const academicYearStart = moment(
-      `04/01/${academicYear.split("-")[0]}`,
+    const financialYearStart = moment(
+      `04/01/${financialYear.split("-")[0]}`,
       "MM/DD/YYYY"
     ).startOf("day");
-    const academicYearEnd = moment(
-      `03/31/${academicYear.split("-")[1]}`,
+    const financialYearEnd = moment(
+      `03/31/${financialYear.split("-")[1]}`,
       "MM/DD/YYYY"
     ).endOf("day");
 
     // Normalize query range
     const start = startDate
       ? moment(startDate).startOf("day")
-      : academicYearStart.clone();
+      : financialYearStart.clone();
     const end = endDate
       ? moment(endDate).endOf("day")
-      : academicYearEnd.clone();
+      : financialYearEnd.clone();
 
     // Validate date range
     if (end.isBefore(start)) {
@@ -54,13 +54,13 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
     // Step 1: Find HeadOfAccount IDs for "Assets" and "Liabilities"
     const assetsHead = await HeadOfAccount.findOne({
       schoolId,
-      academicYear,
+      financialYear,
       headOfAccountName: "Assets",
     });
 
     const liabilitiesHead = await HeadOfAccount.findOne({
       schoolId,
-      academicYear,
+      financialYear,
       headOfAccountName: "Liabilities",
     });
 
@@ -78,7 +78,7 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
     // Step 2: Find all ledgers under Assets and Liabilities heads
     const ledgerQuery = {
       schoolId,
-      academicYear,
+      financialYear,
       $or: [],
     };
 
@@ -120,7 +120,7 @@ async function getBalanceSheetForAssetsLiabilities(req, res) {
     // Step 4: Find OpeningClosingBalance records for these ledgers
     const balanceRecords = await OpeningClosingBalance.find({
       schoolId,
-      academicYear,
+      financialYear,
       ledgerId: { $in: ledgerIds },
     }).populate("ledgerId");
 

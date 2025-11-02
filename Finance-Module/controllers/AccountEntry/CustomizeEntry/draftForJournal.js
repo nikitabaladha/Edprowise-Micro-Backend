@@ -17,7 +17,7 @@ export async function draftForJournal(req, res) {
       narration,
       itemDetails,
       status,
-      academicYear,
+      financialYear,
       customizeEntry,
     } = req.body;
 
@@ -63,7 +63,7 @@ export async function draftForJournal(req, res) {
       totalAmountOfCredit,
       documentImage: documentImageFullPath,
       status,
-      academicYear,
+      financialYear,
       customizeEntry,
     });
 

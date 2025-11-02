@@ -22,7 +22,7 @@ async function create(req, res) {
       });
     }
 
-    const { TDSorTCS, rate, natureOfTransaction, guidance, academicYear } =
+    const { TDSorTCS, rate, natureOfTransaction, guidance, financialYear } =
       req.body;
 
     const newTDSTCSRateChart = new TDSTCSRateChart({
@@ -31,7 +31,7 @@ async function create(req, res) {
       rate,
       guidance,
       natureOfTransaction,
-      academicYear,
+      financialYear,
     });
 
     await newTDSTCSRateChart.save();

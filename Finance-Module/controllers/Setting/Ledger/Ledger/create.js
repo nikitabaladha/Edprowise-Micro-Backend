@@ -31,7 +31,7 @@ async function create(req, res) {
       groupLedgerId,
       bSPLLedgerId,
       openingBalance,
-      academicYear,
+      financialYear,
     } = req.body;
 
     // First, get the HeadOfAccount to determine the type
@@ -89,7 +89,7 @@ async function create(req, res) {
       bSPLLedgerId,
       ledgerName,
       openingBalance: finalOpeningBalance, // This will store whatever value is provided
-      academicYear,
+      financialYear,
       ledgerCode: ledgerCode.toString(),
       balanceType,
     });
@@ -99,13 +99,13 @@ async function create(req, res) {
     if (ledgerName.toLowerCase() === "net surplus/(deficit)") {
       const existingTotalNetRecord = await TotalNetdeficitNetSurplus.findOne({
         schoolId,
-        academicYear,
+        financialYear,
       });
 
       if (!existingTotalNetRecord) {
         const newTotalNetRecord = new TotalNetdeficitNetSurplus({
           schoolId,
-          academicYear,
+          financialYear,
           ledgerId: newLedger._id,
           balanceDetails: [],
         });

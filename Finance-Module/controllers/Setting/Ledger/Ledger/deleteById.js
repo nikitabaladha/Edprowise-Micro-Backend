@@ -3,7 +3,7 @@ import Ledger from "../../../../models/Ledger.js";
 async function deleteById(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { id, academicYear } = req.params;
+    const { id, financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -20,7 +20,7 @@ async function deleteById(req, res) {
       });
     }
 
-    if (!academicYear) {
+    if (!financialYear) {
       return res.status(400).json({
         hasError: true,
         message: "Missing Academic Year.",
@@ -30,7 +30,7 @@ async function deleteById(req, res) {
     const deletedLedger = await Ledger.findOneAndDelete({
       _id: id,
       schoolId,
-      academicYear,
+      financialYear,
     });
 
     if (!deletedLedger) {

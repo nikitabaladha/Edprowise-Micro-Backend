@@ -5,7 +5,7 @@ import mongoose from "mongoose";
 async function getAllBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { academicYear } = req.params;
+    const { financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -17,7 +17,7 @@ async function getAllBySchoolId(req, res) {
     // Get all Journals for the school & year
     const Journals = await Journal.find({
       schoolId,
-      academicYear,
+      financialYear,
       customizeEntry: false,
     })
       .sort({ createdAt: -1 })
@@ -59,7 +59,7 @@ async function getAllBySchoolId(req, res) {
       return {
         _id: entry._id,
         schoolId: entry.schoolId,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
         entryDate: entry.entryDate,
         documentDate: entry.documentDate,
         narration: entry.narration,

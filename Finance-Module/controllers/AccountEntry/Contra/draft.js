@@ -21,7 +21,7 @@ export async function draft(req, res) {
       TDSorTCS,
       TDSTCSRateAmount,
       status,
-      academicYear,
+      financialYear,
     } = req.body;
 
     const { chequeImageForContra } = req.files || {};
@@ -70,7 +70,7 @@ export async function draft(req, res) {
       totalAmountOfCredit,
       chequeImageForContra: chequeImageForContraFullPath,
       status,
-      academicYear,
+      financialYear,
     });
 
     await newContra.save();

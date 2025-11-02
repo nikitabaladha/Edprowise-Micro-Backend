@@ -4,7 +4,7 @@ async function getAll(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
-    const academicYear = req.params.academicYear;
+    const financialYear = req.params.financialYear;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -15,7 +15,7 @@ async function getAll(req, res) {
 
     const headOfAccounts = await HeadOfAccount.find({
       schoolId,
-      academicYear,
+      financialYear,
     }).sort({
       createdAt: -1,
     });

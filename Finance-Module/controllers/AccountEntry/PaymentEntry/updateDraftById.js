@@ -20,7 +20,7 @@ async function generateTransactionNumber() {
 async function updateById(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { id, academicYear } = req.params;
+    const { id, financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -53,7 +53,7 @@ async function updateById(req, res) {
     const existingPaymentEntry = await PaymentEntry.findOne({
       _id: id,
       schoolId,
-      academicYear,
+      financialYear,
     });
     if (!existingPaymentEntry) {
       return res.status(404).json({

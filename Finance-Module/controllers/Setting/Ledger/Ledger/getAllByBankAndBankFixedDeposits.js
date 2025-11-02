@@ -5,7 +5,7 @@ import BSPLLedger from "../../../../models/BSPLLedger.js";
 async function getAllByBankAndBankFixedDepisits(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { academicYear } = req.params;
+    const { financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -17,7 +17,7 @@ async function getAllByBankAndBankFixedDepisits(req, res) {
     // 1. Get GroupLedger based data (Bank and Bank Fixed Deposits)
     const groupLedgers = await GroupLedger.find({
       schoolId,
-      academicYear,
+      financialYear,
       groupLedgerName: { $in: ["Bank", "Bank Fixed Deposits"] },
     });
 
@@ -25,7 +25,7 @@ async function getAllByBankAndBankFixedDepisits(req, res) {
 
     const groupBasedLedgers = await Ledger.find({
       schoolId,
-      academicYear,
+      financialYear,
       groupLedgerId: { $in: groupLedgerIds },
     })
       .populate("headOfAccountId")
@@ -35,7 +35,7 @@ async function getAllByBankAndBankFixedDepisits(req, res) {
     // 2. Get BSPLLedger based data (Fixed Assets)
     const bsplFixedAssets = await BSPLLedger.findOne({
       schoolId,
-      academicYear,
+      financialYear,
       bSPLLedgerName: "Fixed Assets",
     });
 
@@ -43,7 +43,7 @@ async function getAllByBankAndBankFixedDepisits(req, res) {
     if (bsplFixedAssets) {
       fixedAssetsLedgers = await Ledger.find({
         schoolId,
-        academicYear,
+        financialYear,
         bSPLLedgerId: bsplFixedAssets._id,
       })
         .populate("headOfAccountId")

@@ -3,13 +3,13 @@ import HeadOfAccount from "../../models/HeadOfAccount.js";
 
 const copyBSPLLedgers = async (
   schoolId,
-  newAcademicYear,
-  prevAcademicYear,
+  newFinancialYear,
+  prevFinancialYear,
   session
 ) => {
   const previousBSPLLedgers = await BSPLLedger.find({
     schoolId,
-    academicYear: prevAcademicYear,
+    financialYear: prevFinancialYear,
   }).session(session);
 
   if (previousBSPLLedgers.length === 0) {
@@ -22,12 +22,12 @@ const copyBSPLLedgers = async (
   const prevHeadOfAccounts = await HeadOfAccount.find({
     _id: { $in: prevHeadOfAccountIds },
     schoolId,
-    academicYear: prevAcademicYear,
+    financialYear: prevFinancialYear,
   }).session(session);
 
   const newHeadOfAccounts = await HeadOfAccount.find({
     schoolId,
-    academicYear: newAcademicYear,
+    financialYear: newFinancialYear,
   }).session(session);
 
   const headOfAccountNameToNewId = {};
@@ -51,7 +51,7 @@ const copyBSPLLedgers = async (
       schoolId,
       headOfAccountId: newHeadOfAccountId,
       bSPLLedgerName: prevLedger.bSPLLedgerName,
-      academicYear: newAcademicYear,
+      financialYear: newFinancialYear,
     });
   }
 

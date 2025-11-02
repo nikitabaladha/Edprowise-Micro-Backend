@@ -8,7 +8,7 @@ import mongoose from "mongoose";
 async function getAllBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { academicYear } = req.params;
+    const { financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -19,14 +19,14 @@ async function getAllBySchoolId(req, res) {
 
     const authorisedSignature = await AuthorisedSignature.findOne({
       schoolId,
-      academicYear,
+      financialYear,
     })
       .select("authorisedSignatureImage")
       .lean();
 
     const paymentEntries = await PaymentEntry.find({
       schoolId,
-      academicYear,
+      financialYear,
       customizeEntry: false,
     })
       .sort({ createdAt: -1 })
@@ -138,7 +138,7 @@ async function getAllBySchoolId(req, res) {
         // Authorised Signature
         authorisedSignatureImage:
           authorisedSignature?.authorisedSignatureImage || null,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
         approvalStatus: entry.approvalStatus,
         reasonOfDisapprove: entry.reasonOfDisapprove,
       };

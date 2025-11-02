@@ -2,14 +2,14 @@ import BSPLLedger from "../../../../models/BSPLLedger.js";
 
 async function findBSPLLedgerByName(req, res) {
   try {
-    const { bSPLLedgerName, headOfAccountId, academicYear } = req.body;
+    const { bSPLLedgerName, headOfAccountId, financialYear } = req.body;
     const schoolId = req.user?.schoolId;
 
     const bsplLedger = await BSPLLedger.findOne({
       schoolId,
       headOfAccountId,
       bSPLLedgerName,
-      academicYear,
+      financialYear,
     });
 
     return res.status(200).json({

@@ -12,7 +12,7 @@ const JournalSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    academicYear: {
+    financialYear: {
       type: String,
       required: true,
     },

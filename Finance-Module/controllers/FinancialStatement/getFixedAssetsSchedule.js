@@ -18,33 +18,33 @@ async function getFixedAssetsSchedule(req, res) {
       });
     }
 
-    const { startDate, endDate, academicYear } = req.query;
+    const { startDate, endDate, financialYear } = req.query;
 
     // Validate required parameters
-    if (!academicYear) {
+    if (!financialYear) {
       return res.status(400).json({
         hasError: true,
-        message: "academicYear is a required parameter.",
+        message: "financialYear is a required parameter.",
       });
     }
 
     // Parse date range or use academic year range
-    const academicYearStart = moment(
-      `04/01/${academicYear.split("-")[0]}`,
+    const financialYearStart = moment(
+      `04/01/${financialYear.split("-")[0]}`,
       "MM/DD/YYYY"
     ).startOf("day");
-    const academicYearEnd = moment(
-      `03/31/${academicYear.split("-")[1]}`,
+    const financialYearEnd = moment(
+      `03/31/${financialYear.split("-")[1]}`,
       "MM/DD/YYYY"
     ).endOf("day");
 
     // Normalize query range
     const start = startDate
       ? moment(startDate).startOf("day")
-      : academicYearStart.clone();
+      : financialYearStart.clone();
     const end = endDate
       ? moment(endDate).endOf("day")
-      : academicYearEnd.clone();
+      : financialYearEnd.clone();
 
     // Validate date range
     if (end.isBefore(start)) {
@@ -55,23 +55,23 @@ async function getFixedAssetsSchedule(req, res) {
     }
 
     // Calculate first half and second half dates
-    const firstHalfStart = academicYearStart.clone(); // April 1
+    const firstHalfStart = financialYearStart.clone(); // April 1
     const firstHalfEnd = moment(
-      `09/30/${academicYear.split("-")[0]}`,
+      `09/30/${financialYear.split("-")[0]}`,
       "MM/DD/YYYY"
     ).endOf("day"); // September 30
 
     const secondHalfStart = moment(
-      `10/01/${academicYear.split("-")[0]}`,
+      `10/01/${financialYear.split("-")[0]}`,
       "MM/DD/YYYY"
     ).startOf("day"); // October 1
-    const secondHalfEnd = academicYearEnd.clone(); // March 31
+    const secondHalfEnd = financialYearEnd.clone(); // March 31
 
     // Step 1: Get the Fixed Assets BSPLLedger
     const fixedAssetsBSPL = await BSPLLedger.findOne({
       schoolId,
       bSPLLedgerName: "Fixed Assets",
-      academicYear,
+      financialYear,
     });
 
     if (!fixedAssetsBSPL) {
@@ -86,7 +86,7 @@ async function getFixedAssetsSchedule(req, res) {
     const groupLedgers = await GroupLedger.find({
       schoolId,
       bSPLLedgerId: fixedAssetsBSPL._id,
-      academicYear,
+      financialYear,
     });
 
     if (groupLedgers.length === 0) {
@@ -101,7 +101,7 @@ async function getFixedAssetsSchedule(req, res) {
     const depreciationRates = await DepreciationMaster.find({
       schoolId,
       groupLedgerId: { $in: groupLedgers.map((gl) => gl._id) },
-      academicYear,
+      financialYear,
     });
 
     // Create a map for easy access to depreciation rates by groupLedgerId
@@ -126,7 +126,7 @@ async function getFixedAssetsSchedule(req, res) {
     const ledgers = await Ledger.find({
       schoolId,
       groupLedgerId: { $in: groupLedgers.map((gl) => gl._id) },
-      academicYear,
+      financialYear,
     });
 
     // Create a map for easy access to ledger opening balances
@@ -141,7 +141,7 @@ async function getFixedAssetsSchedule(req, res) {
     const openingClosingBalances = await OpeningClosingBalance.find({
       schoolId,
       ledgerId: { $in: ledgerIds },
-      academicYear,
+      financialYear,
     }).populate("ledgerId");
 
     // Step 6: Process the data to create the desired structure

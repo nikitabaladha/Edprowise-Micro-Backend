@@ -17,7 +17,7 @@ import mongoose from "mongoose";
 async function getAllBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { academicYear } = req.params;
+    const { financialYear } = req.params;
     const { startDate, endDate, month } = req.query;
 
     if (!schoolId) {
@@ -29,7 +29,7 @@ async function getAllBySchoolId(req, res) {
 
     const authorisedSignature = await AuthorisedSignature.findOne({
       schoolId,
-      academicYear,
+      financialYear,
     })
       .select("authorisedSignatureImage")
       .lean();
@@ -40,7 +40,7 @@ async function getAllBySchoolId(req, res) {
     };
 
     if (!startDate && !endDate) {
-      baseQuery.academicYear = academicYear;
+      baseQuery.financialYear = financialYear;
     }
 
     if (month) {
@@ -100,7 +100,7 @@ async function getAllBySchoolId(req, res) {
       }
     } else {
       // Default to academic year if no date range provided
-      baseQuery.academicYear = academicYear;
+      baseQuery.financialYear = financialYear;
     }
 
     const [paymentEntries, receiptEntries, contraEntries, journalEntries] =
@@ -345,7 +345,7 @@ async function getAllBySchoolId(req, res) {
         itemDetails: itemsWithLedgerNames,
 
         entryDate: entry.entryDate,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
 
         invoiceDate: entry.invoiceDate,
         narration: entry.narration,
@@ -607,7 +607,7 @@ async function getAllBySchoolId(req, res) {
         itemDetails: itemsWithLedgerNames,
 
         entryDate: entry.entryDate,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
 
         receiptDate: entry.receiptDate,
         narration: entry.narration,
@@ -864,7 +864,7 @@ async function getAllBySchoolId(req, res) {
         itemDetails: itemsWithLedgerNames,
 
         entryDate: entry.entryDate,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
 
         TDSorTCSHeadOfAccountName,
         TDSorTCSBSPLLedgerName,
@@ -962,7 +962,7 @@ async function getAllBySchoolId(req, res) {
         itemDetails: itemsWithLedgerNames,
 
         entryDate: entry.entryDate,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
 
         customizeEntry: entry.customizeEntry,
       };

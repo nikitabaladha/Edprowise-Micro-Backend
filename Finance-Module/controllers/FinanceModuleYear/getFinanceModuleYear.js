@@ -1,6 +1,6 @@
 import FinanceModuleYear from "../../models/FinanceModuleYear.js";
 
-const getAcademicYearsBySchoolId = async (req, res) => {
+const getFinancialYearsBySchoolId = async (req, res) => {
   try {
     const schoolId = req.user?.schoolId;
 
@@ -14,28 +14,28 @@ const getAcademicYearsBySchoolId = async (req, res) => {
 
     const currentYear = new Date().getFullYear();
     const nextYear = currentYear + 1;
-    const currentAcademicYear = `${currentYear}-${nextYear}`;
+    const currentFinancialYear = `${currentYear}-${nextYear}`;
 
     const existing = await FinanceModuleYear.findOne({
       schoolId,
-      academicYear: currentAcademicYear,
+      financialYear: currentFinancialYear,
     });
 
     if (!existing) {
       await FinanceModuleYear.create({
         schoolId,
-        academicYear: currentAcademicYear,
+        financialYear: currentFinancialYear,
       });
     }
 
-    const academicYears = await FinanceModuleYear.find({ schoolId }).sort({
-      academicYear: 1,
+    const financialYears = await FinanceModuleYear.find({ schoolId }).sort({
+      financialYear: 1,
     });
 
     res.status(200).json({
       hasError: false,
       message: "Academic years fetched successfully.",
-      data: academicYears,
+      data: financialYears,
     });
   } catch (err) {
     console.error(err);
@@ -46,4 +46,4 @@ const getAcademicYearsBySchoolId = async (req, res) => {
   }
 };
 
-export default getAcademicYearsBySchoolId;
+export default getFinancialYearsBySchoolId;

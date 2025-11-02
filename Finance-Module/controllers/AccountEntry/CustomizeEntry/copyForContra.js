@@ -16,7 +16,7 @@ export async function copyForContra(req, res) {
       dateOfCashDepositedWithdrawlDate,
       narration,
       itemDetails,
-      academicYear,
+      financialYear,
       contraEntryName,
       chequeImageForContra,
     } = req.body;
@@ -54,7 +54,7 @@ export async function copyForContra(req, res) {
       totalAmountOfCredit,
       chequeImageForContra: chequeImageForContraFullPath,
       status: "Draft",
-      academicYear,
+      financialYear,
       contraEntryName: contraEntryName || "",
       customizeEntry: true,
     });

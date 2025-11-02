@@ -2,7 +2,7 @@ import GroupLedger from "../../../../models/GroupLedger.js";
 
 async function findGroupLedgerByName(req, res) {
   try {
-    const { groupLedgerName, headOfAccountId, bSPLLedgerId, academicYear } =
+    const { groupLedgerName, headOfAccountId, bSPLLedgerId, financialYear } =
       req.body;
     const schoolId = req.user?.schoolId;
 
@@ -11,7 +11,7 @@ async function findGroupLedgerByName(req, res) {
       headOfAccountId,
       bSPLLedgerId,
       groupLedgerName,
-      academicYear,
+      financialYear,
     });
 
     return res.status(200).json({

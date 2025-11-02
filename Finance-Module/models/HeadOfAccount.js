@@ -10,7 +10,7 @@ const HeadOfAccountSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    academicYear: {
+    financialYear: {
       type: String,
       required: true,
     },
@@ -21,7 +21,7 @@ const HeadOfAccountSchema = new mongoose.Schema(
 );
 
 HeadOfAccountSchema.index(
-  { schoolId: 1, headOfAccountName: 1, academicYear: 1 },
+  { schoolId: 1, headOfAccountName: 1, financialYear: 1 },
   { unique: true }
 );
 

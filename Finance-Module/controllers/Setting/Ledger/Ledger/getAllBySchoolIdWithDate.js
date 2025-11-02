@@ -11,7 +11,7 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    const academicYear = req.params.academicYear;
+    const financialYear = req.params.financialYear;
     const { startDate, endDate } = req.query;
 
     // Build the query object
@@ -25,7 +25,7 @@ async function getAllBySchoolId(req, res) {
       };
     } else {
       // If no date range, filter by academic year
-      query.academicYear = academicYear;
+      query.financialYear = financialYear;
     }
 
     const ledgers = await Ledger.find(query)

@@ -2,7 +2,7 @@ import DepreciationMaster from "../../../models/DepreciationMaster.js";
 
 async function updateAll(req, res) {
   try {
-    const { academicYear } = req.params;
+    const { financialYear } = req.params;
     const schoolId = req.user?.schoolId;
 
     if (!schoolId) {
@@ -22,7 +22,7 @@ async function updateAll(req, res) {
 
     const existingDepreciations = await DepreciationMaster.find({
       schoolId,
-      academicYear,
+      financialYear,
     });
 
     if (!existingDepreciations || existingDepreciations.length === 0) {
@@ -44,7 +44,7 @@ async function updateAll(req, res) {
     if (frequency !== undefined) updateFields.frequency = frequency;
 
     const result = await DepreciationMaster.updateMany(
-      { schoolId, academicYear },
+      { schoolId, financialYear },
       { $set: updateFields }
     );
 

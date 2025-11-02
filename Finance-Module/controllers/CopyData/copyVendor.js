@@ -2,13 +2,13 @@ import Vendor from "../../models/Vendor.js";
 
 const copyVendors = async (
   schoolId,
-  newAcademicYear,
-  prevAcademicYear,
+  newFinancialYear,
+  prevFinancialYear,
   session
 ) => {
   const previousVendors = await Vendor.find({
     schoolId,
-    academicYear: prevAcademicYear,
+    financialYear: prevFinancialYear,
   }).session(session);
 
   const newVendors = previousVendors.map((vendor) => ({
@@ -26,7 +26,7 @@ const copyVendors = async (
     ifscCode: vendor.ifscCode,
     accountNumber: vendor.accountNumber,
     accountType: vendor.accountType,
-    academicYear: newAcademicYear,
+    financialYear: newFinancialYear,
   }));
 
   if (newVendors.length > 0) {

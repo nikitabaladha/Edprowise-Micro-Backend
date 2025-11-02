@@ -17,7 +17,8 @@ import AuthorisedSignature from "../../../models/AuthorisedSignature.js";
 async function getAllDateMonthDataWithDebitCredit(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { month, academicYear, specificDate, startDate, endDate } = req.query;
+    const { month, financialYear, specificDate, startDate, endDate } =
+      req.query;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -28,7 +29,7 @@ async function getAllDateMonthDataWithDebitCredit(req, res) {
 
     const authorisedSignature = await AuthorisedSignature.findOne({
       schoolId,
-      academicYear,
+      financialYear,
     })
       .select("authorisedSignatureImage")
       .lean();
@@ -113,7 +114,7 @@ async function getAllDateMonthDataWithDebitCredit(req, res) {
     }
     // Default to academic year if no date filters provided
     else {
-      baseQuery.academicYear = academicYear;
+      baseQuery.financialYear = financialYear;
     }
 
     // Rest of your code remains exactly the same...
@@ -358,7 +359,7 @@ async function getAllDateMonthDataWithDebitCredit(req, res) {
         itemDetails: itemsWithLedgerNames,
 
         entryDate: entry.entryDate,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
 
         invoiceDate: entry.invoiceDate,
         narration: entry.narration,
@@ -621,7 +622,7 @@ async function getAllDateMonthDataWithDebitCredit(req, res) {
         itemDetails: itemsWithLedgerNames,
 
         entryDate: entry.entryDate,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
 
         receiptDate: entry.receiptDate,
         narration: entry.narration,
@@ -880,7 +881,7 @@ async function getAllDateMonthDataWithDebitCredit(req, res) {
         itemDetails: itemsWithLedgerNames,
 
         entryDate: entry.entryDate,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
 
         TDSorTCSHeadOfAccountName,
         TDSorTCSBSPLLedgerName,
@@ -978,7 +979,7 @@ async function getAllDateMonthDataWithDebitCredit(req, res) {
         itemDetails: itemsWithLedgerNames,
 
         entryDate: entry.entryDate,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
 
         customizeEntry: entry.customizeEntry,
         documentImage: entry.documentImage,

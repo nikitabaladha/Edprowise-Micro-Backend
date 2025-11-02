@@ -12,9 +12,9 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    const academicYear = req.params.academicYear;
+    const financialYear = req.params.financialYear;
 
-    const ledgers = await Ledger.find({ schoolId, academicYear })
+    const ledgers = await Ledger.find({ schoolId, financialYear })
       .populate({ path: "headOfAccountId", select: "headOfAccountName" })
       .populate({ path: "groupLedgerId", select: "groupLedgerName" })
       .populate({ path: "bSPLLedgerId", select: "bSPLLedgerName" })
@@ -26,7 +26,7 @@ async function getAllBySchoolId(req, res) {
     // Fetch opening closing balances for all ledgers in one query
     const openingClosingBalances = await OpeningClosingBalance.find({
       schoolId,
-      academicYear,
+      financialYear,
       ledgerId: { $in: ledgerIds },
     });
 
@@ -51,7 +51,7 @@ async function getAllBySchoolId(req, res) {
       return {
         _id: ledger._id,
         schoolId: ledger.schoolId,
-        academicYear: ledger.academicYear,
+        financialYear: ledger.financialYear,
         ledgerName: ledger.ledgerName,
         ledgerCode: ledger.ledgerCode,
         openingBalance: ledger.openingBalance,

@@ -13,13 +13,13 @@ async function getAllOpeningClosingBalanceBySchoolId(req, res) {
       });
     }
 
-    const { ledgerId, startDate, endDate, academicYear } = req.query;
+    const { ledgerId, startDate, endDate, financialYear } = req.query;
 
     // Validate required parameters
-    if (!ledgerId || !academicYear) {
+    if (!ledgerId || !financialYear) {
       return res.status(400).json({
         hasError: true,
-        message: "ledgerId and academicYear are required parameters.",
+        message: "ledgerId and financialYear are required parameters.",
       });
     }
 
@@ -27,7 +27,7 @@ async function getAllOpeningClosingBalanceBySchoolId(req, res) {
     const ledger = await Ledger.findOne({
       schoolId,
       _id: ledgerId,
-      academicYear,
+      financialYear,
     });
 
     if (!ledger) {
@@ -41,26 +41,26 @@ async function getAllOpeningClosingBalanceBySchoolId(req, res) {
     const openingClosingBalance = await OpeningClosingBalance.findOne({
       schoolId,
       ledgerId,
-      academicYear,
+      financialYear,
     }).populate("ledgerId", "ledgerName");
 
     // Parse date range or use academic year range
-    const academicYearStart = moment(
-      `04/01/${academicYear.split("-")[0]}`,
+    const financialYearStart = moment(
+      `04/01/${financialYear.split("-")[0]}`,
       "MM/DD/YYYY"
     ).startOf("day");
-    const academicYearEnd = moment(
-      `03/31/${academicYear.split("-")[1]}`,
+    const financialYearEnd = moment(
+      `03/31/${financialYear.split("-")[1]}`,
       "MM/DD/YYYY"
     ).endOf("day");
 
     // Normalize query range
     const start = startDate
       ? moment(startDate).startOf("day")
-      : academicYearStart.clone();
+      : financialYearStart.clone();
     const end = endDate
       ? moment(endDate).endOf("day")
-      : academicYearEnd.clone();
+      : financialYearEnd.clone();
 
     // Build day list with day granularity
     const allDates = [];
@@ -179,7 +179,7 @@ async function getAllOpeningClosingBalanceBySchoolId(req, res) {
         {
           _id: openingClosingBalance ? openingClosingBalance._id : null,
           schoolId,
-          academicYear,
+          financialYear,
           ledgerId: ledger._id,
           ledgerName: ledger.ledgerName,
           balanceDetails: dailyBalances,

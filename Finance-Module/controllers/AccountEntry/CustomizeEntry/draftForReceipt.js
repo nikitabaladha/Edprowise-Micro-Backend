@@ -17,7 +17,7 @@ export async function draftForReceipt(req, res) {
       narration,
       itemDetails,
       status,
-      academicYear,
+      financialYear,
       totalAmount,
       totalDebitAmount,
       customizeEntry,
@@ -62,7 +62,7 @@ export async function draftForReceipt(req, res) {
       totalDebitAmount,
       receiptImage: receiptImageFullPath,
       status,
-      academicYear,
+      financialYear,
       customizeEntry,
     });
 

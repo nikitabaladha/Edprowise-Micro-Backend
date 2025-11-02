@@ -4,7 +4,7 @@ async function getAllBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
-    const { academicYear } = req.params;
+    const { financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -13,7 +13,7 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    const vendors = await Vendor.find({ schoolId, academicYear }).sort({
+    const vendors = await Vendor.find({ schoolId, financialYear }).sort({
       createdAt: -1,
     });
 

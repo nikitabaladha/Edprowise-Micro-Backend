@@ -34,7 +34,7 @@ async function create(req, res) {
       rateAsPerICAI,
       chargeDepreciation,
       entryAutomation,
-      academicYear,
+      financialYear,
     } = req.body;
 
     // from frontend i will send true or false for them
@@ -48,7 +48,7 @@ async function create(req, res) {
       rateAsPerICAI,
       chargeDepreciation,
       entryAutomation,
-      academicYear,
+      financialYear,
     });
 
     await newDepreciationMaster.save();

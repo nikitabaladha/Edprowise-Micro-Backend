@@ -11,13 +11,13 @@ function toTwoDecimals(value) {
   return Math.round(Number(value) * 100) / 100;
 }
 
-async function generateReceiptVoucherNumber(schoolId, academicYear) {
+async function generateReceiptVoucherNumber(schoolId, financialYear) {
   // Find the highest existing voucher number
   const lastEntry = await Receipt.findOne(
     {
       schoolId,
-      academicYear,
-      status: "Posted",
+      financialYear,
+      status: { $in: ["Posted", "Cancelled"] },
       receiptVoucherNumber: { $exists: true, $ne: null },
     },
     { receiptVoucherNumber: 1 },
@@ -33,7 +33,7 @@ async function generateReceiptVoucherNumber(schoolId, academicYear) {
     }
   }
 
-  return `RVN/${academicYear}/${nextNumber}`;
+  return `RVN/${financialYear}/${nextNumber}`;
 }
 
 async function generateTransactionNumber() {
@@ -54,14 +54,14 @@ async function generateTransactionNumber() {
 
 async function getOrCreateOpeningBalanceRecord(
   schoolId,
-  academicYear,
+  financialYear,
   ledgerId,
   entryDate,
   session // ADDED: session parameter
 ) {
   const ledger = await Ledger.findOne({
     schoolId,
-    academicYear,
+    financialYear,
     _id: ledgerId,
   }).session(session); // ADDED: session
 
@@ -75,14 +75,14 @@ async function getOrCreateOpeningBalanceRecord(
 
   let record = await OpeningClosingBalance.findOne({
     schoolId,
-    academicYear,
+    financialYear,
     ledgerId,
   }).session(session); // ADDED: session
 
   if (!record) {
     record = new OpeningClosingBalance({
       schoolId,
-      academicYear,
+      financialYear,
       ledgerId,
       balanceDetails: [],
       balanceType,
@@ -104,7 +104,7 @@ async function getOrCreateOpeningBalanceRecord(
 
 async function updateOpeningClosingBalance(
   schoolId,
-  academicYear,
+  financialYear,
   ledgerId,
   entryDate,
   receiptId,
@@ -118,7 +118,7 @@ async function updateOpeningClosingBalance(
   const { record, openingBalance, balanceType } =
     await getOrCreateOpeningBalanceRecord(
       schoolId,
-      academicYear,
+      financialYear,
       ledgerId,
       entryDate,
       session // ADDED: session
@@ -192,13 +192,13 @@ async function updateOpeningClosingBalance(
 
 async function recalculateLedgerBalances(
   schoolId,
-  academicYear,
+  financialYear,
   ledgerId,
   session // ADDED: session parameter
 ) {
   const record = await OpeningClosingBalance.findOne({
     schoolId,
-    academicYear,
+    financialYear,
     ledgerId,
   }).session(session); // ADDED: session
 
@@ -208,7 +208,7 @@ async function recalculateLedgerBalances(
 
   const ledger = await Ledger.findOne({
     schoolId,
-    academicYear,
+    financialYear,
     _id: ledgerId,
   }).session(session); // ADDED: session
 
@@ -257,14 +257,14 @@ async function recalculateLedgerBalances(
 
 async function recalculateAllBalancesAfterDate(
   schoolId,
-  academicYear,
+  financialYear,
   ledgerId,
   date,
   session // ADDED: session parameter
 ) {
   const record = await OpeningClosingBalance.findOne({
     schoolId,
-    academicYear,
+    financialYear,
     ledgerId,
   }).session(session); // ADDED: session
 
@@ -296,7 +296,7 @@ async function recalculateAllBalancesAfterDate(
 
     const ledger = await Ledger.findOne({
       schoolId,
-      academicYear,
+      financialYear,
       _id: ledgerId,
     }).session(session); // ADDED: session
 
@@ -333,7 +333,7 @@ function aggregateAmountsByLedger(itemDetails) {
 
 async function propagateBalanceChangeToNextYear(
   schoolId,
-  currentAcademicYear,
+  currentFinancialYear,
   ledgerId,
   session
 ) {
@@ -341,25 +341,25 @@ async function propagateBalanceChangeToNextYear(
     // Find the current ledger to get its details
     const currentLedger = await Ledger.findOne({
       schoolId,
-      academicYear: currentAcademicYear,
+      financialYear: currentFinancialYear,
       _id: ledgerId,
     }).session(session);
 
     if (!currentLedger) {
-      console.log(`Ledger ${ledgerId} not found in ${currentAcademicYear}`);
+      console.log(`Ledger ${ledgerId} not found in ${currentFinancialYear}`);
       return;
     }
 
     // Calculate next academic year
-    const [yearPart1, yearPart2] = currentAcademicYear.split("-");
-    const nextAcademicYear = `${parseInt(yearPart1) + 1}-${
+    const [yearPart1, yearPart2] = currentFinancialYear.split("-");
+    const nextFinancialYear = `${parseInt(yearPart1) + 1}-${
       parseInt(yearPart2) + 1
     }`;
 
     // Find the next year's ledger that has the CURRENT ledger as parent
     const nextYearLedger = await Ledger.findOne({
       schoolId,
-      academicYear: nextAcademicYear,
+      financialYear: nextFinancialYear,
       parentLedgerId: currentLedger._id,
     }).session(session);
 
@@ -371,7 +371,7 @@ async function propagateBalanceChangeToNextYear(
     // Get the current year's balance record for this ledger
     const currentYearBalance = await OpeningClosingBalance.findOne({
       schoolId,
-      academicYear: currentAcademicYear,
+      financialYear: currentFinancialYear,
       ledgerId: ledgerId,
     }).session(session);
 
@@ -395,7 +395,7 @@ async function propagateBalanceChangeToNextYear(
     await Ledger.findOneAndUpdate(
       {
         schoolId,
-        academicYear: nextAcademicYear,
+        financialYear: nextFinancialYear,
         _id: nextYearLedger._id,
       },
       {
@@ -410,7 +410,7 @@ async function propagateBalanceChangeToNextYear(
     // Update the OpeningClosingBalance for next year
     let nextYearOpeningBalance = await OpeningClosingBalance.findOne({
       schoolId,
-      academicYear: nextAcademicYear,
+      financialYear: nextFinancialYear,
       ledgerId: nextYearLedger._id,
     }).session(session);
 
@@ -418,7 +418,7 @@ async function propagateBalanceChangeToNextYear(
       // Create new OpeningClosingBalance record if it doesn't exist
       nextYearOpeningBalance = new OpeningClosingBalance({
         schoolId,
-        academicYear: nextAcademicYear,
+        financialYear: nextFinancialYear,
         ledgerId: nextYearLedger._id,
         balanceDetails: [],
         balanceType: newOpeningBalance < 0 ? "Credit" : "Debit",
@@ -495,7 +495,7 @@ async function propagateBalanceChangeToNextYear(
     // Recursively propagate to the next year if it exists
     await propagateBalanceChangeToNextYear(
       schoolId,
-      nextAcademicYear,
+      nextFinancialYear,
       nextYearLedger._id,
       session
     );
@@ -548,7 +548,7 @@ async function create(req, res) {
       status,
       TDSTCSRateWithAmount,
       ledgerIdWithPaymentMode,
-      academicYear,
+      financialYear,
       totalAmount,
     } = req.body;
 
@@ -558,7 +558,7 @@ async function create(req, res) {
     if (status === "Posted") {
       receiptVoucherNumber = await generateReceiptVoucherNumber(
         schoolId,
-        academicYear
+        financialYear
       );
     }
 
@@ -610,13 +610,13 @@ async function create(req, res) {
       // Find the ledger with exact name match
       let tdsTcsLedgerToUpdate = await Ledger.findOne({
         schoolId,
-        academicYear,
+        financialYear,
         ledgerName: { $regex: new RegExp(`^${ledgerNameToFind}$`, "i") },
       }).session(session); // ADDED: session
 
       if (!tdsTcsLedgerToUpdate) {
         throw new Error(
-          `${ledgerNameToFind} Ledger not found for school ${schoolId} and academic year ${academicYear}`
+          `${ledgerNameToFind} Ledger not found for school ${schoolId} and academic year ${financialYear}`
         );
       }
 
@@ -643,7 +643,7 @@ async function create(req, res) {
       chequeImageForReceipt: chequeImageForReceiptFullPath,
       ledgerIdWithPaymentMode,
       status,
-      academicYear,
+      financialYear,
       TDSorTCSLedgerId,
     });
 
@@ -658,7 +658,7 @@ async function create(req, res) {
     for (const [ledgerId, amount] of ledgerAmounts) {
       await updateOpeningClosingBalance(
         schoolId,
-        academicYear,
+        financialYear,
         ledgerId,
         entryDate,
         newReceipt._id,
@@ -675,7 +675,7 @@ async function create(req, res) {
         // For TDS: Debit the TDS ledger
         await updateOpeningClosingBalance(
           schoolId,
-          academicYear,
+          financialYear,
           TDSorTCSLedgerId,
           entryDate,
           newReceipt._id,
@@ -687,7 +687,7 @@ async function create(req, res) {
         // For TCS: Credit the TCS ledger
         await updateOpeningClosingBalance(
           schoolId,
-          academicYear,
+          financialYear,
           TDSorTCSLedgerId,
           entryDate,
           newReceipt._id,
@@ -714,7 +714,7 @@ async function create(req, res) {
 
     await updateOpeningClosingBalance(
       schoolId,
-      academicYear,
+      financialYear,
       ledgerIdWithPaymentMode,
       entryDate,
       newReceipt._id,
@@ -728,7 +728,7 @@ async function create(req, res) {
     for (const ledgerId of ledgerIdsToUpdate) {
       await recalculateLedgerBalances(
         schoolId,
-        academicYear,
+        financialYear,
         ledgerId,
         session // ADDED: session parameter
       );
@@ -736,7 +736,7 @@ async function create(req, res) {
       // Also recalculate all entries after this date to handle backdated entries
       await recalculateAllBalancesAfterDate(
         schoolId,
-        academicYear,
+        financialYear,
         ledgerId,
         entryDate,
         session // ADDED: session parameter
@@ -787,13 +787,13 @@ async function create(req, res) {
     // Find or create TotalNetdeficitNetSurplus record
     let totalNetRecord = await TotalNetdeficitNetSurplus.findOne({
       schoolId,
-      academicYear,
+      financialYear,
     }).session(session);
 
     if (!totalNetRecord) {
       totalNetRecord = new TotalNetdeficitNetSurplus({
         schoolId,
-        academicYear,
+        financialYear,
         balanceDetails: [],
       });
     }
@@ -832,7 +832,7 @@ async function create(req, res) {
     // ========= Net Surplus/(Deficit) Ledger ===========
     const netSurplusDeficitLedger = await Ledger.findOne({
       schoolId,
-      academicYear,
+      financialYear,
       ledgerName: "Net Surplus/(Deficit)",
     }).session(session);
 
@@ -889,7 +889,7 @@ async function create(req, res) {
     if (netSurplusDebitAmount !== 0) {
       await updateOpeningClosingBalance(
         schoolId,
-        academicYear,
+        financialYear,
         netSurplusDeficitLedger._id,
         entryDate,
         newReceipt._id,
@@ -901,13 +901,13 @@ async function create(req, res) {
       // Recalculate balances
       await recalculateLedgerBalances(
         schoolId,
-        academicYear,
+        financialYear,
         netSurplusDeficitLedger._id,
         session // ADDED: session parameter
       );
       await recalculateAllBalancesAfterDate(
         schoolId,
-        academicYear,
+        financialYear,
         netSurplusDeficitLedger._id,
         entryDate,
         session // ADDED: session parameter
@@ -919,7 +919,7 @@ async function create(req, res) {
     // ========= Capital Fund Ledger ===========
     const capitalFundLedger = await Ledger.findOne({
       schoolId,
-      academicYear,
+      financialYear,
       ledgerName: "Capital Fund",
     }).session(session);
 
@@ -945,7 +945,7 @@ async function create(req, res) {
     if (capitalFundCreditAmount !== 0) {
       await updateOpeningClosingBalance(
         schoolId,
-        academicYear,
+        financialYear,
         capitalFundLedger._id,
         entryDate,
         newReceipt._id,
@@ -957,13 +957,13 @@ async function create(req, res) {
       // Recalculate balances
       await recalculateLedgerBalances(
         schoolId,
-        academicYear,
+        financialYear,
         capitalFundLedger._id,
         session // ADDED: session parameter
       );
       await recalculateAllBalancesAfterDate(
         schoolId,
-        academicYear,
+        financialYear,
         capitalFundLedger._id,
         entryDate,
         session // ADDED: session parameter
@@ -985,7 +985,7 @@ async function create(req, res) {
       try {
         await propagateBalanceChangeToNextYear(
           schoolId,
-          academicYear,
+          financialYear,
           ledgerId,
           session
         );

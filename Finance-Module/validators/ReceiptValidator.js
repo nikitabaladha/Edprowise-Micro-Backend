@@ -13,13 +13,13 @@ import Joi from "joi";
 //   return value;
 // };
 
-const academicYearCreate = Joi.string().required().messages({
+const financialYearCreate = Joi.string().required().messages({
   "string.base": "Academic Year must be a string.",
   "string.empty": "Academic Year cannot be empty.",
   "any.required": "Academic Year is required.",
 });
 
-const academicYearUpdate = Joi.string().allow("").optional().messages({
+const financialYearUpdate = Joi.string().allow("").optional().messages({
   "string.base": "Academic Year must be a string.",
   "string.empty": "Academic Year cannot be empty.",
 });
@@ -158,7 +158,7 @@ const ReceiptValidator = Joi.object({
   totalAmount,
   ledgerIdWithPaymentMode,
   status,
-  academicYear: academicYearCreate,
+  financialYear: financialYearCreate,
 });
 
 const ReceiptValidatorUpdate = Joi.object({
@@ -177,7 +177,7 @@ const ReceiptValidatorUpdate = Joi.object({
   totalAmount,
   ledgerIdWithPaymentMode,
   status,
-  academicYear: academicYearUpdate,
+  financialYear: financialYearUpdate,
   receiptImage,
   chequeImageForReceipt,
 });

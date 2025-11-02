@@ -3,15 +3,15 @@ import TotalNetdeficitNetSurplus from "../../models/TotalNetdeficitNetSurplus.js
 
 const copyTotalNetdeficitNetSurplus = async (
   schoolId,
-  newAcademicYear,
-  prevAcademicYear,
+  newFinancialYear,
+  prevFinancialYear,
   session
 ) => {
   // Find the previous year's TotalNetdeficitNetSurplus record
   const previousTotalNetdeficitNetSurplus =
     await TotalNetdeficitNetSurplus.findOne({
       schoolId,
-      academicYear: prevAcademicYear,
+      financialYear: prevFinancialYear,
     }).session(session);
 
   if (!previousTotalNetdeficitNetSurplus) {
@@ -21,7 +21,7 @@ const copyTotalNetdeficitNetSurplus = async (
   // Find the newly created Net Surplus/(Deficit) ledger for the new academic year
   const newNetSurplusDeficitLedger = await Ledger.findOne({
     schoolId,
-    academicYear: newAcademicYear,
+    financialYear: newFinancialYear,
     ledgerName: "Net Surplus/(Deficit)",
   }).session(session);
 
@@ -33,7 +33,7 @@ const copyTotalNetdeficitNetSurplus = async (
   // Check if TotalNetdeficitNetSurplus record already exists for new academic year
   const existingRecord = await TotalNetdeficitNetSurplus.findOne({
     schoolId,
-    academicYear: newAcademicYear,
+    financialYear: newFinancialYear,
   }).session(session);
 
   if (existingRecord) {
@@ -46,7 +46,7 @@ const copyTotalNetdeficitNetSurplus = async (
   // Create new TotalNetdeficitNetSurplus record for the new academic year
   const newTotalNetdeficitNetSurplus = new TotalNetdeficitNetSurplus({
     schoolId,
-    academicYear: newAcademicYear,
+    financialYear: newFinancialYear,
     ledgerId: newNetSurplusDeficitLedger._id, // Use the new ledger ID
     balanceDetails: [], // Start with empty balance details for new year
   });
@@ -54,7 +54,7 @@ const copyTotalNetdeficitNetSurplus = async (
   await newTotalNetdeficitNetSurplus.save({ session });
 
   console.log(
-    `Created TotalNetdeficitNetSurplus record for academic year ${newAcademicYear}`
+    `Created TotalNetdeficitNetSurplus record for academic year ${newFinancialYear}`
   );
   return 1; // Return 1 since we created one record
 };

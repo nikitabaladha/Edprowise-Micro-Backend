@@ -47,10 +47,10 @@ async function draft(req, res) {
       TDSTCSRateWithAmountBeforeGST,
       ledgerIdWithPaymentMode,
       totalAmountAfterGST,
-      academicYear,
+      financialYear,
     } = req.body;
 
-    if (!academicYear || academicYear.trim() === "") {
+    if (!financialYear || financialYear.trim() === "") {
       return res.status(400).json({
         hasError: true,
         message: "Academic year is required.",
@@ -109,7 +109,7 @@ async function draft(req, res) {
 
     const newPaymentEntry = new PaymentEntry({
       schoolId,
-      academicYear,
+      financialYear,
       vendorCode,
       vendorId,
       entryDate,

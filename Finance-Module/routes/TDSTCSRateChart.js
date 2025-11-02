@@ -18,25 +18,25 @@ router.post(
 );
 
 router.get(
-  "/get-all-rate-chart/:academicYear",
+  "/get-all-rate-chart/:financialYear",
   roleBasedMiddleware("School"),
   getAllTDSTCSRateChartBySchoolId
 );
 
 router.get(
-  "/get-all-rate-chart-by-tds-or-tcs/:TDSorTCS/:academicYear",
+  "/get-all-rate-chart-by-tds-or-tcs/:TDSorTCS/:financialYear",
   roleBasedMiddleware("School"),
   getAllByTDSOrTCS
 );
 
 router.put(
-  "/update-rate-chart-by-id/:id/:academicYear",
+  "/update-rate-chart-by-id/:id/:financialYear",
   roleBasedMiddleware("School"),
   updateTDSTCSRateChartById
 );
 
 router.delete(
-  "/delete-rate-chart-by-id/:id/:academicYear",
+  "/delete-rate-chart-by-id/:id/:financialYear",
   roleBasedMiddleware("School"),
   deleteTDSTCSRateChartById
 );

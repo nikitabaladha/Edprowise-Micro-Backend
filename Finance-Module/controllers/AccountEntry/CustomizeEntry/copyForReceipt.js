@@ -16,7 +16,7 @@ export async function copyForReceipt(req, res) {
       receiptDate,
       narration,
       itemDetails,
-      academicYear,
+      financialYear,
       totalAmount,
       totalDebitAmount,
       receiptImage,
@@ -52,7 +52,7 @@ export async function copyForReceipt(req, res) {
       totalDebitAmount,
       receiptImage: receiptImageFullPath,
       status: "Draft",
-      academicYear,
+      financialYear,
       customizeEntry: true,
     });
 

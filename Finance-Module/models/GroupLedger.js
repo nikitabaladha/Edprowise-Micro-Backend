@@ -20,7 +20,7 @@ const GroupLedgerSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    academicYear: {
+    financialYear: {
       type: String,
       required: true,
     },
@@ -36,7 +36,7 @@ GroupLedgerSchema.index(
     headOfAccountId: 1,
     bSPLLedgerId: 1,
     groupLedgerName: 1,
-    academicYear: 1,
+    financialYear: 1,
   },
   { unique: true }
 );

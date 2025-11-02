@@ -2,19 +2,19 @@ import HeadOfAccount from "../../models/HeadOfAccount.js";
 
 const copyHeadOfAccounts = async (
   schoolId,
-  newAcademicYear,
-  prevAcademicYear,
+  newFinancialYear,
+  prevFinancialYear,
   session
 ) => {
   const previousHeadOfAccounts = await HeadOfAccount.find({
     schoolId,
-    academicYear: prevAcademicYear,
+    financialYear: prevFinancialYear,
   }).session(session);
 
   const newHeadOfAccounts = previousHeadOfAccounts.map((headOfAccount) => ({
     schoolId,
     headOfAccountName: headOfAccount.headOfAccountName,
-    academicYear: newAcademicYear,
+    financialYear: newFinancialYear,
   }));
 
   if (newHeadOfAccounts.length > 0) {

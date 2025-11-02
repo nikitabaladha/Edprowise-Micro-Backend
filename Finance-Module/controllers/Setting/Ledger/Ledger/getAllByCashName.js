@@ -4,7 +4,7 @@ import GroupLedger from "../../../../models/GroupLedger.js";
 async function getByCashName(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { academicYear } = req.params;
+    const { financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -15,7 +15,7 @@ async function getByCashName(req, res) {
 
     const cashGroup = await GroupLedger.findOne({
       schoolId,
-      academicYear,
+      financialYear,
       groupLedgerName: "Cash",
     });
 
@@ -28,7 +28,7 @@ async function getByCashName(req, res) {
 
     const cashLedger = await Ledger.findOne({
       schoolId,
-      academicYear,
+      financialYear,
       groupLedgerId: cashGroup._id,
     })
       .populate("headOfAccountId")

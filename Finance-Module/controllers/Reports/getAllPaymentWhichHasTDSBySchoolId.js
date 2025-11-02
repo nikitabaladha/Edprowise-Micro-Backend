@@ -9,33 +9,33 @@ import moment from "moment";
 async function getAllPaymentWhichHasTDSBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { startDate, endDate, academicYear } = req.query;
+    const { startDate, endDate, financialYear } = req.query;
 
     // Validate required parameters
-    if (!academicYear) {
+    if (!financialYear) {
       return res.status(400).json({
         hasError: true,
-        message: "academicYear is a required parameter.",
+        message: "financialYear is a required parameter.",
       });
     }
 
     // Parse date range or use academic year range
-    const academicYearStart = moment(
-      `04/01/${academicYear.split("-")[0]}`,
+    const financialYearStart = moment(
+      `04/01/${financialYear.split("-")[0]}`,
       "MM/DD/YYYY"
     ).startOf("day");
-    const academicYearEnd = moment(
-      `03/31/${academicYear.split("-")[1]}`,
+    const financialYearEnd = moment(
+      `03/31/${financialYear.split("-")[1]}`,
       "MM/DD/YYYY"
     ).endOf("day");
 
     // Normalize query range
     const start = startDate
       ? moment(startDate).startOf("day")
-      : academicYearStart.clone();
+      : financialYearStart.clone();
     const end = endDate
       ? moment(endDate).endOf("day")
-      : academicYearEnd.clone();
+      : financialYearEnd.clone();
 
     // Validate date range
     if (end.isBefore(start)) {
@@ -54,7 +54,7 @@ async function getAllPaymentWhichHasTDSBySchoolId(req, res) {
 
     const authorisedSignature = await AuthorisedSignature.findOne({
       schoolId,
-      academicYear,
+      financialYear,
     })
       .select("authorisedSignatureImage")
       .lean();
@@ -62,7 +62,7 @@ async function getAllPaymentWhichHasTDSBySchoolId(req, res) {
     // Build the query with date range filtering
     const query = {
       schoolId,
-      academicYear,
+      financialYear,
       customizeEntry: false,
       TDSorTCS: "TDS",
       entryDate: {
@@ -130,7 +130,7 @@ async function getAllPaymentWhichHasTDSBySchoolId(req, res) {
         // PaymentEntry fields
         _id: entry._id,
         schoolId: entry.schoolId,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
         vendorCode: entry.vendorCode,
         vendorId: entry.vendorId,
         entryDate: entry.entryDate,

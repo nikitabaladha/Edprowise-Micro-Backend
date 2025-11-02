@@ -20,7 +20,7 @@ const TDSTCSRateChartSchema = new mongoose.Schema(
       required: true,
     },
     guidance: { type: String },
-    academicYear: {
+    financialYear: {
       type: String,
       required: true,
     },
@@ -35,7 +35,7 @@ TDSTCSRateChartSchema.index(
     schoolId: 1,
     TDSorTCS: 1,
     natureOfTransaction: 1,
-    academicYear: 1,
+    financialYear: 1,
   },
   { unique: true }
 );

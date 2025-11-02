@@ -17,7 +17,7 @@ import AuthorisedSignature from "../../models/AuthorisedSignature.js";
 async function getAllBankBookBySchoolId(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { academicYear } = req.params;
+    const { financialYear } = req.params;
     const { startDate, endDate } = req.query;
 
     if (!schoolId) {
@@ -29,7 +29,7 @@ async function getAllBankBookBySchoolId(req, res) {
 
     const authorisedSignature = await AuthorisedSignature.findOne({
       schoolId,
-      academicYear,
+      financialYear,
     })
       .select("authorisedSignatureImage")
       .lean();
@@ -41,8 +41,8 @@ async function getAllBankBookBySchoolId(req, res) {
         $gte: new Date(startDate),
         $lte: new Date(endDate),
       };
-    } else if (academicYear) {
-      const yearParts = academicYear.split("-");
+    } else if (financialYear) {
+      const yearParts = financialYear.split("-");
       if (yearParts.length === 2) {
         const startYear = parseInt(yearParts[0]);
         const endYear = parseInt(yearParts[1]);
@@ -310,7 +310,7 @@ async function getAllBankBookBySchoolId(req, res) {
         itemDetails: itemsWithLedgerNames,
 
         entryDate: entry.entryDate,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
 
         invoiceDate: entry.invoiceDate,
         narration: entry.narration,
@@ -583,7 +583,7 @@ async function getAllBankBookBySchoolId(req, res) {
         itemDetails: itemsWithLedgerNames,
 
         entryDate: entry.entryDate,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
 
         receiptDate: entry.receiptDate,
         narration: entry.narration,
@@ -851,7 +851,7 @@ async function getAllBankBookBySchoolId(req, res) {
         itemDetails: itemsWithLedgerNames,
 
         entryDate: entry.entryDate,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
 
         TDSorTCSHeadOfAccountName,
         TDSorTCSBSPLLedgerName,
@@ -957,7 +957,7 @@ async function getAllBankBookBySchoolId(req, res) {
         itemDetails: itemsWithLedgerNames,
 
         entryDate: entry.entryDate,
-        academicYear: entry.academicYear,
+        financialYear: entry.financialYear,
 
         customizeEntry: entry.customizeEntry,
       };

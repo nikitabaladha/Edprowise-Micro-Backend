@@ -8,7 +8,7 @@ import {
   updateHeadOfAccount,
   deleteHeadOfAccount,
   findHeadOfAccountByName,
-  deleteAllHeadOfAccountBySchoolAndAcademicYear,
+  deleteAllHeadOfAccountBySchoolAndFinancialYear,
 } from "../controllers/Setting/Ledger/HeadOfAccount/index.js";
 
 router.post(
@@ -18,19 +18,19 @@ router.post(
 );
 
 router.get(
-  "/get-all-head-of-account/:academicYear",
+  "/get-all-head-of-account/:financialYear",
   roleBasedMiddleware("School"),
   getAllHeadOfAccount
 );
 
 router.put(
-  "/update-head-of-account-by-id/:id/:academicYear",
+  "/update-head-of-account-by-id/:id/:financialYear",
   roleBasedMiddleware("School"),
   updateHeadOfAccount
 );
 
 router.delete(
-  "/delete-head-of-account-by-id/:id/:academicYear",
+  "/delete-head-of-account-by-id/:id/:financialYear",
   roleBasedMiddleware("School"),
   deleteHeadOfAccount
 );
@@ -48,7 +48,7 @@ import {
   deleteBSPLLedgerById,
   getAllByHeadOfAccountId,
   findBSPLLedgerByName,
-  deleteAllBSPLLedgerBySchoolAndAcademicYear,
+  deleteAllBSPLLedgerBySchoolAndFinancialYear,
 } from "../controllers/Setting/Ledger/BSPLLedger/index.js";
 
 router.post(
@@ -58,25 +58,25 @@ router.post(
 );
 
 router.get(
-  "/get-all-bs-pl-ledger/:academicYear",
+  "/get-all-bs-pl-ledger/:financialYear",
   roleBasedMiddleware("School"),
   getAllBSPLLedgerBySchoolId
 );
 
 router.get(
-  "/get-all-bs-pl-ledger-by-head-of-account-id/:headOfAccountId/:academicYear",
+  "/get-all-bs-pl-ledger-by-head-of-account-id/:headOfAccountId/:financialYear",
   roleBasedMiddleware("School"),
   getAllByHeadOfAccountId
 );
 
 router.put(
-  "/update-bs-pl-ledger-by-id/:id/:academicYear",
+  "/update-bs-pl-ledger-by-id/:id/:financialYear",
   roleBasedMiddleware("School"),
   updateBSPLLedgerById
 );
 
 router.delete(
-  "/delete-bs-pl-ledger-by-id/:id/:academicYear",
+  "/delete-bs-pl-ledger-by-id/:id/:financialYear",
   roleBasedMiddleware("School"),
   deleteBSPLLedgerById
 );
@@ -96,7 +96,7 @@ import {
   findGroupLedgerByName,
   getAllByFixedAssets,
   getAllGroupLedgerBySchoolIdWithDate,
-  deleteAllGroupLedgerBySchoolAndAcademicYear,
+  deleteAllGroupLedgerBySchoolAndFinancialYear,
 } from "../controllers/Setting/Ledger/GroupLedger/index.js";
 
 router.post(
@@ -106,37 +106,37 @@ router.post(
 );
 
 router.get(
-  "/get-all-group-ledger/:academicYear",
+  "/get-all-group-ledger/:financialYear",
   roleBasedMiddleware("School"),
   getAllGroupLedgerBySchoolId
 );
 
 router.get(
-  "/get-all-group-ledger-with-date/:academicYear",
+  "/get-all-group-ledger-with-date/:financialYear",
   roleBasedMiddleware("School"),
   getAllGroupLedgerBySchoolIdWithDate
 );
 
 router.get(
-  "/get-all-group-ledger-by-fixed-assets/:academicYear",
+  "/get-all-group-ledger-by-fixed-assets/:financialYear",
   roleBasedMiddleware("School"),
   getAllByFixedAssets
 );
 
 router.get(
-  "/get-all-group-ledger-by-bs-and-pl-ledger-id/:bSPLLedgerId/:academicYear",
+  "/get-all-group-ledger-by-bs-and-pl-ledger-id/:bSPLLedgerId/:financialYear",
   roleBasedMiddleware("School"),
   getAllByBSPLLedgerId
 );
 
 router.put(
-  "/update-group-ledger-by-id/:id/:academicYear",
+  "/update-group-ledger-by-id/:id/:financialYear",
   roleBasedMiddleware("School"),
   updateGroupLedgerById
 );
 
 router.delete(
-  "/delete-group-ledger-by-id/:id/:academicYear",
+  "/delete-group-ledger-by-id/:id/:financialYear",
   roleBasedMiddleware("School"),
   deleteGroupLedgerById
 );
@@ -161,95 +161,95 @@ import {
   getAllLedgerByGroupLedgerId,
   getAllBySchoolIdWithDate,
   getAllByBankAndBankFixedDeposits,
-  deleteAllBySchoolAndAcademicYear,
+  deleteAllBySchoolAndFinancialYear,
 } from "../controllers/Setting/Ledger/Ledger/index.js";
 
 router.post("/create-ledger", roleBasedMiddleware("School"), createLedger);
 
 router.get(
-  "/get-all-ledger/:academicYear",
+  "/get-all-ledger/:financialYear",
   roleBasedMiddleware("School"),
   getAllLedgerBySchoolId
 );
 
 router.get(
-  "/get-all-ledger-with-date/:academicYear",
+  "/get-all-ledger-with-date/:financialYear",
   roleBasedMiddleware("School"),
   getAllBySchoolIdWithDate
 );
 
 router.get(
-  "/get-all-ledger-by-name/:academicYear",
+  "/get-all-ledger-by-name/:financialYear",
   roleBasedMiddleware("School"),
   getAllLedgerByName
 );
 
 router.get(
-  "/get-all-ledger-by-bank-name/:academicYear",
+  "/get-all-ledger-by-bank-name/:financialYear",
   roleBasedMiddleware("School"),
   getAllLedgerByBankName
 );
 
 router.get(
-  "/get-all-ledger-by-bank-and-fixed-deposits-name/:academicYear",
+  "/get-all-ledger-by-bank-and-fixed-deposits-name/:financialYear",
   roleBasedMiddleware("School"),
   getAllByBankAndBankFixedDeposits
 );
 
 router.get(
-  "/get-ledger-by-cash-name/:academicYear",
+  "/get-ledger-by-cash-name/:financialYear",
   roleBasedMiddleware("School"),
   getAllLedgerByCashName
 );
 
 router.get(
-  "/get-all-ledger-by-payment-mode/:paymentMode/:academicYear",
+  "/get-all-ledger-by-payment-mode/:paymentMode/:financialYear",
   roleBasedMiddleware("School"),
   getAllByPaymentMode
 );
 
 router.get(
-  "/get-all-ledger-by-group-ledger-id/:groupLedgerId/:academicYear",
+  "/get-all-ledger-by-group-ledger-id/:groupLedgerId/:financialYear",
   roleBasedMiddleware("School"),
   getAllLedgerByGroupLedgerId
 );
 
 router.put(
-  "/update-ledger-by-id/:id/:academicYear",
+  "/update-ledger-by-id/:id/:financialYear",
   roleBasedMiddleware("School"),
   updateLedgerById
 );
 
 router.put(
-  "/update-ledger-payment-mode-by-id/:id/:academicYear",
+  "/update-ledger-payment-mode-by-id/:id/:financialYear",
   roleBasedMiddleware("School"),
   updatePaymentModeById
 );
 
 router.delete(
-  "/delete-ledger-by-id/:id/:academicYear",
+  "/delete-ledger-by-id/:id/:financialYear",
   roleBasedMiddleware("School"),
   deleteLedgerById
 );
 
 router.delete(
-  "/delete-all-ledgers-for-test/:academicYear/:schoolId",
-  deleteAllBySchoolAndAcademicYear
+  "/delete-all-ledgers-for-test/:financialYear/:schoolId",
+  deleteAllBySchoolAndFinancialYear
 );
 
 router.delete(
-  "/delete-all-group-ledgers-for-test/:academicYear/:schoolId",
-  deleteAllGroupLedgerBySchoolAndAcademicYear
+  "/delete-all-group-ledgers-for-test/:financialYear/:schoolId",
+  deleteAllGroupLedgerBySchoolAndFinancialYear
 );
 
 router.delete(
-  "/delete-all-bspl-ledgers-for-test/:academicYear/:schoolId",
-  deleteAllBSPLLedgerBySchoolAndAcademicYear
+  "/delete-all-bspl-ledgers-for-test/:financialYear/:schoolId",
+  deleteAllBSPLLedgerBySchoolAndFinancialYear
 );
 
 router.delete(
-  "/delete-all-headofaccount-ledgers-for-test/:academicYear/:schoolId",
-  deleteAllHeadOfAccountBySchoolAndAcademicYear
+  "/delete-all-headofaccount-ledgers-for-test/:financialYear/:schoolId",
+  deleteAllHeadOfAccountBySchoolAndFinancialYear
 );
 
 router.post(

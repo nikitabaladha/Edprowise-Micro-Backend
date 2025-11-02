@@ -11,9 +11,9 @@ export async function create(req, res) {
       });
     }
 
-    const { academicYear, ledgerId, remarks } = req.body;
+    const { financialYear, ledgerId, remarks } = req.body;
 
-    if (!academicYear) {
+    if (!financialYear) {
       return res.status(400).json({
         hasError: true,
         message: "Academic year is required.",
@@ -47,10 +47,10 @@ export async function create(req, res) {
       });
     }
 
-    // Check if document already exists for this school, academicYear, and ledgerId
+    // Check if document already exists for this school, financialYear, and ledgerId
     let existingDocument = await AuditorDocument.findOne({
       schoolId,
-      academicYear,
+      financialYear,
       ledgerId: ledgerId || null, // Handle cases where ledgerId might be empty
     });
 
@@ -68,7 +68,7 @@ export async function create(req, res) {
       // Create new document
       const newAuditorDocument = new AuditorDocument({
         schoolId,
-        academicYear,
+        financialYear,
         ledgerId: ledgerId || null,
         itemDetails,
       });

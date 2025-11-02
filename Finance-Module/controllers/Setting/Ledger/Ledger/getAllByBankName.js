@@ -5,7 +5,7 @@ async function getAllByBankName(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
-    const { academicYear } = req.params;
+    const { financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -16,7 +16,7 @@ async function getAllByBankName(req, res) {
 
     const groupLedgers = await GroupLedger.find({
       schoolId,
-      academicYear,
+      financialYear,
       groupLedgerName: { $in: ["Bank"] },
     });
 
@@ -24,7 +24,7 @@ async function getAllByBankName(req, res) {
 
     const ledgers = await Ledger.find({
       schoolId,
-      academicYear,
+      financialYear,
       groupLedgerId: { $in: groupLedgerIds },
     })
       .populate("headOfAccountId")

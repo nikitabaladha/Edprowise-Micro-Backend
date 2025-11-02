@@ -20,26 +20,26 @@ router.post(
 );
 
 router.get(
-  "/get-all-vendor/:academicYear",
+  "/get-all-vendor/:financialYear",
   roleBasedMiddleware("School"),
   getAllVendorBySchoolId
 );
 
 router.get(
-  "/get-one-by-vendor-code/:vendorCode/:academicYear",
+  "/get-one-by-vendor-code/:vendorCode/:financialYear",
   roleBasedMiddleware("School"),
   getOneByVendorCode
 );
 
 router.put(
-  "/update-vendor-by-id/:id/:academicYear",
+  "/update-vendor-by-id/:id/:financialYear",
   upload,
   roleBasedMiddleware("School"),
   updateVendorById
 );
 
 router.delete(
-  "/delete-vendor-by-id/:id/:academicYear",
+  "/delete-vendor-by-id/:id/:financialYear",
   roleBasedMiddleware("School"),
   deleteVendorById
 );

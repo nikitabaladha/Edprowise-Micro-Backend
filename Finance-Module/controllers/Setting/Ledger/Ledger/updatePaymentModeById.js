@@ -2,7 +2,7 @@ import Ledger from "../../../../models/Ledger.js";
 
 async function updatePaymentModeById(req, res) {
   try {
-    const { id, academicYear } = req.params;
+    const { id, financialYear } = req.params;
     const schoolId = req.user?.schoolId;
     const { paymentMode } = req.body;
 
@@ -20,7 +20,7 @@ async function updatePaymentModeById(req, res) {
       });
     }
 
-    if (!id || !academicYear) {
+    if (!id || !financialYear) {
       return res.status(400).json({
         hasError: true,
         message: "Missing Academic Year.",
@@ -43,7 +43,7 @@ async function updatePaymentModeById(req, res) {
     }
 
     const updatedLedger = await Ledger.findOneAndUpdate(
-      { _id: id, schoolId, academicYear },
+      { _id: id, schoolId, financialYear },
       { paymentMode },
       { new: true }
     );

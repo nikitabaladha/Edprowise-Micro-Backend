@@ -42,7 +42,7 @@ const LedgerSchema = new mongoose.Schema(
       default: "Not Defined",
     },
     ledgerCode: { type: String },
-    academicYear: {
+    financialYear: {
       type: String,
       required: true,
     },
@@ -64,7 +64,7 @@ LedgerSchema.index(
     groupLedgerId: 1,
     bSPLLedgerId: 1,
     ledgerName: 1,
-    academicYear: 1,
+    financialYear: 1,
   },
   { unique: true }
 );

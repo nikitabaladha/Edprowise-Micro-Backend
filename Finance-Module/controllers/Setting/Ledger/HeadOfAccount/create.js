@@ -26,12 +26,12 @@ async function create(req, res) {
       });
     }
 
-    const { headOfAccountName, academicYear } = req.body;
+    const { headOfAccountName, financialYear } = req.body;
 
     const newHeadOfAccount = new HeadOfAccount({
       schoolId,
       headOfAccountName,
-      academicYear,
+      financialYear,
     });
 
     await newHeadOfAccount.save();

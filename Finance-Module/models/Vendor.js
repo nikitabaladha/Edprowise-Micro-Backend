@@ -58,7 +58,7 @@ const VendorSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    academicYear: {
+    financialYear: {
       type: String,
       required: true,
     },
@@ -82,7 +82,7 @@ const VendorSchema = new mongoose.Schema(
 );
 
 VendorSchema.index(
-  { schoolId: 1, vendorCode: 1, nameOfVendor: 1, academicYear: 1 },
+  { schoolId: 1, vendorCode: 1, nameOfVendor: 1, financialYear: 1 },
   { unique: true }
 );
 

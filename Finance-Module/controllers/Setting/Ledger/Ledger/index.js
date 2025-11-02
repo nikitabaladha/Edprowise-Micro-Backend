@@ -12,7 +12,7 @@ import getAllLedgerByGroupLedgerId from "./getAllLedgerByGroupLedgerId.js";
 import getAllBySchoolIdWithDate from "./getAllBySchoolIdWithDate.js";
 
 import getAllByBankAndBankFixedDeposits from "./getAllByBankAndBankFixedDeposits.js";
-import deleteAllBySchoolAndAcademicYear from "./deleteAllBySchoolAndAcademicYear.js";
+import deleteAllBySchoolAndFinancialYear from "./deleteAllBySchoolAndFinancialYear.js";
 
 export {
   createLedger,
@@ -28,5 +28,5 @@ export {
   getAllLedgerByGroupLedgerId,
   getAllBySchoolIdWithDate,
   getAllByBankAndBankFixedDeposits,
-  deleteAllBySchoolAndAcademicYear,
+  deleteAllBySchoolAndFinancialYear,
 };

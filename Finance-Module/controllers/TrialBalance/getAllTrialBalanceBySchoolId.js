@@ -13,33 +13,33 @@ async function getTrialBalanceBySchoolId(req, res) {
       });
     }
 
-    const { startDate, endDate, academicYear } = req.query;
+    const { startDate, endDate, financialYear } = req.query;
 
     // Validate required parameters
-    if (!academicYear) {
+    if (!financialYear) {
       return res.status(400).json({
         hasError: true,
-        message: "academicYear is a required parameter.",
+        message: "financialYear is a required parameter.",
       });
     }
 
     // Parse date range or use academic year range
-    const academicYearStart = moment(
-      `04/01/${academicYear.split("-")[0]}`,
+    const financialYearStart = moment(
+      `04/01/${financialYear.split("-")[0]}`,
       "MM/DD/YYYY"
     ).startOf("day");
-    const academicYearEnd = moment(
-      `03/31/${academicYear.split("-")[1]}`,
+    const financialYearEnd = moment(
+      `03/31/${financialYear.split("-")[1]}`,
       "MM/DD/YYYY"
     ).endOf("day");
 
     // Normalize query range
     const start = startDate
       ? moment(startDate).startOf("day")
-      : academicYearStart.clone();
+      : financialYearStart.clone();
     const end = endDate
       ? moment(endDate).endOf("day")
-      : academicYearEnd.clone();
+      : financialYearEnd.clone();
 
     // Validate date range
     if (end.isBefore(start)) {
@@ -52,7 +52,7 @@ async function getTrialBalanceBySchoolId(req, res) {
     // Get all ledgers for the school and academic year
     const allLedgers = await Ledger.find({
       schoolId,
-      academicYear,
+      financialYear,
     })
       .populate("headOfAccountId", "headOfAccountName")
       .populate("groupLedgerId", "groupLedgerName")
@@ -68,7 +68,7 @@ async function getTrialBalanceBySchoolId(req, res) {
     // Get all opening closing balance records
     const openingClosingBalances = await OpeningClosingBalance.find({
       schoolId,
-      academicYear,
+      financialYear,
     });
 
     // Build day list with day granularity
@@ -188,7 +188,7 @@ async function getTrialBalanceBySchoolId(req, res) {
           start: start.format("YYYY-MM-DD"),
           end: end.format("YYYY-MM-DD"),
         },
-        academicYear,
+        financialYear,
         trialBalance: filteredTrialBalanceData,
       },
     });

@@ -3,7 +3,7 @@ import PaymentEntry from "../../../models/PaymentEntry.js";
 export async function updateById(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { id, academicYear } = req.params;
+    const { id, financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -25,7 +25,7 @@ export async function updateById(req, res) {
     const existingPaymentEntry = await PaymentEntry.findOne({
       _id: id,
       schoolId,
-      academicYear,
+      financialYear,
     });
 
     if (!existingPaymentEntry) {

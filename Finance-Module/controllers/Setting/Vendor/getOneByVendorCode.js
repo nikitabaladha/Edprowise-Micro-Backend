@@ -4,7 +4,7 @@ async function getOneByVendorCode(req, res) {
   try {
     const schoolId = req.user?.schoolId;
 
-    const { vendorCode, academicYear } = req.params;
+    const { vendorCode, financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -20,7 +20,11 @@ async function getOneByVendorCode(req, res) {
       });
     }
 
-    const vendor = await Vendor.findOne({ schoolId, vendorCode, academicYear });
+    const vendor = await Vendor.findOne({
+      schoolId,
+      vendorCode,
+      financialYear,
+    });
 
     if (!vendor) {
       return res.status(404).json({

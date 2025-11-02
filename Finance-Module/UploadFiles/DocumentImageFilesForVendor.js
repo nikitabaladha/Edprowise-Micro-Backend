@@ -71,7 +71,7 @@ export default (req, res, next) => {
     const sizeErrors = [];
 
     const fieldConfig = {
-      documentImageImageForContra: {
+      documentImage: {
         displayName: "documentImage",
         maxSizeImage: 500 * 1024,
         maxSizePdf: 3 * 1024 * 1024,

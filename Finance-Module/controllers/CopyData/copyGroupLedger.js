@@ -4,13 +4,13 @@ import HeadOfAccount from "../../models/HeadOfAccount.js";
 
 const copyGroupLedgers = async (
   schoolId,
-  newAcademicYear,
-  prevAcademicYear,
+  newFinancialYear,
+  prevFinancialYear,
   session
 ) => {
   const previousGroupLedgers = await GroupLedger.find({
     schoolId,
-    academicYear: prevAcademicYear,
+    financialYear: prevFinancialYear,
   }).session(session);
 
   if (previousGroupLedgers.length === 0) {
@@ -26,23 +26,23 @@ const copyGroupLedgers = async (
     HeadOfAccount.find({
       _id: { $in: prevHeadOfAccountIds },
       schoolId,
-      academicYear: prevAcademicYear,
+      financialYear: prevFinancialYear,
     }).session(session),
     BSPLLedger.find({
       _id: { $in: prevBSPLLedgerIds },
       schoolId,
-      academicYear: prevAcademicYear,
+      financialYear: prevFinancialYear,
     }).session(session),
   ]);
 
   const [newHeadOfAccounts, newBSPLLedgers] = await Promise.all([
     HeadOfAccount.find({
       schoolId,
-      academicYear: newAcademicYear,
+      financialYear: newFinancialYear,
     }).session(session),
     BSPLLedger.find({
       schoolId,
-      academicYear: newAcademicYear,
+      financialYear: newFinancialYear,
     }).session(session),
   ]);
 
@@ -80,7 +80,7 @@ const copyGroupLedgers = async (
       headOfAccountId: newHeadOfAccountId,
       bSPLLedgerId: newBSPLLedgerId,
       groupLedgerName: prevLedger.groupLedgerName,
-      academicYear: newAcademicYear,
+      financialYear: newFinancialYear,
     });
   }
 

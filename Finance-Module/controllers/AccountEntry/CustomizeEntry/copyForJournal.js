@@ -16,7 +16,7 @@ export async function copyForJournal(req, res) {
       documentDate,
       narration,
       itemDetails,
-      academicYear,
+      financialYear,
       documentImage,
     } = req.body;
 
@@ -53,7 +53,7 @@ export async function copyForJournal(req, res) {
       totalAmountOfDebit,
       totalAmountOfCredit,
       documentImage: documentImageFullPath,
-      academicYear,
+      financialYear,
       customizeEntry: true,
       status: "Draft",
     });

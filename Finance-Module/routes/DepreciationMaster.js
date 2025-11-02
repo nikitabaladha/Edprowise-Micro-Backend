@@ -18,25 +18,25 @@ router.post(
 );
 
 router.get(
-  "/get-all-depreciation-master/:academicYear",
+  "/get-all-depreciation-master/:financialYear",
   roleBasedMiddleware("School"),
   getAllDepreciationMasterBySchoolId
 );
 
 router.put(
-  "/update-depreciation-master-by-id/:id/:academicYear",
+  "/update-depreciation-master-by-id/:id/:financialYear",
   roleBasedMiddleware("School"),
   updateDepreciationMasterById
 );
 
 router.put(
-  "/update-all-depreciation-master/:academicYear",
+  "/update-all-depreciation-master/:financialYear",
   roleBasedMiddleware("School"),
   updateAllDepreciationMaster
 );
 
 router.delete(
-  "/delete-depreciation-master-by-id/:id/:academicYear",
+  "/delete-depreciation-master-by-id/:id/:financialYear",
   roleBasedMiddleware("School"),
   deleteDepreciationMasterById
 );

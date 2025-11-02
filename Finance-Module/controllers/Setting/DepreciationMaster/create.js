@@ -34,7 +34,7 @@ async function create(req, res) {
       rateAsPerICAI,
       chargeDepreciation,
       entryAutomation,
-      academicYear,
+      financialYear,
     } = req.body;
 
     // Create new document with all required fields
@@ -46,7 +46,7 @@ async function create(req, res) {
       rateAsPerICAI,
       chargeDepreciation,
       entryAutomation,
-      academicYear,
+      financialYear,
     });
 
     await newDepreciationMaster.save();

@@ -18,7 +18,7 @@ export async function copyForPayment(req, res) {
       itemDetails,
       totalAmountAfterGST,
       totalCreditAmount,
-      academicYear,
+      financialYear,
       invoiceImage,
     } = req.body;
 
@@ -54,7 +54,7 @@ export async function copyForPayment(req, res) {
       customizeEntry: true,
       invoiceImage: invoiceImageFullPath,
       status: "Draft",
-      academicYear,
+      financialYear,
     });
 
     await newPaymentEntry.save();

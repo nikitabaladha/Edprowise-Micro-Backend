@@ -12,12 +12,12 @@ async function update(req, res) {
       });
     }
 
-    const { id, academicYear } = req.params;
+    const { id, financialYear } = req.params;
 
     const existingHead = await HeadOfAccount.findOne({
       _id: id,
       schoolId,
-      academicYear,
+      financialYear,
     });
     if (!existingHead) {
       return res.status(404).json({
@@ -32,7 +32,7 @@ async function update(req, res) {
       const { error } =
         HeadOfAccountValidator.HeadOfAccountValidatorUpdate.validate({
           headOfAccountName,
-          academicYear,
+          financialYear,
         });
 
       if (error) {

@@ -24,7 +24,7 @@ async function create(req, res) {
       });
     }
 
-    const { groupLedgerName, headOfAccountId, bSPLLedgerId, academicYear } =
+    const { groupLedgerName, headOfAccountId, bSPLLedgerId, financialYear } =
       req.body;
 
     const newGroupLedger = new GroupLedger({
@@ -32,7 +32,7 @@ async function create(req, res) {
       headOfAccountId,
       bSPLLedgerId,
       groupLedgerName,
-      academicYear,
+      financialYear,
     });
 
     await newGroupLedger.save();

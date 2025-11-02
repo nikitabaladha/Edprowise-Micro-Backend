@@ -7,7 +7,7 @@ async function findLedgerByName(req, res) {
       headOfAccountId,
       bSPLLedgerId,
       groupLedgerId,
-      academicYear,
+      financialYear,
     } = req.body;
     const schoolId = req.user?.schoolId;
 
@@ -17,7 +17,7 @@ async function findLedgerByName(req, res) {
       bSPLLedgerId,
       groupLedgerId,
       ledgerName,
-      academicYear,
+      financialYear,
     });
 
     return res.status(200).json({

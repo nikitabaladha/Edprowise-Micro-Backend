@@ -17,7 +17,7 @@ export async function draftForContra(req, res) {
       narration,
       itemDetails,
       status,
-      academicYear,
+      financialYear,
       contraEntryName,
       customizeEntry,
     } = req.body;
@@ -63,7 +63,7 @@ export async function draftForContra(req, res) {
       totalAmountOfCredit,
       chequeImageForContra: chequeImageForContraFullPath,
       status,
-      academicYear,
+      financialYear,
       contraEntryName: contraEntryName || "",
       customizeEntry,
     });

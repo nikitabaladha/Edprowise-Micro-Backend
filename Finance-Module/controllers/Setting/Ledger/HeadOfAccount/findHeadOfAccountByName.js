@@ -2,13 +2,13 @@ import HeadOfAccount from "../../../../models/HeadOfAccount.js";
 
 async function findHeadOfAccount(req, res) {
   try {
-    const { headOfAccountName, academicYear } = req.body;
+    const { headOfAccountName, financialYear } = req.body;
     const schoolId = req.user?.schoolId;
 
     const headOfAccount = await HeadOfAccount.findOne({
       schoolId,
       headOfAccountName,
-      academicYear,
+      financialYear,
     });
 
     return res.status(200).json({

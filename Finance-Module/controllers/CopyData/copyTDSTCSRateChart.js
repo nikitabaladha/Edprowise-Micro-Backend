@@ -2,13 +2,13 @@ import TDSTCSRateChart from "../../models/TDSTCSRateChart.js";
 
 const copyTDSTCSRateCharts = async (
   schoolId,
-  newAcademicYear,
-  prevAcademicYear,
+  newFinancialYear,
+  prevFinancialYear,
   session
 ) => {
   const previousTDSTCSRateCharts = await TDSTCSRateChart.find({
     schoolId,
-    academicYear: prevAcademicYear,
+    financialYear: prevFinancialYear,
   }).session(session);
 
   const newTDSTCSRateCharts = previousTDSTCSRateCharts.map((chart) => ({
@@ -16,7 +16,7 @@ const copyTDSTCSRateCharts = async (
     TDSorTCS: chart.TDSorTCS,
     rate: chart.rate,
     natureOfTransaction: chart.natureOfTransaction,
-    academicYear: newAcademicYear,
+    financialYear: newFinancialYear,
   }));
 
   if (newTDSTCSRateCharts.length > 0) {

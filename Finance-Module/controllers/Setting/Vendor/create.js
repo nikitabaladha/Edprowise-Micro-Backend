@@ -49,7 +49,7 @@ async function create(req, res) {
       ifscCode,
       accountNumber,
       accountType,
-      academicYear,
+      financialYear,
       openingBalance,
       paymentTerms,
     } = req.body;
@@ -79,7 +79,7 @@ async function create(req, res) {
       ifscCode,
       accountNumber,
       accountType,
-      academicYear,
+      financialYear,
       openingBalance,
       paymentTerms,
       documentImage: documentImageFullPath,
@@ -93,12 +93,12 @@ async function create(req, res) {
       {
         schoolId,
         headOfAccountName: "Liabilities",
-        academicYear,
+        financialYear,
       },
       {
         schoolId,
         headOfAccountName: "Liabilities",
-        academicYear,
+        financialYear,
       },
       {
         new: true,
@@ -112,13 +112,13 @@ async function create(req, res) {
         schoolId,
         headOfAccountId: headOfAccount._id,
         bSPLLedgerName: "Current Liabilities",
-        academicYear,
+        financialYear,
       },
       {
         schoolId,
         headOfAccountId: headOfAccount._id,
         bSPLLedgerName: "Current Liabilities",
-        academicYear,
+        financialYear,
       },
       {
         new: true,
@@ -133,14 +133,14 @@ async function create(req, res) {
         headOfAccountId: headOfAccount._id,
         bSPLLedgerId: bsplLedger._id,
         groupLedgerName: "Payable",
-        academicYear,
+        financialYear,
       },
       {
         schoolId,
         headOfAccountId: headOfAccount._id,
         bSPLLedgerId: bsplLedger._id,
         groupLedgerName: "Payable",
-        academicYear,
+        financialYear,
       },
       {
         new: true,
@@ -178,7 +178,7 @@ async function create(req, res) {
         bSPLLedgerId: bsplLedger._id,
         groupLedgerId: groupLedger._id,
         ledgerName: nameOfVendor,
-        academicYear,
+        financialYear,
       },
       {
         schoolId,
@@ -190,7 +190,7 @@ async function create(req, res) {
         balanceType,
         paymentMode: "Not Defined",
         ledgerCode: ledgerCode.toString(),
-        academicYear,
+        financialYear,
       },
       {
         new: true,

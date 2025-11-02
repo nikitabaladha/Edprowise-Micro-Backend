@@ -11,7 +11,7 @@ async function getAllBySchoolId(req, res) {
       });
     }
 
-    const { academicYear } = req.params;
+    const { financialYear } = req.params;
     const { startDate, endDate } = req.query;
 
     // Build the query object
@@ -25,7 +25,7 @@ async function getAllBySchoolId(req, res) {
       };
     } else {
       // If no date range, filter by academic year
-      query.academicYear = academicYear;
+      query.financialYear = financialYear;
     }
 
     const ledgers = await GroupLedger.find(query).sort({
@@ -36,7 +36,7 @@ async function getAllBySchoolId(req, res) {
     const seenGroups = new Set();
 
     ledgers.forEach((ledger) => {
-      const groupKey = `${ledger.headOfAccountId}_${ledger.bSPLLedgerId}_${ledger.groupLedgerName}_${ledger.academicYear}`;
+      const groupKey = `${ledger.headOfAccountId}_${ledger.bSPLLedgerId}_${ledger.groupLedgerName}_${ledger.financialYear}`;
 
       if (!seenGroups.has(groupKey)) {
         uniqueLedgers.push(ledger);

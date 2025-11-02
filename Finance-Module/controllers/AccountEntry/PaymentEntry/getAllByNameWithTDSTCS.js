@@ -4,7 +4,7 @@ import Ledger from "../../../models/Ledger.js";
 async function getById(req, res) {
   try {
     const schoolId = req.user?.schoolId;
-    const { id, academicYear } = req.params;
+    const { id, financialYear } = req.params;
 
     if (!schoolId) {
       return res.status(401).json({
@@ -16,7 +16,7 @@ async function getById(req, res) {
     const paymentEntry = await PaymentEntry.findOne({
       _id: id,
       schoolId,
-      academicYear,
+      financialYear,
     });
 
     if (!paymentEntry) {
@@ -39,7 +39,7 @@ async function getById(req, res) {
     const ledger = await Ledger.findOne({
       _id: paymentEntry.TDSorTCSLedgerId,
       schoolId,
-      academicYear,
+      financialYear,
     }).select("_id ledgerName");
 
     if (!ledger) {

@@ -32,45 +32,45 @@ router.post(
 );
 
 router.get(
-  "/get-all-payment-entry/:academicYear",
+  "/get-all-payment-entry/:financialYear",
   roleBasedMiddleware("School"),
   getAllPaymentEntryBySchoolId
 );
 
 router.put(
-  "/update-payment-entry/:id/:academicYear",
+  "/update-payment-entry/:id/:financialYear",
   upload,
   roleBasedMiddleware("School"),
   updatePaymentEntryById
 );
 
 router.put(
-  "/update-approval-status-for-payment/:id/:academicYear",
+  "/update-approval-status-for-payment/:id/:financialYear",
   roleBasedMiddleware("School"),
   updateApprovalStatusById
 );
 
 router.put(
-  "/update-draft-payment-entry/:id/:academicYear",
+  "/update-draft-payment-entry/:id/:financialYear",
   upload,
   roleBasedMiddleware("School"),
   updateDraftPaymentEntryById
 );
 
 router.put(
-  "/cancel-payment-entry/:id/:academicYear",
+  "/cancel-payment-entry/:id/:financialYear",
   roleBasedMiddleware("School"),
   cancelPaymentEntryById
 );
 
 router.get(
-  "/get-payment-entry-with-ledger-by-tds-tcs/:id/:academicYear",
+  "/get-payment-entry-with-ledger-by-tds-tcs/:id/:financialYear",
   roleBasedMiddleware("School"),
   getAllLedgerByNameWithTDSorTCS
 );
 
 router.delete(
-  "/delete-payment-entry/:id/:academicYear",
+  "/delete-payment-entry/:id/:financialYear",
   roleBasedMiddleware("School"),
   deletePaymentEntryById
 );
