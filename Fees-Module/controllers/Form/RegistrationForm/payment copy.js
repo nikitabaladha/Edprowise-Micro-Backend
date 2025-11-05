@@ -5,7 +5,7 @@ import crypto from "crypto";
 import axios from "axios";
 import { RegistrationPayment } from "../../../models/RegistrationForm.js";
 
-import { addInReceiptForFees } from "../../AxiosRequestService/AddInReceiptForFees.js";
+import { addRegistartionPaymentInFinance } from "../../AxiosRequestService/RegistartionPaymentInFinance.js";
 
 const generateShortId = () => {
   return Math.random().toString(36).substring(2, 8);
@@ -266,7 +266,7 @@ const creatregistrationpayment = async (req, res) => {
     const newPayment = new RegistrationPayment(paymentData);
     await newPayment.save();
 
-    // Call the finance module to store the payment in Receipt
+    // Call the finance module to store the payment in OpeningClosingBalance
     if (paymentMode !== "null" && paymentStatus === "Paid") {
       try {
         const financeData = {
@@ -275,17 +275,23 @@ const creatregistrationpayment = async (req, res) => {
           paymentDate: newPayment.paymentDate,
           academicYear: academicYear,
           paymentMode: paymentMode,
-          feeType: "Registration", // ADD THIS - Important!
         };
 
-        await addInReceiptForFees(schoolId, academicYear, financeData);
+        await addRegistartionPaymentInFinance(
+          schoolId,
+          academicYear,
+          financeData
+        );
 
         console.log(
-          "===========Payment added to Receipt successfully==============="
+          "===========Payment also stored in Finance Module successfully==============="
         );
       } catch (financeError) {
-        console.error("Failed to add payment to Receipt:", financeError);
-        // Don't fail the main payment if receipt creation fails
+        console.error(
+          "Failed to store payment in Finance Module:",
+          financeError
+        );
+        // Don't fail the main payment if finance storage fails
       }
     }
 
@@ -415,10 +421,13 @@ const handlePaymentSuccess = async (req, res) => {
         paymentDate: newPayment.paymentDate,
         academicYear: academicYear,
         paymentMode: "Online",
-        feeType: "Registration",
       };
 
-      await addInReceiptForFees(schoolId, academicYear, financeData);
+      await addRegistartionPaymentInFinance(
+        schoolId,
+        academicYear,
+        financeData
+      );
 
       console.log("Payment also stored in Finance Module successfully");
     } catch (financeError) {
@@ -553,3 +562,93 @@ const handlePaymentFailure = async (req, res) => {
 };
 
 export { creatregistrationpayment, handlePaymentSuccess, handlePaymentFailure };
+
+// here you can see in RegistrationPayment table user is storing so many things but mostly focus on things like
+
+// studentId
+// 690af39cf2bf0d2ad36239f5
+// schoolId
+// "SID144732"
+// academicYear
+// "2025-2026"
+// finalAmount
+// 1000
+// paymentMode
+// "Cash" or "Cheque" or "Online"
+// paymentDate
+// 2025-11-05T06:50:35.263+00:00
+
+// just like that i have OpeningClosing Balance table i have
+
+// _id
+// 690af85ffe3940822325fbc0
+// schoolId
+// "SID144732"
+// financialYear
+// "2025-2026"
+// ledgerId
+// 690af679fe3940822325f696
+// balanceDetails
+// Array (1)
+// 0
+// Object
+// entryId
+// "690af85ffe3940822325fbba"
+// entryDate
+// 2025-11-05T00:00:00.000+00:00
+// openingBalance
+// 0
+// debit
+// 100
+// credit
+// 0
+// closingBalance
+// 100
+// _id
+// 690af85ffe3940822325fbc1
+// balanceType
+// "Debit"
+// createdAt
+// 2025-11-05T07:10:23.360+00:00
+// updatedAt
+// 2025-11-05T07:10:24.532+00:00
+// __v
+// 1
+
+// see above setup stores data for "Registration Fee" ledger perfectly
+
+// till this it works correctly
+
+//  now add one more thing
+
+// if for that entry
+
+// if paymentMode is "Cash" then find ledger "Cash Account" in ledger table  and
+// for in Opening Closing bance table find openingBalance for that ledger if openingBalance present then
+// use it otherwise  use previus entryData of "Cash Account"
+
+// if finalAmount is positive example 1000 then store in debit
+// in credit store 0
+// if finalAmount is negative example -1000 then store in credit
+// in debit store 0
+// and as closing balance openingBalance+debit-credit
+
+// if paymentMode is "Online" then find ledger "Online" in ledger table  and
+// for in Opening Closing bance table find openingBalance for that ledger if openingBalance present then
+// use it otherwise  use previus entryData of "Online"
+
+// if finalAmount is positive example 1000 then store in debit
+// in credit store 0
+// if finalAmount is negative example -1000 then store in credit
+// in debit store 0
+// and as closing balance openingBalance+debit-credit
+
+// if paymentMode is "Cheque" then find ledger "Cheque" in ledger table  and
+// for in Opening Closing bance table find openingBalance for that ledger if openingBalance present then
+// use it otherwise  use previus entryData of "Cheque"
+
+// if finalAmount is positive example 1000 then store in debit
+// in credit store 0
+// if finalAmount is negative example -1000 then store in credit
+// in debit store 0
+// and as closing balance openingBalance+debit-credit

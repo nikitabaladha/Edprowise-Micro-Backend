@@ -16,7 +16,7 @@
     "ms11": "npm --prefix Subscription-Service start",
     "ms12": "npm --prefix User-And-Profile-Service start",
     "ms13": "npm --prefix api-geteway start",
-    "ms14": "npm --prefix Finance-Module start",
+    "ms14": "npm --prefix Fees-Module start",
     "dev-all": "npm-run-all --parallel ms1 ms2 ms3 ms4 ms5 ms6 ms7 ms8 ms9 ms10 ms11 ms12 ms13 ms14"
   },
   "devDependencies": {

@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import { TCPayment } from "../../../models/TCForm.js";
 
+import { addInReceiptForFees } from "../../AxiosRequestService/AddInReceiptForFees.js";
+
 const validatePaymentData = (body) => {
   const errors = [];
 
@@ -105,6 +107,8 @@ const createTCPayment = async (req, res) => {
       throw new Error("TC form not found or does not belong to your school.");
     }
 
+    const paymentStatus = paymentMode === "null" ? "Pending" : "Paid";
+
     const paymentData = {
       tcFormId,
       schoolId,
@@ -119,12 +123,35 @@ const createTCPayment = async (req, res) => {
       name: name || "",
       paymentDate:
         paymentMode === "Cash" || paymentMode === "Cheque" ? new Date() : null,
-      status: paymentMode === "null" ? "Pending" : "Paid",
+      status: paymentStatus,
     };
 
     const newPayment = new TCPayment(paymentData);
     newPayment.$session(session);
+
     await newPayment.save({ session });
+
+    // Call the finance module to store the payment in Receipt
+    if (paymentMode !== "null" && paymentStatus === "Paid") {
+      try {
+        const financeData = {
+          paymentId: newPayment._id.toString(),
+          finalAmount: parseFloat(finalAmount),
+          paymentDate: newPayment.paymentDate,
+          academicYear: academicYear,
+          paymentMode: paymentMode,
+          feeType: "TC", // ADD THIS
+        };
+
+        await addInReceiptForFees(schoolId, academicYear, financeData);
+
+        console.log(
+          "===========TC Payment added to Receipt successfully==============="
+        );
+      } catch (financeError) {
+        console.error("Failed to add TC payment to Receipt:", financeError);
+      }
+    }
 
     await session.commitTransaction();
 

@@ -1,5 +1,6 @@
+// Fees-Module/models/FeesManagementYear.js
 
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 import FeesType from "./FeesType.js";
 
 const FeesManagementYearSchema = new mongoose.Schema(
@@ -13,39 +14,45 @@ const FeesManagementYearSchema = new mongoose.Schema(
       required: true,
       validate: {
         validator: function (v) {
-          return /^\d{4}-\d{4}$/.test(v) && parseInt(v.split('-')[1]) - parseInt(v.split('-')[0]) === 1;
+          return (
+            /^\d{4}-\d{4}$/.test(v) &&
+            parseInt(v.split("-")[1]) - parseInt(v.split("-")[0]) === 1
+          );
         },
-        message: props => `${props.value} is not a valid academic year format (e.g., 2025-2026)`,
+        message: (props) =>
+          `${props.value} is not a valid academic year format (e.g., 2025-2026)`,
       },
     },
     startDate: {
       type: Date,
       default: function () {
-        const startYear = parseInt(this.academicYear.split('-')[0]);
-        return new Date(startYear, 3, 1); 
+        const startYear = parseInt(this.academicYear.split("-")[0]);
+        return new Date(startYear, 3, 1);
       },
       validate: {
         validator: function (v) {
           if (!v) return true;
-          const startYear = parseInt(this.academicYear.split('-')[0]);
+          const startYear = parseInt(this.academicYear.split("-")[0]);
           return v.getFullYear() === startYear;
         },
-        message: props => `Start date ${props.value} must be in the first year of the academic year`,
+        message: (props) =>
+          `Start date ${props.value} must be in the first year of the academic year`,
       },
     },
     endDate: {
       type: Date,
       default: function () {
-        const endYear = parseInt(this.academicYear.split('-')[1]);
-        return new Date(endYear, 2, 31); 
+        const endYear = parseInt(this.academicYear.split("-")[1]);
+        return new Date(endYear, 2, 31);
       },
       validate: {
         validator: function (v) {
-          if (!v) return true; 
-          const endYear = parseInt(this.academicYear.split('-')[1]);
+          if (!v) return true;
+          const endYear = parseInt(this.academicYear.split("-")[1]);
           return v.getFullYear() === endYear;
         },
-        message: props => `End date ${props.value} must be in the second year of the academic year`,
+        message: (props) =>
+          `End date ${props.value} must be in the second year of the academic year`,
       },
     },
   },
@@ -63,7 +70,7 @@ const ONE_TIME_FEES = [
 
 FeesManagementYearSchema.post("save", async function (doc, next) {
   try {
-    const bulkOps = ONE_TIME_FEES.map(name => ({
+    const bulkOps = ONE_TIME_FEES.map((name) => ({
       updateOne: {
         filter: {
           schoolId: doc.schoolId,
@@ -91,4 +98,4 @@ FeesManagementYearSchema.post("save", async function (doc, next) {
   }
 });
 
-export default mongoose.model('FeesManagementYear', FeesManagementYearSchema);
+export default mongoose.model("FeesManagementYear", FeesManagementYearSchema);

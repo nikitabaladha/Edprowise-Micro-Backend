@@ -107,11 +107,6 @@ const ReceiptSchema = new mongoose.Schema(
     reasonOfDisapprove: {
       type: String,
     },
-    sourceModule: {
-      type: String,
-      enum: ["Finance", "Fees"],
-      default: "Finance",
-    },
   },
   {
     timestamps: true,

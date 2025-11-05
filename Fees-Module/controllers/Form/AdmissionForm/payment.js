@@ -1,5 +1,9 @@
+// /Users/nikita/Desktop/EDPROWISE_Nikita_FINAL/Edprowise_Backend/Edprowise-Micro-Backend/Fees-Module/controllers/Form/AdmissionForm/payment.js
+
 import mongoose from "mongoose";
 import { AdmissionPayment } from "../../../models/AdmissionForm.js";
+
+import { addInReceiptForFees } from "../../AxiosRequestService/AddInReceiptForFees.js";
 
 const validatePaymentData = (body) => {
   const errors = [];
@@ -109,6 +113,8 @@ const createAdmissionPayment = async (req, res) => {
       });
     }
 
+    const paymentStatus = paymentMode === "null" ? "Pending" : "Paid";
+
     const paymentData = {
       studentId,
       schoolId,
@@ -123,12 +129,37 @@ const createAdmissionPayment = async (req, res) => {
       name: name || "",
       paymentDate:
         paymentMode === "Cash" || paymentMode === "Cheque" ? new Date() : null,
-      status: paymentMode === "null" ? "Pending" : "Paid",
+      status: paymentStatus,
     };
 
     const newPayment = new AdmissionPayment(paymentData);
     newPayment.$session(session);
     await newPayment.save({ session });
+
+    // In your creatregistrationpayment function, update the finance call:
+
+    // Call the finance module to store the payment in Receipt
+    if (paymentMode !== "null" && paymentStatus === "Paid") {
+      try {
+        const financeData = {
+          paymentId: newPayment._id.toString(),
+          finalAmount: parseFloat(finalAmount),
+          paymentDate: newPayment.paymentDate,
+          academicYear: academicYear,
+          paymentMode: paymentMode,
+          feeType: "Admission", // ADD THIS - Important!
+        };
+
+        await addInReceiptForFees(schoolId, academicYear, financeData);
+
+        console.log(
+          "===========Payment added to Receipt successfully==============="
+        );
+      } catch (financeError) {
+        console.error("Failed to add payment to Receipt:", financeError);
+        // Don't fail the main payment if receipt creation fails
+      }
+    }
 
     await session.commitTransaction();
 

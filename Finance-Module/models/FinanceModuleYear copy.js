@@ -22,6 +22,12 @@ const FinanceModuleYearSchema = new mongoose.Schema(
   }
 );
 
+// i want to add few things more like
+// HeadofAccount	       BS&P&LLedger	          GroupLedger	           Ledger
+// NetSurplus/(Deficit)	 Net Surplus/(Deficit)	Net Surplus/(Deficit)	 Net Surplus/(Deficit)
+// Capital Fund	         Capital Fund	          Capital Fund	         Capital Fund
+
+// Default chart of accounts structure
 const DEFAULT_CHART_OF_ACCOUNTS = [
   {
     headOfAccount: "Assets",
@@ -56,34 +62,6 @@ const DEFAULT_CHART_OF_ACCOUNTS = [
               "Board Exam Fee",
               "Board Registration Fee",
             ],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    headOfAccount: "NetSurplus/(Deficit)",
-    bsplLedgers: [
-      {
-        name: "Net Surplus/(Deficit)",
-        groupLedgers: [
-          {
-            name: "Net Surplus/(Deficit)",
-            ledgers: ["Net Surplus/(Deficit)"],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    headOfAccount: "Capital Fund",
-    bsplLedgers: [
-      {
-        name: "Capital Fund",
-        groupLedgers: [
-          {
-            name: "Capital Fund",
-            ledgers: ["Capital Fund"],
           },
         ],
       },
@@ -198,12 +176,7 @@ async function createDefaultChartOfAccounts(schoolId, financialYear) {
 }
 
 async function initializeCounters(schoolId) {
-  const counterTypes = [
-    "Assets",
-    "Income",
-    "NetSurplus/(Deficit)",
-    "Capital Fund",
-  ];
+  const counterTypes = ["Assets", "Income"];
 
   for (const type of counterTypes) {
     await CounterForFinaceLedger.findOneAndUpdate(
@@ -236,14 +209,13 @@ async function createLedger(
       Liabilities: 2000,
       Income: 3000,
       Expenses: 4000,
-      "NetSurplus/(Deficit)": 5000,
-      "Capital Fund": 6000,
     };
 
     const ledgerCode = (
       baseCodes[headOfAccountType] + counter.lastLedgerCode
     ).toString();
 
+    // Set defaults as specified
     const openingBalance = 0; // Default 0
     const balanceType = "Debit"; // Default Debit for all
     const paymentMode = "Not Defined"; // Default "Not Defined"
@@ -264,9 +236,9 @@ async function createLedger(
           groupLedgerId,
           bSPLLedgerId,
           ledgerName,
-          openingBalance,
-          balanceType,
-          paymentMode,
+          openingBalance, // Default 0
+          balanceType, // Default "Debit"
+          paymentMode, // Default "Not Defined"
           ledgerCode,
           financialYear,
         },
@@ -278,7 +250,7 @@ async function createLedger(
     );
 
     console.log(
-      `Created/Verified ledger: ${ledgerName} with code: ${ledgerCode}, balanceType: ${balanceType}`
+      `Created/Verified ledger: ${ledgerName} with code: ${ledgerCode}`
     );
   } catch (error) {
     if (error.code === 11000) {

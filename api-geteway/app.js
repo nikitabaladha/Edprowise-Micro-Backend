@@ -30,8 +30,8 @@ const SERVICE_TARGETS = {
 
   bankdetailsAndPaymentService: process.env.BANKDETAILS_AND_PAYMENT_SERVICE_URL,
 
-  financeModule: process.env.FINANCE_MODULE_URL,
-  feesModule: process.env.FEES_MODULE_URL,
+  financeModule: process.env.FINANCE_MODULE_SERVICE_URL,
+  feesModule: process.env.FEES_MODULE_SERVICE_URL,
 };
 
 // Route specific API prefixes
