@@ -1,7 +1,26 @@
 import mongoose from "mongoose";
 import { TCPayment } from "../../../models/TCForm.js";
 
+// ==========Nikita's Code Start=======
 import { addInReceiptForFees } from "../../AxiosRequestService/AddInReceiptForFees.js";
+
+function normalizeDateToUTCStartOfDay(date) {
+  const newDate = new Date(date);
+  // Convert to UTC start of day (00:00:00.000Z)
+  return new Date(
+    Date.UTC(
+      newDate.getUTCFullYear(),
+      newDate.getUTCMonth(),
+      newDate.getUTCDate(),
+      0,
+      0,
+      0,
+      0
+    )
+  );
+}
+
+// ==========Nikita's Code End=======
 
 const validatePaymentData = (body) => {
   const errors = [];
@@ -131,13 +150,15 @@ const createTCPayment = async (req, res) => {
 
     await newPayment.save({ session });
 
+    // ==========Nikita's Code Start=======
+
     // Call the finance module to store the payment in Receipt
     if (paymentMode !== "null" && paymentStatus === "Paid") {
       try {
         const financeData = {
           paymentId: newPayment._id.toString(),
           finalAmount: parseFloat(finalAmount),
-          paymentDate: newPayment.paymentDate,
+          paymentDate: normalizeDateToUTCStartOfDay(newPayment.paymentDate),
           academicYear: academicYear,
           paymentMode: paymentMode,
           feeType: "TC", // ADD THIS
@@ -152,6 +173,8 @@ const createTCPayment = async (req, res) => {
         console.error("Failed to add TC payment to Receipt:", financeError);
       }
     }
+
+    // ==========Nikita's Code End=======
 
     await session.commitTransaction();
 

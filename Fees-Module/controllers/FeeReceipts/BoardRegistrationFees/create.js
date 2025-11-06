@@ -1,6 +1,27 @@
 import RegistrationFeePayment from "../../../models/BoardRegistrationFeePayment.js";
 import { BoardRegistrationFeePaymentValidator } from "../../../validators/BoardRegistrationFeesPayment.js";
 
+// ==========Nikita's Code Start=======
+import { addInReceiptForFees } from "../../AxiosRequestService/AddInReceiptForFees.js";
+
+function normalizeDateToUTCStartOfDay(date) {
+  const newDate = new Date(date);
+  // Convert to UTC start of day (00:00:00.000Z)
+  return new Date(
+    Date.UTC(
+      newDate.getUTCFullYear(),
+      newDate.getUTCMonth(),
+      newDate.getUTCDate(),
+      0,
+      0,
+      0,
+      0
+    )
+  );
+}
+
+// ==========Nikita's Code End=======
+
 export const submitRegistrationFees = async (req, res) => {
   try {
     const schoolId = req.user?.schoolId;
@@ -54,10 +75,43 @@ export const submitRegistrationFees = async (req, res) => {
         chequeNumber: payment.chequeNumber || "",
         bankName: payment.bankName || "",
         status: payment.status,
+        paymentDate:
+          payment.status === "Paid" ? payment.paymentDate : new Date(),
       });
 
       const saved = await paymentDoc.save();
       createdPayments.push(saved);
+
+      // ==========Nikita's Code Start=======
+      // Call the finance module to store the payment in Receipt And Opening Closing Balance
+      if (payment.paymentMode !== "null" && payment.status === "Paid") {
+        try {
+          const financeData = {
+            paymentId: saved._id.toString(),
+            finalAmount: parseFloat(payment.finalAmount),
+            paymentDate:
+              normalizeDateToUTCStartOfDay(saved.paymentDate) || new Date(),
+            academicYear: payment.academicYear,
+            paymentMode: payment.paymentMode,
+            feeType: "Board Registration", // ADD THIS - Important!
+          };
+
+          await addInReceiptForFees(
+            schoolId,
+            payment.academicYear,
+            financeData
+          );
+
+          console.log(
+            "===========Payment added to Receipt successfully==============="
+          );
+        } catch (financeError) {
+          console.error("Failed to add payment to Receipt:", financeError);
+          // Don't fail the main payment if receipt creation fails
+        }
+      }
+
+      // ==========Nikita's Code End=======
     }
 
     return res.status(201).json({
