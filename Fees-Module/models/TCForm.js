@@ -136,7 +136,7 @@
 // //     await AdmissionForm.updateOne(
 // //       { schoolId: doc.schoolId, AdmissionNumber: doc.AdmissionNumber },
 // //       {
-// //          $set: { 
+// //          $set: {
 // //           TCStatus: 'Inactive',
 // //           TCStatusDate: new Date() ,
 // //           TCStatusYear: doc.academicYear
@@ -151,7 +151,7 @@
 
 // // TCFormSchema.pre('findOneAndUpdate', async function (next) {
 // //   const update = this.getUpdate();
-// //   const newStatus = update.$set?.status; 
+// //   const newStatus = update.$set?.status;
 // //   if (newStatus && newStatus !== 'Pending') {
 // //     const doc = await this.model.findOne(this.getQuery());
 // //     if (doc && !doc.reportStatus.includes(newStatus)) {
@@ -165,7 +165,6 @@
 // // });
 
 // // export default mongoose.model('TCForm', TCFormSchema);
-
 
 // import mongoose from 'mongoose';
 // import AdmissionForm from './AdmissionForm.js';
@@ -250,7 +249,6 @@
 //   this.reportStatus = [];
 // }
 
-          
 //           if (!this.reportStatus.includes('Paid')) {
 //             this.reportStatus.push('Paid');
 //           }
@@ -405,8 +403,8 @@
 // export const TCPayment = mongoose.model('TCPayment', TCPaymentSchema);
 // export default mongoose.model('TCForm', TCFormSchema);
 
-import mongoose from 'mongoose';
-import AdmissionForm from './AdmissionForm.js';
+import mongoose from "mongoose";
+import AdmissionForm from "./AdmissionForm.js";
 
 const { Schema } = mongoose;
 
@@ -414,26 +412,26 @@ const { Schema } = mongoose;
    TCCounter Schema
 --------------------------------*/
 const TCCounterSchema = new Schema({
-  schoolId: { type: String, required: true, },
+  schoolId: { type: String, required: true },
   receiptSeq: { type: Number, default: 0 },
 });
-const TCCounter = mongoose.model('TCCounter', TCCounterSchema);
+const TCCounter = mongoose.model("TCCounter", TCCounterSchema);
 
 /* -------------------------------
    TCPayment Schema
 --------------------------------*/
 const TCPaymentSchema = new Schema(
   {
-    tcFormId: { type: Schema.Types.ObjectId, required: true, ref: 'TCForm' },
-    schoolId: { type: String, required: true, ref: 'School' },
+    tcFormId: { type: Schema.Types.ObjectId, required: true, ref: "TCForm" },
+    schoolId: { type: String, required: true, ref: "School" },
     academicYear: { type: String },
-    receiptNumber: { type: String, },
+    receiptNumber: { type: String },
     name: { type: String, required: true },
 
     TCfees: { type: Number, required: true, default: 0 },
     concessionType: {
       type: String,
-      enum: ['EWS', 'SC', 'ST', 'OBC', 'Staff Children', 'Other'],
+      enum: ["EWS", "SC", "ST", "OBC", "Staff Children", "Other"],
     },
     concessionAmount: { type: Number, default: 0 },
     finalAmount: { type: Number, required: true, default: 0 },
@@ -441,7 +439,7 @@ const TCPaymentSchema = new Schema(
     paymentMode: {
       type: String,
       required: true,
-      enum: ['Cash', 'Cheque', 'Online', 'null'],
+      enum: ["Cash", "Cheque", "Online", "null"],
     },
     chequeNumber: { type: String },
     bankName: { type: String },
@@ -449,29 +447,31 @@ const TCPaymentSchema = new Schema(
     transactionNumber: {
       type: String,
       default: function () {
-        return 'TRA' + Math.floor(10000 + Math.random() * 90000);
+        return "TRA" + Math.floor(10000 + Math.random() * 90000);
       },
     },
 
     paymentDate: { type: Date },
     refundReceiptNumbers: [{ type: String }],
 
-    status: { type: String, enum: ['Pending', 'Paid'], default: 'Paid' },
+    status: { type: String, enum: ["Pending", "Paid"], default: "Paid" },
 
     reportStatus: {
       type: [String],
-      enum: ['Paid', 'Cancelled', 'Cheque Return', 'Refund'],
+      enum: ["Paid", "Cancelled", "Cheque Return", "Refund"],
       default: [],
+    },
+    isProcessedInFinance: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }
 );
 
-
 // TCPaymentSchema.index({ schoolId: 1, receiptNumber: 1 }, { unique: true, sparse: true });
 
-
-TCPaymentSchema.pre('save', async function (next) {
+TCPaymentSchema.pre("save", async function (next) {
   let attempts = 3;
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -480,41 +480,45 @@ TCPaymentSchema.pre('save', async function (next) {
     while (attempts > 0) {
       try {
         // Generate receiptNumber
-        if (!this.receiptNumber && this.paymentMode !== 'null') {
+        if (!this.receiptNumber && this.paymentMode !== "null") {
           const counter = await TCCounter.findOneAndUpdate(
             { schoolId: this.schoolId },
             { $inc: { receiptSeq: 1 } },
             { new: true, upsert: true, session }
           );
-          const padded = counter.receiptSeq.toString().padStart(6, '0');
+          const padded = counter.receiptSeq.toString().padStart(6, "0");
           this.receiptNumber = `REC/TC/${padded}`;
         }
 
-
-        if ((this.paymentMode === 'Cash' || this.paymentMode === 'Cheque') && !this.paymentDate) {
+        if (
+          (this.paymentMode === "Cash" || this.paymentMode === "Cheque") &&
+          !this.paymentDate
+        ) {
           this.paymentDate = new Date();
         }
-
 
         if (!Array.isArray(this.reportStatus)) {
           this.reportStatus = [];
         }
 
-        if (this.status === 'Paid') {
-          const tcForm = await mongoose.model('TCForm').findById(this.tcFormId).session(session);
-          if (!tcForm) throw new Error('Associated TCForm not found');
+        if (this.status === "Paid") {
+          const tcForm = await mongoose
+            .model("TCForm")
+            .findById(this.tcFormId)
+            .session(session);
+          if (!tcForm) throw new Error("Associated TCForm not found");
 
-          if (!this.reportStatus.includes('Paid')) {
-            this.reportStatus.push('Paid');
+          if (!this.reportStatus.includes("Paid")) {
+            this.reportStatus.push("Paid");
           }
 
-          if (tcForm.status !== 'Paid') {
-            tcForm.status = 'Paid';
+          if (tcForm.status !== "Paid") {
+            tcForm.status = "Paid";
             if (!Array.isArray(tcForm.reportStatus)) {
               tcForm.reportStatus = [];
             }
-            if (!tcForm.reportStatus.includes('Paid')) {
-              tcForm.reportStatus.push('Paid');
+            if (!tcForm.reportStatus.includes("Paid")) {
+              tcForm.reportStatus.push("Paid");
             }
             await tcForm.save({ session });
           }
@@ -523,7 +527,11 @@ TCPaymentSchema.pre('save', async function (next) {
         await session.commitTransaction();
         return next();
       } catch (err) {
-        if (err.code === 11000 && (err.message.includes('receiptNumber') || err.message.includes('transactionNumber'))) {
+        if (
+          err.code === 11000 &&
+          (err.message.includes("receiptNumber") ||
+            err.message.includes("transactionNumber"))
+        ) {
           attempts--;
           if (attempts === 0) throw err;
         } else {
@@ -539,17 +547,16 @@ TCPaymentSchema.pre('save', async function (next) {
   }
 });
 
-
-TCPaymentSchema.post('save', async function (doc, next) {
+TCPaymentSchema.post("save", async function (doc, next) {
   try {
-    if (doc.status === 'Paid') {
-      const tcForm = await mongoose.model('TCForm').findById(doc.tcFormId);
+    if (doc.status === "Paid") {
+      const tcForm = await mongoose.model("TCForm").findById(doc.tcFormId);
       if (tcForm && tcForm.AdmissionNumber) {
         await AdmissionForm.updateOne(
           { schoolId: doc.schoolId, AdmissionNumber: tcForm.AdmissionNumber },
           {
             $set: {
-              TCStatus: 'Inactive',
+              TCStatus: "Inactive",
               TCStatusDate: new Date(),
               TCStatusYear: tcForm.academicYear,
             },
@@ -563,12 +570,11 @@ TCPaymentSchema.post('save', async function (doc, next) {
   }
 });
 
-
-TCPaymentSchema.pre('findOneAndUpdate', async function (next) {
+TCPaymentSchema.pre("findOneAndUpdate", async function (next) {
   const update = this.getUpdate();
   const newStatus = update.$set?.status;
 
-  if (newStatus && newStatus !== 'Pending') {
+  if (newStatus && newStatus !== "Pending") {
     const doc = await this.model.findOne(this.getQuery());
 
     if (doc) {
@@ -592,7 +598,7 @@ TCPaymentSchema.pre('findOneAndUpdate', async function (next) {
 --------------------------------*/
 const TCFormSchema = new Schema(
   {
-    schoolId: { type: String, required: true, ref: 'School' },
+    schoolId: { type: String, required: true, ref: "School" },
     academicYear: { type: String, required: true },
     AdmissionNumber: { type: String },
 
@@ -603,13 +609,16 @@ const TCFormSchema = new Schema(
 
     dateOfBirth: { type: Date },
     age: { type: Number },
-    nationality: { type: String, enum: ['India', 'International', 'SAARC Countries'] },
+    nationality: {
+      type: String,
+      enum: ["India", "International", "SAARC Countries"],
+    },
 
     fatherName: { type: String },
     motherName: { type: String },
     dateOfIssue: { type: Date },
     dateOfAdmission: { type: Date },
-    masterDefineClass: { type: Schema.Types.ObjectId, ref: 'Class' },
+    masterDefineClass: { type: Schema.Types.ObjectId, ref: "Class" },
     percentageObtainInLastExam: { type: String },
     qualifiedPromotionInHigherClass: { type: String },
     whetherFaildInAnyClass: { type: String },
@@ -624,7 +633,7 @@ const TCFormSchema = new Schema(
       type: String,
       // unique: true,
       default: function () {
-        return 'TC' + Math.floor(10000 + Math.random() * 90000);
+        return "TC" + Math.floor(10000 + Math.random() * 90000);
       },
     },
     applicationDate: { type: Date, default: Date.now },
@@ -632,5 +641,5 @@ const TCFormSchema = new Schema(
   { timestamps: true }
 );
 
-export const TCPayment = mongoose.model('TCPayment', TCPaymentSchema);
-export default mongoose.model('TCForm', TCFormSchema);
+export const TCPayment = mongoose.model("TCPayment", TCPaymentSchema);
+export default mongoose.model("TCForm", TCFormSchema);

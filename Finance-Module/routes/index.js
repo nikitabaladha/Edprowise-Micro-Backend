@@ -1,4 +1,4 @@
-// /Users/nikita/Desktop/EDPROWISE_Nikita_FINAL/Edprowise_Backend/Edprowise-Micro-Backend/Finance-Module/routes/index.js
+// Finance-Module/routes/index.js
 
 import FinanceModuleYearRoutes from "./FinanceModuleYear.js";
 import ledgerRoutes from "./Ledger.js";

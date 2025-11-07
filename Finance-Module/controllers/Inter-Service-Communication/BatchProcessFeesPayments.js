@@ -1,5 +1,4 @@
-// Finance-Module/controllers/Inter-Service-Communication/AddInReceiptForFees.js
-
+// Finance-Module/controllers/Inter-Service-Communication/BatchProcessFeesPayments.js
 import mongoose from "mongoose";
 import Receipt from "../../models/Receipt.js";
 import OpeningClosingBalance from "../../models/OpeningClosingBalance.js";
@@ -176,7 +175,8 @@ async function findOrCreateReceipt(
   financialYear,
   entryDate,
   paymentMode,
-  session
+  session,
+  preGeneratedVoucherNumber = null // Add this parameter
 ) {
   const paymentMethodLedger = await getPaymentMethodLedger(
     schoolId,
@@ -208,10 +208,10 @@ async function findOrCreateReceipt(
     return existingReceipt;
   }
 
-  const receiptVoucherNumber = await generateReceiptVoucherNumber(
-    schoolId,
-    financialYear
-  );
+  // Use pre-generated voucher number if provided, otherwise generate new one
+  const receiptVoucherNumber =
+    preGeneratedVoucherNumber ||
+    (await generateReceiptVoucherNumber(schoolId, financialYear));
 
   const newReceipt = new Receipt({
     schoolId,
@@ -648,188 +648,125 @@ async function recalculateLedgerBalances(
   await record.save({ session });
 }
 
-async function recalculateAllBalancesAfterDate(
+async function processBatchPaymentsForDate(
   schoolId,
   financialYear,
-  ledgerId,
-  date,
-  session
+  processDate,
+  paymentsData
 ) {
-  const record = await OpeningClosingBalance.findOne({
-    schoolId,
-    financialYear,
-    ledgerId,
-  }).session(session);
-
-  if (!record || record.balanceDetails.length === 0) {
-    return;
-  }
-
-  const startIndex = record.balanceDetails.findIndex(
-    (detail) => new Date(detail.entryDate) > new Date(date)
-  );
-
-  if (startIndex === -1) {
-    return;
-  }
-
-  const previousBalance =
-    startIndex > 0
-      ? record.balanceDetails[startIndex - 1].closingBalance
-      : record.balanceDetails[0].openingBalance;
-
-  let currentBalance = previousBalance;
-
-  for (let i = startIndex; i < record.balanceDetails.length; i++) {
-    const detail = record.balanceDetails[i];
-    detail.openingBalance = currentBalance;
-
-    const ledger = await Ledger.findOne({
-      schoolId,
-      financialYear,
-      _id: ledgerId,
-    }).session(session);
-
-    const balanceType = ledger?.balanceType || "Debit";
-
-    if (balanceType === "Debit") {
-      detail.closingBalance = currentBalance + detail.debit - detail.credit;
-    } else {
-      detail.closingBalance = currentBalance + detail.debit - detail.credit;
-    }
-
-    currentBalance = detail.closingBalance;
-  }
-
-  await record.save({ session });
-}
-
-async function addInReceiptForFees(req, res) {
-  console.log("============== addInReceiptForFees CALLED ================");
-  console.log("Query params:", req.query);
-  console.log("Body data:", req.body);
-
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const { schoolId, financialYear } = req.query;
-    const paymentData = req.body;
+    console.log(
+      `Processing ${paymentsData.length} payments for date: ${processDate}`
+    );
 
-    if (!schoolId) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(401).json({
-        hasError: true,
-        message: "Access denied: You do not have permission.",
-      });
+    // Group payments by paymentMode and date for receipt creation
+    const paymentsByMode = {};
+
+    paymentsData.forEach((payment) => {
+      const key = `${payment.paymentMode}_${payment.paymentDate}`;
+      if (!paymentsByMode[key]) {
+        paymentsByMode[key] = [];
+      }
+      paymentsByMode[key].push(payment);
+    });
+
+    const allLedgerIdsToUpdate = new Set();
+
+    // Get the number of groups that will need new receipts
+    const groupKeys = Object.keys(paymentsByMode).filter(
+      (key) => !key.startsWith("null_")
+    );
+
+    // Generate sequential voucher numbers for all new receipts that will be created
+    let currentVoucherNumber = await generateReceiptVoucherNumber(
+      schoolId,
+      financialYear
+    );
+
+    const voucherNumbers = [];
+    for (let i = 0; i < groupKeys.length; i++) {
+      voucherNumbers.push(currentVoucherNumber);
+
+      // Increment the voucher number for next one
+      const matches = currentVoucherNumber.match(/\/(\d+)$/);
+      if (matches && matches[1]) {
+        const nextNum = parseInt(matches[1]) + 1;
+        currentVoucherNumber = `RVN/${financialYear}/${nextNum}`;
+      }
     }
 
-    if (!financialYear) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        hasError: true,
-        message: "Financial Year is required in query.",
-      });
+    let voucherIndex = 0;
+
+    // Process each group (payment mode + date combination)
+    for (const [key, payments] of Object.entries(paymentsByMode)) {
+      const [paymentMode, paymentDate] = key.split("_");
+
+      if (paymentMode === "null") continue;
+
+      // Get the first payment to use for receipt creation
+      const firstPayment = payments[0];
+
+      // Find or create receipt for this date and payment mode
+      const receipt = await findOrCreateReceipt(
+        schoolId,
+        financialYear,
+        new Date(paymentDate),
+        paymentMode,
+        session,
+        voucherNumbers[voucherIndex] // Pass the pre-generated voucher number
+      );
+
+      voucherIndex++;
+
+      // Process all payments for this group
+      for (const payment of payments) {
+        const feeLedger = await getFeeLedger(
+          schoolId,
+          financialYear,
+          payment.feeType,
+          session
+        );
+
+        const paymentMethodLedger = await getPaymentMethodLedger(
+          schoolId,
+          financialYear,
+          payment.paymentMode,
+          session
+        );
+
+        // Update receipt with this payment
+        const updatedReceipt = await updateReceiptWithFeePayment(
+          receipt,
+          feeLedger,
+          paymentMethodLedger,
+          payment.finalAmount,
+          session
+        );
+
+        // Update opening closing balance
+        const ledgerIdsToUpdate = await updateOpeningClosingForFeePayment(
+          schoolId,
+          financialYear,
+          updatedReceipt,
+          feeLedger,
+          paymentMethodLedger,
+          payment.finalAmount,
+          session
+        );
+
+        ledgerIdsToUpdate.forEach((id) => allLedgerIdsToUpdate.add(id));
+      }
     }
-
-    const {
-      paymentId,
-      finalAmount,
-      paymentDate,
-      academicYear,
-      paymentMode,
-      feeType,
-    } = paymentData;
-
-    if (
-      !paymentId ||
-      !finalAmount ||
-      !paymentDate ||
-      !paymentMode ||
-      !feeType
-    ) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        hasError: true,
-        message:
-          "Missing required fields: paymentId, finalAmount, paymentDate, paymentMode, feeType",
-      });
-    }
-
-    if (paymentMode === "null") {
-      await session.commitTransaction();
-      session.endSession();
-      return res.status(200).json({
-        hasError: false,
-        message: "Payment mode is 'null', skipping receipt creation.",
-      });
-    }
-
-    // Get required ledgers
-    const feeLedger = await getFeeLedger(
-      schoolId,
-      financialYear,
-      feeType,
-      session
-    );
-    const paymentMethodLedger = await getPaymentMethodLedger(
-      schoolId,
-      financialYear,
-      paymentMode,
-      session
-    );
-
-    // Normalize the payment date to start of day
-    const normalizedPaymentDate = normalizeDateToUTCStartOfDay(
-      new Date(paymentDate)
-    );
-
-    // Find or create receipt for this date and payment mode
-    const receipt = await findOrCreateReceipt(
-      schoolId,
-      financialYear,
-      normalizedPaymentDate,
-      paymentMode,
-      session
-    );
-
-    // Update receipt with the new payment
-    const updatedReceipt = await updateReceiptWithFeePayment(
-      receipt,
-      feeLedger,
-      paymentMethodLedger,
-      finalAmount,
-      session
-    );
-
-    // ===== UPDATE OPENING CLOSING BALANCE =====
-    const ledgerIdsToUpdate = await updateOpeningClosingForFeePayment(
-      schoolId,
-      financialYear,
-      updatedReceipt,
-      feeLedger,
-      paymentMethodLedger,
-      finalAmount,
-      session
-    );
 
     // Recalculate all ledgers that were updated
-    for (const ledgerId of ledgerIdsToUpdate) {
+    for (const ledgerId of allLedgerIdsToUpdate) {
       await recalculateLedgerBalances(
         schoolId,
         financialYear,
         ledgerId,
-        session
-      );
-
-      await recalculateAllBalancesAfterDate(
-        schoolId,
-        financialYear,
-        ledgerId,
-        updatedReceipt.entryDate,
         session
       );
     }
@@ -837,29 +774,65 @@ async function addInReceiptForFees(req, res) {
     await session.commitTransaction();
     session.endSession();
 
-    return res.status(200).json({
-      hasError: false,
-      message: "Payment successfully added to receipt and opening balance.",
-      data: {
-        receiptId: updatedReceipt._id,
-        receiptVoucherNumber: updatedReceipt.receiptVoucherNumber,
-        totalAmount: updatedReceipt.totalAmount,
-        itemDetails: updatedReceipt.itemDetails,
-        entryDate: updatedReceipt.entryDate, // This will now be normalized
-        receiptDate: updatedReceipt.receiptDate, // This will now be normalized
-      },
-    });
+    return {
+      success: true,
+      message: `Successfully processed ${paymentsData.length} payments`,
+      processedCount: paymentsData.length,
+    };
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
+    throw error;
+  }
+}
 
-    console.error("Error adding payment to receipt:", error);
+// Controller to handle batch processing request
+async function batchProcessFeesPayments(req, res) {
+  console.log(
+    "============== batchProcessFeesPayments CALLED ================"
+  );
+
+  try {
+    const { schoolId, financialYear, processDate } = req.body;
+
+    if (!schoolId || !financialYear || !processDate) {
+      return res.status(400).json({
+        hasError: true,
+        message:
+          "Missing required fields: schoolId, financialYear, processDate",
+      });
+    }
+
+    // This endpoint expects payments data to be sent in the request
+    // In actual implementation, you'll get this from Fees Module
+    const { paymentsData } = req.body;
+
+    if (!paymentsData || !Array.isArray(paymentsData)) {
+      return res.status(400).json({
+        hasError: true,
+        message: "paymentsData array is required",
+      });
+    }
+
+    const result = await processBatchPaymentsForDate(
+      schoolId,
+      financialYear,
+      new Date(processDate),
+      paymentsData
+    );
+
+    return res.status(200).json({
+      hasError: false,
+      ...result,
+    });
+  } catch (error) {
+    console.error("Error in batch processing:", error);
     return res.status(500).json({
       hasError: true,
-      message: "Internal server error.",
+      message: "Internal server error during batch processing",
       error: error.message,
     });
   }
 }
 
-export default addInReceiptForFees;
+export default batchProcessFeesPayments;

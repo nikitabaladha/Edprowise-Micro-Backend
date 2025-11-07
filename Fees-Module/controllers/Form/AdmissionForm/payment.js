@@ -3,26 +3,26 @@
 import mongoose from "mongoose";
 import { AdmissionPayment } from "../../../models/AdmissionForm.js";
 
-// ==========Nikita's Code Start=======
-import { addInReceiptForFees } from "../../AxiosRequestService/AddInReceiptForFees.js";
+// // ==========Nikita's Code Start=======
+// import { addInReceiptForFees } from "../../AxiosRequestService/AddInReceiptForFees.js";
 
-function normalizeDateToUTCStartOfDay(date) {
-  const newDate = new Date(date);
-  // Convert to UTC start of day (00:00:00.000Z)
-  return new Date(
-    Date.UTC(
-      newDate.getUTCFullYear(),
-      newDate.getUTCMonth(),
-      newDate.getUTCDate(),
-      0,
-      0,
-      0,
-      0
-    )
-  );
-}
+// function normalizeDateToUTCStartOfDay(date) {
+//   const newDate = new Date(date);
+//   // Convert to UTC start of day (00:00:00.000Z)
+//   return new Date(
+//     Date.UTC(
+//       newDate.getUTCFullYear(),
+//       newDate.getUTCMonth(),
+//       newDate.getUTCDate(),
+//       0,
+//       0,
+//       0,
+//       0
+//     )
+//   );
+// }
 
-// ==========Nikita's Code End=======
+// // ==========Nikita's Code End=======
 
 const validatePaymentData = (body) => {
   const errors = [];
@@ -155,31 +155,31 @@ const createAdmissionPayment = async (req, res) => {
     newPayment.$session(session);
     await newPayment.save({ session });
 
-    // ==========Nikita's Code Start=======
-    // Call the finance module to store the payment in Receipt
-    if (paymentMode !== "null" && paymentStatus === "Paid") {
-      try {
-        const financeData = {
-          paymentId: newPayment._id.toString(),
-          finalAmount: parseFloat(finalAmount),
-          paymentDate: normalizeDateToUTCStartOfDay(newPayment.paymentDate),
-          academicYear: academicYear,
-          paymentMode: paymentMode,
-          feeType: "Admission", // ADD THIS - Important!
-        };
+    // // ==========Nikita's Code Start=======
+    // // Call the finance module to store the payment in Receipt
+    // if (paymentMode !== "null" && paymentStatus === "Paid") {
+    //   try {
+    //     const financeData = {
+    //       paymentId: newPayment._id.toString(),
+    //       finalAmount: parseFloat(finalAmount),
+    //       paymentDate: normalizeDateToUTCStartOfDay(newPayment.paymentDate),
+    //       academicYear: academicYear,
+    //       paymentMode: paymentMode,
+    //       feeType: "Admission", // ADD THIS - Important!
+    //     };
 
-        await addInReceiptForFees(schoolId, academicYear, financeData);
+    //     await addInReceiptForFees(schoolId, academicYear, financeData);
 
-        console.log(
-          "===========Payment added to Receipt successfully==============="
-        );
-      } catch (financeError) {
-        console.error("Failed to add payment to Receipt:", financeError);
-        // Don't fail the main payment if receipt creation fails
-      }
-    }
+    //     console.log(
+    //       "===========Payment added to Receipt successfully==============="
+    //     );
+    //   } catch (financeError) {
+    //     console.error("Failed to add payment to Receipt:", financeError);
+    //     // Don't fail the main payment if receipt creation fails
+    //   }
+    // }
 
-    // ==========Nikita's Code End=======
+    // // ==========Nikita's Code End=======
 
     await session.commitTransaction();
 

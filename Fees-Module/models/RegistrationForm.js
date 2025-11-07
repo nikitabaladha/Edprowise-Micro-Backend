@@ -62,6 +62,10 @@ const registrationPaymentSchema = new Schema(
     // razorpaySignature: { type: String },
     easebuzzTxnId: { type: String },
     easebuzzResponse: { type: Schema.Types.Mixed },
+    isProcessedInFinance: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );
@@ -176,6 +180,7 @@ registrationPaymentSchema.pre("save", async function (next) {
     session.endSession();
   }
 });
+
 export const RegistrationPayment = mongoose.model(
   "RegistrationPayment",
   registrationPaymentSchema

@@ -1,4 +1,4 @@
-// /Users/nikita/Desktop/EDPROWISE_Nikita_FINAL/Edprowise_Backend/Edprowise-Micro-Backend/Fees-Module/controllers/AxiosRequestService/AddInReceiptForFees.js
+// Fees-Module/controllers/AxiosRequestService/AddInReceiptForFees.js
 import axios from "axios";
 
 export async function addInReceiptForFees(schoolId, academicYear, paymentData) {

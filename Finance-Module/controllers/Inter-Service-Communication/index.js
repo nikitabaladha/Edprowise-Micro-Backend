@@ -1,3 +1,6 @@
-import addInReceiptForFees from "./AddInReceiptForFees.js";
+// Finance-Module/controllers/Inter-Service-Communication/index.js
 
-export { addInReceiptForFees };
+import addInReceiptForFees from "./AddInReceiptForFees.js";
+import batchProcessFeesPayments from "./BatchProcessFeesPayments.js";
+
+export { addInReceiptForFees, batchProcessFeesPayments };

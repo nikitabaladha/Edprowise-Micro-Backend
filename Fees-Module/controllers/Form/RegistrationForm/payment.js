@@ -5,26 +5,26 @@ import crypto from "crypto";
 import axios from "axios";
 import { RegistrationPayment } from "../../../models/RegistrationForm.js";
 
-// ==========Nikita's Code Start=======
-import { addInReceiptForFees } from "../../AxiosRequestService/AddInReceiptForFees.js";
+// // ==========Nikita's Code Start=======
+// import { addInReceiptForFees } from "../../AxiosRequestService/AddInReceiptForFees.js";
 
-function normalizeDateToUTCStartOfDay(date) {
-  const newDate = new Date(date);
-  // Convert to UTC start of day (00:00:00.000Z)
-  return new Date(
-    Date.UTC(
-      newDate.getUTCFullYear(),
-      newDate.getUTCMonth(),
-      newDate.getUTCDate(),
-      0,
-      0,
-      0,
-      0
-    )
-  );
-}
+// function normalizeDateToUTCStartOfDay(date) {
+//   const newDate = new Date(date);
+//   // Convert to UTC start of day (00:00:00.000Z)
+//   return new Date(
+//     Date.UTC(
+//       newDate.getUTCFullYear(),
+//       newDate.getUTCMonth(),
+//       newDate.getUTCDate(),
+//       0,
+//       0,
+//       0,
+//       0
+//     )
+//   );
+// }
 
-// ==========Nikita's Code End=======
+// // ==========Nikita's Code End=======
 
 const generateShortId = () => {
   return Math.random().toString(36).substring(2, 8);
@@ -285,31 +285,31 @@ const creatregistrationpayment = async (req, res) => {
     const newPayment = new RegistrationPayment(paymentData);
     await newPayment.save();
 
-    // ==========Nikita's Code Start=======
-    // Call the finance module to store the payment in Receipt And Opening Closing Balance
-    if (paymentMode !== "null" && paymentStatus === "Paid") {
-      try {
-        const financeData = {
-          paymentId: newPayment._id.toString(),
-          finalAmount: parseFloat(finalAmount),
-          paymentDate: normalizeDateToUTCStartOfDay(newPayment.paymentDate),
-          academicYear: academicYear,
-          paymentMode: paymentMode,
-          feeType: "Registration", // ADD THIS - Important!
-        };
+    // // ==========Nikita's Code Start=======
+    // // Call the finance module to store the payment in Receipt And Opening Closing Balance
+    // if (paymentMode !== "null" && paymentStatus === "Paid") {
+    //   try {
+    //     const financeData = {
+    //       paymentId: newPayment._id.toString(),
+    //       finalAmount: parseFloat(finalAmount),
+    //       paymentDate: normalizeDateToUTCStartOfDay(newPayment.paymentDate),
+    //       academicYear: academicYear,
+    //       paymentMode: paymentMode,
+    //       feeType: "Registration", // ADD THIS - Important!
+    //     };
 
-        await addInReceiptForFees(schoolId, academicYear, financeData);
+    //     await addInReceiptForFees(schoolId, academicYear, financeData);
 
-        console.log(
-          "===========Payment added to Receipt successfully==============="
-        );
-      } catch (financeError) {
-        console.error("Failed to add payment to Receipt:", financeError);
-        // Don't fail the main payment if receipt creation fails
-      }
-    }
+    //     console.log(
+    //       "===========Payment added to Receipt successfully==============="
+    //     );
+    //   } catch (financeError) {
+    //     console.error("Failed to add payment to Receipt:", financeError);
+    //     // Don't fail the main payment if receipt creation fails
+    //   }
+    // }
 
-    // ==========Nikita's Code End=======
+    // // ==========Nikita's Code End=======
 
     res.status(201).json({
       hasError: false,
@@ -429,28 +429,28 @@ const handlePaymentSuccess = async (req, res) => {
 
     console.log("Payment record created successfully:", newPayment._id);
 
-    // ==========Nikita's Code Start=======
+    // // ==========Nikita's Code Start=======
 
-    // Call the finance module to store the payment in OpeningClosingBalance
-    try {
-      const financeData = {
-        paymentId: newPayment._id.toString(),
-        finalAmount: parseFloat(finalAmount) || parseFloat(data.amount),
-        paymentDate: normalizeDateToUTCStartOfDay(newPayment.paymentDate),
-        academicYear: academicYear,
-        paymentMode: "Online",
-        feeType: "Registration",
-      };
+    // // Call the finance module to store the payment in OpeningClosingBalance
+    // try {
+    //   const financeData = {
+    //     paymentId: newPayment._id.toString(),
+    //     finalAmount: parseFloat(finalAmount) || parseFloat(data.amount),
+    //     paymentDate: normalizeDateToUTCStartOfDay(newPayment.paymentDate),
+    //     academicYear: academicYear,
+    //     paymentMode: "Online",
+    //     feeType: "Registration",
+    //   };
 
-      await addInReceiptForFees(schoolId, academicYear, financeData);
+    //   await addInReceiptForFees(schoolId, academicYear, financeData);
 
-      console.log("Payment also stored in Finance Module successfully");
-    } catch (financeError) {
-      console.error("Failed to store payment in Finance Module:", financeError);
-      // Don't fail the main payment if finance storage fails
-    }
+    //   console.log("Payment also stored in Finance Module successfully");
+    // } catch (financeError) {
+    //   console.error("Failed to store payment in Finance Module:", financeError);
+    //   // Don't fail the main payment if finance storage fails
+    // }
 
-    // ==========Nikita's Code End=======
+    // // ==========Nikita's Code End=======
 
     // Redirect to frontend success page
     res.redirect(

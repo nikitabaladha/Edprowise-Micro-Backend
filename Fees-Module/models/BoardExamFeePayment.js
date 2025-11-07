@@ -240,6 +240,7 @@ const BoardExamFeePaymentSchema = new Schema(
       type: String,
       unique: true,
     },
+
     cancelledDate: { type: Date },
     cancelReason: { type: String },
     chequeSpecificReason: { type: String },
@@ -248,6 +249,10 @@ const BoardExamFeePaymentSchema = new Schema(
       { type: String, enum: ["Paid", "Cancelled", "Cheque Return", "Refund"] },
     ],
     refundReceiptNumbers: [{ type: String }],
+    isProcessedInFinance: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );
