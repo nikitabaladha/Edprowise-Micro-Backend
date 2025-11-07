@@ -1,4 +1,4 @@
-// Edprowise-Micro-Backend\User-And-Profile-Service\app.js
+// Fees-Module/app.js
 
 import dotenv from "dotenv";
 import path from "path";
@@ -8,6 +8,7 @@ import routes from "./routes/index.js";
 import configureServer from "../shared/config/server-config.js";
 
 import { startDailyScheduler } from "../Fees-Module/controllers/Inter-Service-Communication/DailyBatchScheduler.js";
+import { startDailyRefundScheduler } from "../Fees-Module/controllers/Inter-Service-Communication/DailyBatchRefundScheduler.js";
 
 dotenv.config();
 
@@ -35,6 +36,7 @@ app.get("/health", (req, res) => {
 const PORT = process.env.FEES_MODULE_PORT;
 
 startDailyScheduler();
+startDailyRefundScheduler();
 
 app.listen(PORT, () => {
   console.log(`${process.env.SERVICE_NAME} running on port ${PORT}`);

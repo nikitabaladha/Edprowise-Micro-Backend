@@ -364,7 +364,7 @@ async function processDailyBatch() {
 // Schedule the job to run daily at 10 PM
 export function startDailyScheduler() {
   // '0 22 * * *' means at 22:00 (10 PM) every day
-  cron.schedule("49 12 * * *", processDailyBatch, {
+  cron.schedule("6 20 * * *", processDailyBatch, {
     scheduled: true,
     timezone: "Asia/Kolkata",
   });

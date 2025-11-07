@@ -1,3 +1,5 @@
+// Fees-Module/controllers/FeeReceipts/FeesRefund/create.js
+
 import mongoose from "mongoose";
 import RefundFees from "../../../models/RefundFees.js";
 import { SchoolFees } from "../../../models/SchoolFees.js";
@@ -80,27 +82,6 @@ const createRefundRequest = async (req, res) => {
         message: `Invalid status. Must be one of: ${validStatuses.join(", ")}.`,
       });
     }
-
-    // if (typeof concessionAmount !== 'number' || concessionAmount < 0) {
-    //   return res.status(400).json({
-    //     hasError: true,
-    //     message: 'Concession amount must be a non-negative number.',
-    //   });
-    // }
-
-    // if (typeof fineAmount !== 'number' || fineAmount < 0) {
-    //   return res.status(400).json({
-    //     hasError: true,
-    //     message: 'Fine amount must be a non-negative number.',
-    //   });
-    // }
-
-    // if (typeof excessAmount !== 'number' || excessAmount < 0) {
-    //   return res.status(400).json({
-    //     hasError: true,
-    //     message: 'Excess amount must be a non-negative number.',
-    //   });
-    // }
 
     if (status === "Refund") {
       if (typeof paidAmount !== "number" || paidAmount <= 0) {
@@ -207,10 +188,6 @@ const createRefundRequest = async (req, res) => {
         (sum, refund) => sum + (refund.refundAmount || 0),
         0
       );
-      const totalFeeTypeCancelled = feeTypeRefunds.reduce(
-        (sum, refund) => sum + (refund.cancelledAmount || 0),
-        0
-      );
 
       if (
         status === "Refund" &&
@@ -222,12 +199,6 @@ const createRefundRequest = async (req, res) => {
           message: `Sum of feeTypeRefunds amounts (${totalFeeTypeRefund}) does not match refundAmount (${refundAmount}).`,
         });
       }
-      // if ((status === 'Cancelled' || status === 'Cheque Return') && cancelledAmount !== undefined && totalFeeTypeCancelled !== cancelledAmount) {
-      //   return res.status(400).json({
-      //     hasError: true,
-      //     message: `Sum of feeTypeRefunds cancelled amounts (${totalFeeTypeCancelled}) does not match cancelledAmount (${cancelledAmount}).`,
-      //   });
-      // }
 
       for (const refund of feeTypeRefunds) {
         const feeTypeExists = await FeesType.findById(refund.feeType);
@@ -297,43 +268,6 @@ const createRefundRequest = async (req, res) => {
           });
         }
       }
-    }
-
-    const existingRefunds = await RefundFees.find({
-      schoolId,
-      academicYear,
-      refundType,
-      ...(refundType === "Registration Fee"
-        ? { registrationNumber }
-        : { admissionNumber }),
-    });
-
-    if (
-      paidAmount !== undefined &&
-      (refundAmount !== undefined || cancelledAmount !== undefined)
-    ) {
-      const totalRefundedAmount = existingRefunds.reduce(
-        (sum, refund) => sum + (refund.refundAmount || 0),
-        0
-      );
-      const totalCancelledAmount = existingRefunds.reduce(
-        (sum, refund) => sum + (refund.cancelledAmount || 0),
-        0
-      );
-
-      const remainingBalance =
-        paidAmount -
-        totalRefundedAmount -
-        totalCancelledAmount -
-        concessionAmount +
-        fineAmount -
-        excessAmount;
-      // if (remainingBalance < 0) {
-      //   return res.status(400).json({
-      //     hasError: true,
-      //     message: 'Remaining balance cannot be negative after accounting for concession, fine, and excess amounts.',
-      //   });
-      // }
     }
 
     console.log("Creating RefundFees with values:", {
