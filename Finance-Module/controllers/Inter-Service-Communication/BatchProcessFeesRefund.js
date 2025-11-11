@@ -90,8 +90,15 @@ async function getFeeLedger(schoolId, financialYear, feeType, session) {
     case "Board Exam":
       ledgerName = "Board Exam Fee";
       break;
+    case "Excess":
+      ledgerName = "Excess";
+      break;
+    case "Fine":
+      ledgerName = "Fine";
+      break;
     default:
-      throw new Error(`Unsupported fee type: ${feeType}`);
+      // For School Fees, use the feeType directly as it contains the actual fees type name
+      ledgerName = feeType;
   }
 
   const ledger = await Ledger.findOne({
@@ -246,63 +253,6 @@ async function createRefundReceipt(
     amount: toTwoDecimals(refundAmount), // Credit the payment method (money going out)
     debitAmount: 0,
   });
-
-  receipt.subTotalAmount = toTwoDecimals(
-    receipt.itemDetails.reduce((sum, item) => sum + (item.amount || 0), 0)
-  );
-  receipt.subTotalOfDebit = toTwoDecimals(
-    receipt.itemDetails.reduce((sum, item) => sum + (item.debitAmount || 0), 0)
-  );
-  receipt.totalAmount = receipt.subTotalAmount;
-  receipt.totalDebitAmount = receipt.subTotalOfDebit;
-
-  await receipt.save({ session });
-  return receipt;
-}
-
-async function updateReceiptWithFeeRefund(
-  receipt,
-  feeLedger,
-  paymentMethodLedger,
-  refundAmount,
-  session
-) {
-  const entryDate = receipt.entryDate;
-
-  const existingFeeItemIndex = receipt.itemDetails.findIndex(
-    (item) => item.ledgerId.toString() === feeLedger._id.toString()
-  );
-
-  const existingPaymentItemIndex = receipt.itemDetails.findIndex(
-    (item) => item.ledgerId.toString() === paymentMethodLedger._id.toString()
-  );
-
-  // For refunds: Fee ledger gets DEBIT, Payment method gets CREDIT
-  if (existingFeeItemIndex !== -1) {
-    receipt.itemDetails[existingFeeItemIndex].debitAmount = toTwoDecimals(
-      receipt.itemDetails[existingFeeItemIndex].debitAmount + refundAmount
-    );
-  } else {
-    receipt.itemDetails.push({
-      itemName: "",
-      ledgerId: feeLedger._id.toString(),
-      amount: 0,
-      debitAmount: toTwoDecimals(refundAmount),
-    });
-  }
-
-  if (existingPaymentItemIndex !== -1) {
-    receipt.itemDetails[existingPaymentItemIndex].amount = toTwoDecimals(
-      receipt.itemDetails[existingPaymentItemIndex].amount + refundAmount
-    );
-  } else {
-    receipt.itemDetails.push({
-      itemName: "",
-      ledgerId: paymentMethodLedger._id.toString(),
-      amount: toTwoDecimals(refundAmount),
-      debitAmount: 0,
-    });
-  }
 
   receipt.subTotalAmount = toTwoDecimals(
     receipt.itemDetails.reduce((sum, item) => sum + (item.amount || 0), 0)
@@ -663,7 +613,7 @@ async function processBatchRefundForDate(
       `Processing ${refundsData.length} refunds for date: ${processDate}`
     );
 
-    // Group refunds by paymentMode, feeType AND effective date for receipt creation
+    // Group ALL refunds by paymentMode AND effective date only (not by feeType)
     const refundsByGroup = {};
 
     refundsData.forEach((refund) => {
@@ -675,19 +625,16 @@ async function processBatchRefundForDate(
         new Date(effectiveDate)
       );
 
-      // Group by paymentMode + feeType + normalizedDate
-      const key = `${refund.paymentMode}_${
-        refund.feeType
-      }_${normalizedDate.toISOString()}`;
+      // Group by paymentMode + normalizedDate only (for ALL refund types)
+      const key = `${refund.paymentMode}_${normalizedDate.toISOString()}`;
 
       console.log(
-        `Refund grouping key: ${key}, Amount: ${refund.refundAmount}`
+        `Refund grouping key: ${key}, Amount: ${refund.refundAmount}, FeeType: ${refund.feeType}`
       );
 
       if (!refundsByGroup[key]) {
         refundsByGroup[key] = {
           paymentMode: refund.paymentMode,
-          feeType: refund.feeType,
           refundDate: normalizedDate,
           refunds: [],
           totalRefundAmount: 0,
@@ -703,6 +650,8 @@ async function processBatchRefundForDate(
         key,
         count: refundsByGroup[key].refunds.length,
         totalAmount: refundsByGroup[key].totalRefundAmount,
+        paymentMode: refundsByGroup[key].paymentMode,
+        refundDate: refundsByGroup[key].refundDate,
       }))
     );
 
@@ -731,10 +680,9 @@ async function processBatchRefundForDate(
 
     let voucherIndex = 0;
 
-    // Process each group (payment mode + feeType + normalizedDate combination)
+    // Process each group (payment mode + date combination)
     for (const [key, group] of Object.entries(refundsByGroup)) {
-      const { paymentMode, feeType, refundDate, totalRefundAmount, refunds } =
-        group;
+      const { paymentMode, refundDate, totalRefundAmount, refunds } = group;
 
       console.log(
         `Processing refund group: ${key}, Total Amount: ${totalRefundAmount}, Count: ${refunds.length}`
@@ -753,13 +701,28 @@ async function processBatchRefundForDate(
 
       voucherIndex++;
 
-      // Get the ledgers for this group
-      const feeLedger = await getFeeLedger(
-        schoolId,
-        financialYear,
-        feeType,
-        session
-      );
+      // Process all fee types in this group together
+      const feeLedgersMap = new Map(); // To track fee ledgers and their amounts
+
+      for (const refund of refunds) {
+        const feeLedger = await getFeeLedger(
+          schoolId,
+          financialYear,
+          refund.feeType,
+          session
+        );
+
+        if (feeLedgersMap.has(feeLedger._id.toString())) {
+          // Add to existing fee ledger amount
+          feeLedgersMap.set(
+            feeLedger._id.toString(),
+            feeLedgersMap.get(feeLedger._id.toString()) + refund.refundAmount
+          );
+        } else {
+          // Add new fee ledger
+          feeLedgersMap.set(feeLedger._id.toString(), refund.refundAmount);
+        }
+      }
 
       const paymentMethodLedger = await getPaymentMethodLedger(
         schoolId,
@@ -768,36 +731,69 @@ async function processBatchRefundForDate(
         session
       );
 
-      // Create SINGLE refund receipt with SUMMED amount for this group
-      const updatedReceipt = await createRefundReceipt(
-        receipt,
-        feeLedger,
-        paymentMethodLedger,
-        totalRefundAmount,
-        session
-      );
+      // Create refund entries for each fee ledger in the group
+      for (const [ledgerId, amount] of feeLedgersMap.entries()) {
+        const feeLedger = await Ledger.findById(ledgerId).session(session);
 
-      // Update opening closing balance for the SUMMED REFUND amount
-      const ledgerIdsToUpdate = await updateOpeningClosingForFeeRefund(
-        schoolId,
-        financialYear,
-        updatedReceipt,
-        feeLedger,
-        paymentMethodLedger,
-        totalRefundAmount,
-        session
-      );
+        receipt.itemDetails.push({
+          itemName: `Refund - ${feeLedger.ledgerName}`,
+          ledgerId: feeLedger._id.toString(),
+          amount: 0,
+          debitAmount: toTwoDecimals(amount), // Debit the fee ledger
+        });
 
-      ledgerIdsToUpdate.forEach((id) => allLedgerIdsToUpdate.add(id));
+        console.log(
+          `Added refund entry for ${feeLedger.ledgerName}: ${amount}`
+        );
+      }
+
+      // Add payment method entry (single entry for the group)
+      receipt.itemDetails.push({
+        itemName: `Refund Payment - ${paymentMethodLedger.ledgerName}`,
+        ledgerId: paymentMethodLedger._id.toString(),
+        amount: toTwoDecimals(totalRefundAmount), // Credit the payment method
+        debitAmount: 0,
+      });
+
+      receipt.subTotalAmount = toTwoDecimals(
+        receipt.itemDetails.reduce((sum, item) => sum + (item.amount || 0), 0)
+      );
+      receipt.subTotalOfDebit = toTwoDecimals(
+        receipt.itemDetails.reduce(
+          (sum, item) => sum + (item.debitAmount || 0),
+          0
+        )
+      );
+      receipt.totalAmount = receipt.subTotalAmount;
+      receipt.totalDebitAmount = receipt.subTotalOfDebit;
+
+      await receipt.save({ session });
+
+      // Update opening closing balance for each fee ledger
+      for (const [ledgerId, amount] of feeLedgersMap.entries()) {
+        const feeLedger = await Ledger.findById(ledgerId).session(session);
+
+        const ledgerIdsToUpdate = await updateOpeningClosingForFeeRefund(
+          schoolId,
+          financialYear,
+          receipt,
+          feeLedger,
+          paymentMethodLedger,
+          amount,
+          session
+        );
+
+        ledgerIdsToUpdate.forEach((id) => allLedgerIdsToUpdate.add(id));
+      }
 
       // Log the grouped processing
       console.log(
         `Created single receipt for ${refunds.length} refunds in group ${key}:`,
         {
-          receiptVoucherNumber: updatedReceipt.receiptVoucherNumber,
+          receiptVoucherNumber: receipt.receiptVoucherNumber,
           totalRefundAmount: totalRefundAmount,
           refundCount: refunds.length,
-          feeType: feeType,
+          feeTypes: Array.from(feeLedgersMap.keys()).length,
           paymentMode: paymentMode,
           refundDate: refundDate,
         }
@@ -829,6 +825,7 @@ async function processBatchRefundForDate(
     throw error;
   }
 }
+
 async function batchProcessFeesRefund(req, res) {
   console.log("============== batchProcessFeesRefund CALLED ================");
 

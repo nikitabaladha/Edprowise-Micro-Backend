@@ -1,3 +1,4 @@
+// Finance-Module/models/HeadOfAccount.js
 import mongoose from "mongoose";
 
 const HeadOfAccountSchema = new mongoose.Schema(

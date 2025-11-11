@@ -23,6 +23,9 @@ const FeesTypeSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-FeesTypeSchema.index({ feesTypeName: 1, academicYear: 1 ,schoolId:1,}, { unique: true });
+FeesTypeSchema.index(
+  { feesTypeName: 1, academicYear: 1, schoolId: 1 },
+  { unique: true }
+);
 
 export default mongoose.model("FeesType", FeesTypeSchema);

@@ -7,6 +7,8 @@ import { AdmissionPayment } from "../../models/AdmissionForm.js";
 import { RegistrationPayment } from "../../models/RegistrationForm.js";
 import BoardRegistrationPayment from "../../models/BoardRegistrationFeePayment.js";
 import BoardExamFeePayment from "../../models/BoardExamFeePayment.js";
+import { SchoolFees } from "../../models/SchoolFees.js";
+import FeesType from "../../models/FeesType.js";
 
 function normalizeDateToUTCStartOfDay(date) {
   const newDate = new Date(date);
@@ -33,6 +35,7 @@ async function getAllSchoolIds() {
       registrationSchoolIds,
       boardRegistrationSchoolIds,
       boardExamFeeSchoolIds,
+      schoolFeesSchoolIds,
     ] = await Promise.all([
       TCPayment.distinct("schoolId", {
         paymentMode: { $ne: "null" },
@@ -59,6 +62,11 @@ async function getAllSchoolIds() {
         status: "Paid",
         isProcessedInFinance: { $ne: true },
       }),
+      SchoolFees.distinct("schoolId", {
+        paymentMode: { $ne: "null" },
+        status: "Paid",
+        isProcessedInFinance: { $ne: true },
+      }),
     ]);
 
     // Combine and get unique school IDs
@@ -69,6 +77,7 @@ async function getAllSchoolIds() {
         ...registrationSchoolIds,
         ...boardRegistrationSchoolIds,
         ...boardExamFeeSchoolIds,
+        ...schoolFeesSchoolIds,
       ]),
     ];
 
@@ -91,12 +100,24 @@ async function getAcademicYearForSchool(schoolId) {
       (await AdmissionPayment.findOne({ schoolId })) ||
       (await TCPayment.findOne({ schoolId })) ||
       (await BoardRegistrationPayment.findOne({ schoolId })) ||
-      (await BoardExamFeePayment.findOne({ schoolId }));
+      (await BoardExamFeePayment.findOne({ schoolId })) ||
+      (await SchoolFees.findOne({ schoolId }));
 
     return payment.academicYear;
   } catch (error) {
     console.error(`Error getting academic year for school ${schoolId}:`, error);
     return "2025-2026"; // Default fallback
+  }
+}
+
+// Function to get fees type name from feeTypeId
+async function getFeesTypeName(feeTypeId) {
+  try {
+    const feesType = await FeesType.findById(feeTypeId);
+    return feesType?.feesTypeName || "School Fees"; // Default fallback
+  } catch (error) {
+    console.error(`Error getting fees type name for ID ${feeTypeId}:`, error);
+    return "School Fees"; // Default fallback
   }
 }
 
@@ -117,6 +138,7 @@ async function getTodaysPayments(schoolId) {
     registrationPayments,
     boardRegistrationPayments,
     boardExamFeePayments,
+    schoolFeesPayments,
   ] = await Promise.all([
     TCPayment.find({
       schoolId,
@@ -168,7 +190,83 @@ async function getTodaysPayments(schoolId) {
       status: "Paid",
       isProcessedInFinance: { $ne: true },
     }),
+    SchoolFees.find({
+      schoolId,
+      paymentDate: {
+        $gte: startOfToday,
+        $lt: startOfTomorrow,
+      },
+      paymentMode: { $ne: "null" },
+      status: "Paid",
+      isProcessedInFinance: { $ne: true },
+    }),
   ]);
+
+  // Process SchoolFees payments - flatten installments and fee items
+  const schoolFeesFlattened = [];
+
+  for (const schoolFee of schoolFeesPayments) {
+    console.log(
+      `Processing SchoolFee: ${schoolFee._id}, excessAmount: ${schoolFee.installments[0]?.excessAmount}, fineAmount: ${schoolFee.installments[0]?.fineAmount}`
+    );
+
+    for (const installment of schoolFee.installments) {
+      console.log(
+        `Installment: ${installment.installmentName}, excess: ${installment.excessAmount}, fine: ${installment.fineAmount}`
+      );
+
+      // Process fee items
+      for (const feeItem of installment.feeItems) {
+        if (feeItem.paid > 0) {
+          const feesTypeName = await getFeesTypeName(feeItem.feeTypeId);
+          schoolFeesFlattened.push({
+            paymentId: schoolFee._id.toString(),
+            finalAmount: feeItem.paid,
+            paymentDate: schoolFee.paymentDate,
+            academicYear: schoolFee.academicYear,
+            paymentMode: schoolFee.paymentMode,
+            feeType: feesTypeName,
+            source: "SchoolFees",
+            installmentName: installment.installmentName,
+            feeItemId: feeItem._id.toString(),
+            type: "feeItem",
+          });
+        }
+      }
+
+      // Process excess amount if exists
+      if (installment.excessAmount > 0) {
+        console.log(`Adding excess payment: ${installment.excessAmount}`);
+        schoolFeesFlattened.push({
+          paymentId: schoolFee._id.toString(),
+          finalAmount: installment.excessAmount,
+          paymentDate: schoolFee.paymentDate,
+          academicYear: schoolFee.academicYear,
+          paymentMode: schoolFee.paymentMode,
+          feeType: "Excess",
+          source: "SchoolFees",
+          installmentName: installment.installmentName,
+          type: "excess",
+        });
+      }
+
+      // Process fine amount if exists
+      if (installment.fineAmount > 0) {
+        console.log(`Adding fine payment: ${installment.fineAmount}`);
+        schoolFeesFlattened.push({
+          paymentId: schoolFee._id.toString(),
+          finalAmount: installment.fineAmount,
+          paymentDate: schoolFee.paymentDate,
+          academicYear: schoolFee.academicYear,
+          paymentMode: schoolFee.paymentMode,
+          feeType: "Fine",
+          source: "SchoolFees",
+          installmentName: installment.installmentName,
+          type: "fine",
+        });
+      }
+    }
+  }
 
   // Transform data for finance module
   const allPayments = [
@@ -217,7 +315,15 @@ async function getTodaysPayments(schoolId) {
       feeType: "Board Exam",
       source: "BoardExamFeePayment",
     })),
+    ...schoolFeesFlattened,
   ];
+
+  const excessPayments = allPayments.filter((p) => p.feeType === "Excess");
+  const finePayments = allPayments.filter((p) => p.feeType === "Fine");
+
+  console.log("Excess payments found:", excessPayments.length);
+  console.log("Fine payments found:", finePayments.length);
+  console.log("All payments count:", allPayments.length);
 
   console.log(
     `Found ${allPayments.length} payments to process for school ${schoolId}`
@@ -230,6 +336,25 @@ async function getTodaysPayments(schoolId) {
     registrationPayments: registrationPayments.length,
     boardRegistrationPayments: boardRegistrationPayments.length,
     boardExamFeePayments: boardExamFeePayments.length,
+    schoolFeesPayments: schoolFeesPayments.length,
+    schoolFeesFlattened: schoolFeesFlattened.length,
+    totalAllPayments: allPayments.length,
+  });
+
+  const schoolFeesFeeItems = schoolFeesFlattened.filter(
+    (p) => p.type === "feeItem"
+  ).length;
+  const schoolFeesExcess = schoolFeesFlattened.filter(
+    (p) => p.type === "excess"
+  ).length;
+  const schoolFeesFine = schoolFeesFlattened.filter(
+    (p) => p.type === "fine"
+  ).length;
+
+  console.log("SchoolFees detailed breakdown:", {
+    feeItems: schoolFeesFeeItems,
+    excessPayments: schoolFeesExcess,
+    finePayments: schoolFeesFine,
   });
 
   return allPayments;
@@ -254,6 +379,10 @@ async function markPaymentsAsProcessed(payments) {
 
   const boardExamFeePaymentIds = payments
     .filter((p) => p.source === "BoardExamFeePayment")
+    .map((p) => p.paymentId);
+
+  const schoolFeesPaymentIds = payments
+    .filter((p) => p.source === "SchoolFees")
     .map((p) => p.paymentId);
 
   await Promise.all([
@@ -288,6 +417,13 @@ async function markPaymentsAsProcessed(payments) {
     boardExamFeePaymentIds.length > 0
       ? BoardExamFeePayment.updateMany(
           { _id: { $in: boardExamFeePaymentIds } },
+          { $set: { isProcessedInFinance: true } }
+        )
+      : Promise.resolve(),
+
+    schoolFeesPaymentIds.length > 0
+      ? SchoolFees.updateMany(
+          { _id: { $in: schoolFeesPaymentIds } },
           { $set: { isProcessedInFinance: true } }
         )
       : Promise.resolve(),
@@ -364,7 +500,7 @@ async function processDailyBatch() {
 // Schedule the job to run daily at 10 PM
 export function startDailyScheduler() {
   // '0 22 * * *' means at 22:00 (10 PM) every day
-  cron.schedule("6 20 * * *", processDailyBatch, {
+  cron.schedule("50 13 * * *", processDailyBatch, {
     scheduled: true,
     timezone: "Asia/Kolkata",
   });

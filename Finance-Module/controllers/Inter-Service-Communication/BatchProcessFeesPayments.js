@@ -90,8 +90,14 @@ async function getFeeLedger(schoolId, financialYear, feeType, session) {
     case "Board Exam":
       ledgerName = "Board Exam Fee";
       break;
+    case "Excess":
+      ledgerName = "Excess"; // Directly use "Excess" as ledger name
+      break;
+    case "Fine":
+      ledgerName = "Fine"; // Directly use "Fine" as ledger name
+      break;
     default:
-      throw new Error(`Unsupported fee type: ${feeType}`);
+      ledgerName = feeType;
   }
 
   const ledger = await Ledger.findOne({
@@ -662,6 +668,12 @@ async function processBatchPaymentsForDate(
       `Processing ${paymentsData.length} payments for date: ${processDate}`
     );
 
+    const excessPayments = paymentsData.filter((p) => p.feeType === "Excess");
+    const finePayments = paymentsData.filter((p) => p.feeType === "Fine");
+    console.log("Received Excess payments:", excessPayments.length);
+    console.log("Received Fine payments:", finePayments.length);
+    console.log("All received payments:", paymentsData.length);
+
     // Group payments by paymentMode and date for receipt creation
     const paymentsByMode = {};
 
@@ -723,41 +735,63 @@ async function processBatchPaymentsForDate(
 
       // Process all payments for this group
       for (const payment of payments) {
-        const feeLedger = await getFeeLedger(
-          schoolId,
-          financialYear,
-          payment.feeType,
-          session
-        );
+        try {
+          const feeLedger = await getFeeLedger(
+            schoolId,
+            financialYear,
+            payment.feeType,
+            session
+          );
 
-        const paymentMethodLedger = await getPaymentMethodLedger(
-          schoolId,
-          financialYear,
-          payment.paymentMode,
-          session
-        );
+          console.log(
+            `Found ledger for ${payment.feeType}:`,
+            feeLedger ? feeLedger.ledgerName : "NOT FOUND"
+          );
 
-        // Update receipt with this payment
-        const updatedReceipt = await updateReceiptWithFeePayment(
-          receipt,
-          feeLedger,
-          paymentMethodLedger,
-          payment.finalAmount,
-          session
-        );
+          const paymentMethodLedger = await getPaymentMethodLedger(
+            schoolId,
+            financialYear,
+            payment.paymentMode,
+            session
+          );
 
-        // Update opening closing balance
-        const ledgerIdsToUpdate = await updateOpeningClosingForFeePayment(
-          schoolId,
-          financialYear,
-          updatedReceipt,
-          feeLedger,
-          paymentMethodLedger,
-          payment.finalAmount,
-          session
-        );
+          // Update receipt with this payment
+          const updatedReceipt = await updateReceiptWithFeePayment(
+            receipt,
+            feeLedger,
+            paymentMethodLedger,
+            payment.finalAmount,
+            session
+          );
 
-        ledgerIdsToUpdate.forEach((id) => allLedgerIdsToUpdate.add(id));
+          // Update opening closing balance
+          const ledgerIdsToUpdate = await updateOpeningClosingForFeePayment(
+            schoolId,
+            financialYear,
+            updatedReceipt,
+            feeLedger,
+            paymentMethodLedger,
+            payment.finalAmount,
+            session
+          );
+
+          ledgerIdsToUpdate.forEach((id) => allLedgerIdsToUpdate.add(id));
+
+          console.log(`Processed payment:`, {
+            source: payment.source,
+            feeType: payment.feeType,
+            amount: payment.finalAmount,
+            paymentMode: payment.paymentMode,
+            type: payment.type || "feeItem",
+          });
+        } catch (error) {
+          console.error(
+            `Error processing payment ${payment.paymentId} (FeeType: ${payment.feeType}):`,
+            error.message
+          );
+          // Continue with next payment even if one fails
+          continue;
+        }
       }
     }
 

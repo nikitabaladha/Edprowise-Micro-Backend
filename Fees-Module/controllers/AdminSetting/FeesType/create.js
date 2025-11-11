@@ -1,5 +1,9 @@
+// Fees-Module/controllers/AdminSetting/FeesType/create.js
+
 import FeesType from "../../../models/FeesType.js";
 import FeesTypeValidator from "../../../validators/FeesType.js";
+
+import { addLedgerForFeesType } from "../../AxiosRequestService/AddLedgerForFeesType.js";
 
 async function create(req, res) {
   try {
@@ -40,6 +44,36 @@ async function create(req, res) {
     });
 
     await feesType.save();
+
+    // here after creating of feetype i want to create ledger in finance table
+
+    try {
+      const ledgerData = {
+        feesTypeName: feesTypeName,
+        academicYear: academicYear,
+        schoolId: schoolId,
+      };
+
+      const ledgerResponse = await addLedgerForFeesType(
+        schoolId,
+        academicYear,
+        ledgerData
+      );
+
+      if (ledgerResponse.hasError) {
+        console.error(
+          "Failed to create ledger in Finance module:",
+          ledgerResponse.message
+        );
+      } else {
+        console.log(
+          "===========Ledger added to Finance successfully==============="
+        );
+        console.log("Ledger created:", ledgerResponse.data);
+      }
+    } catch (financeError) {
+      console.error("Failed to add ledger in Finance module:", financeError);
+    }
 
     return res.status(201).json({
       hasError: false,

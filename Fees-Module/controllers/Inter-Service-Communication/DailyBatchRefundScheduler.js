@@ -3,6 +3,7 @@ import cron from "node-cron";
 import axios from "axios";
 import mongoose from "mongoose";
 import RefundFees from "../../models/RefundFees.js";
+import FeesType from "../../models/FeesType.js";
 
 function normalizeDateToUTCStartOfDay(date) {
   const newDate = new Date(date);
@@ -23,7 +24,7 @@ function normalizeDateToUTCStartOfDay(date) {
 async function getAllSchoolIdsFromRefunds() {
   try {
     const schoolIds = await RefundFees.distinct("schoolId", {
-      status: { $in: ["Refund", "Cancelled", "Cheque Return"] }, // FIXED: Added "Cheque Return"
+      status: { $in: ["Refund", "Cancelled", "Cheque Return"] },
       isProcessedInFinance: { $ne: true },
       $or: [
         { refundAmount: { $gt: 0 } },
@@ -59,10 +60,21 @@ async function getAcademicYearForSchoolFromRefunds(schoolId) {
 
     // Fallback: try to get from any refund record
     const anyRefund = await RefundFees.findOne({ schoolId });
-    return anyRefund?.academicYear || "2025-2026";
+    return anyRefund?.academicYear;
   } catch (error) {
     console.error(`Error getting academic year for school ${schoolId}:`, error);
     return "2025-2026";
+  }
+}
+
+// Function to get fees type name from feeTypeId
+async function getFeesTypeName(feeTypeId) {
+  try {
+    const feesType = await FeesType.findById(feeTypeId);
+    return feesType?.feesTypeName || "School Fees"; // Default fallback
+  } catch (error) {
+    console.error(`Error getting fees type name for ID ${feeTypeId}:`, error);
+    return "School Fees"; // Default fallback
   }
 }
 
@@ -144,30 +156,128 @@ async function getTodaysRefunds(schoolId) {
   });
 
   // Transform data for finance module
-  const allRefunds = todaysRefunds.map((refund) => {
-    const refundAmount = calculateRefundAmount(refund);
+  const allRefunds = [];
+
+  for (const refund of todaysRefunds) {
     const effectiveDate = getEffectiveDate(refund);
 
-    return {
-      refundId: refund._id.toString(),
-      refundAmount: refundAmount,
-      finalAmount: -refundAmount, // Negative amount for finance module (refund)
-      refundDate: effectiveDate,
-      academicYear: refund.academicYear,
-      paymentMode: refund.paymentMode,
-      feeType: getFeeTypeFromRefundType(refund.refundType),
-      refundType: refund.refundType,
-      status: refund.status,
-      source: "RefundFees",
-      originalReceiptNumber: refund.existancereceiptNumber,
-      cancelledAmount: refund.cancelledAmount,
-      receiptNumber: refund.receiptNumber,
-      // Additional fields that might be useful for finance module
-      paidAmount: refund.paidAmount,
-      balance: refund.balance,
-      transactionNumber: refund.transactionNumber,
-    };
-  });
+    // SPECIAL HANDLING FOR SCHOOL FEES
+    if (
+      refund.refundType === "School Fees" &&
+      refund.feeTypeRefunds &&
+      refund.feeTypeRefunds.length > 0
+    ) {
+      console.log(
+        `Processing School Fees refund with ${refund.feeTypeRefunds.length} fee types`
+      );
+
+      // Process each fee type in feeTypeRefunds array
+      for (const feeTypeRefund of refund.feeTypeRefunds) {
+        const refundAmount = calculateRefundAmount(refund);
+        const feeTypeName = await getFeesTypeName(feeTypeRefund.feeType);
+
+        // Use the feeTypeRefund's cancelledAmount or refundAmount
+        const feeTypeAmount =
+          refund.status === "Refund"
+            ? feeTypeRefund.refundAmount || 0
+            : feeTypeRefund.cancelledAmount || 0;
+
+        if (feeTypeAmount > 0) {
+          allRefunds.push({
+            refundId: refund._id.toString(),
+            refundAmount: feeTypeAmount,
+            finalAmount: -feeTypeAmount, // Negative amount for finance module (refund)
+            refundDate: effectiveDate,
+            academicYear: refund.academicYear,
+            paymentMode: refund.paymentMode,
+            feeType: feeTypeName, // Use the actual fees type name from FeesType collection
+            refundType: refund.refundType,
+            status: refund.status,
+            source: "RefundFees",
+            originalReceiptNumber: refund.existancereceiptNumber,
+            cancelledAmount: feeTypeRefund.cancelledAmount,
+            receiptNumber: refund.receiptNumber,
+            // Additional fields that might be useful for finance module
+            paidAmount: feeTypeRefund.paidAmount,
+            balance: feeTypeRefund.balance,
+            transactionNumber: refund.transactionNumber,
+            feeTypeId: feeTypeRefund.feeType, // Keep for reference
+            isSchoolFees: true, // Flag to identify School Fees refunds
+          });
+
+          console.log(
+            `Added School Fees refund for fee type ${feeTypeName}: ${feeTypeAmount}`
+          );
+        }
+      }
+
+      // Also process excessAmount and fineAmount if they exist
+      if (refund.excessAmount > 0) {
+        allRefunds.push({
+          refundId: refund._id.toString(),
+          refundAmount: refund.excessAmount,
+          finalAmount: -refund.excessAmount,
+          refundDate: effectiveDate,
+          academicYear: refund.academicYear,
+          paymentMode: refund.paymentMode,
+          feeType: "Excess", // Use "Excess" as ledger name
+          refundType: refund.refundType,
+          status: refund.status,
+          source: "RefundFees",
+          originalReceiptNumber: refund.existancereceiptNumber,
+          receiptNumber: refund.receiptNumber,
+          isSchoolFees: true,
+          type: "excess",
+        });
+        console.log(`Added Excess refund: ${refund.excessAmount}`);
+      }
+
+      if (refund.fineAmount > 0) {
+        allRefunds.push({
+          refundId: refund._id.toString(),
+          refundAmount: refund.fineAmount,
+          finalAmount: -refund.fineAmount,
+          refundDate: effectiveDate,
+          academicYear: refund.academicYear,
+          paymentMode: refund.paymentMode,
+          feeType: "Fine", // Use "Fine" as ledger name
+          refundType: refund.refundType,
+          status: refund.status,
+          source: "RefundFees",
+          originalReceiptNumber: refund.existancereceiptNumber,
+          receiptNumber: refund.receiptNumber,
+          isSchoolFees: true,
+          type: "fine",
+        });
+        console.log(`Added Fine refund: ${refund.fineAmount}`);
+      }
+    } else {
+      // REGULAR HANDLING FOR OTHER REFUND TYPES
+      const refundAmount = calculateRefundAmount(refund);
+
+      if (refundAmount > 0) {
+        allRefunds.push({
+          refundId: refund._id.toString(),
+          refundAmount: refundAmount,
+          finalAmount: -refundAmount, // Negative amount for finance module (refund)
+          refundDate: effectiveDate,
+          academicYear: refund.academicYear,
+          paymentMode: refund.paymentMode,
+          feeType: getFeeTypeFromRefundType(refund.refundType),
+          refundType: refund.refundType,
+          status: refund.status,
+          source: "RefundFees",
+          originalReceiptNumber: refund.existancereceiptNumber,
+          cancelledAmount: refund.cancelledAmount,
+          receiptNumber: refund.receiptNumber,
+          // Additional fields that might be useful for finance module
+          paidAmount: refund.paidAmount,
+          balance: refund.balance,
+          transactionNumber: refund.transactionNumber,
+        });
+      }
+    }
+  }
 
   console.log(
     `Found ${allRefunds.length} refunds to process for school ${schoolId}`
@@ -182,8 +292,10 @@ async function getTodaysRefunds(schoolId) {
         amount: r.refundAmount,
         status: r.status,
         type: r.refundType,
+        feeType: r.feeType,
         date: r.refundDate,
         originalReceipt: r.originalReceiptNumber,
+        isSchoolFees: r.isSchoolFees || false,
       }))
     );
   } else {
@@ -200,11 +312,12 @@ async function getTodaysRefunds(schoolId) {
       allUnprocessed.map((r) => ({
         id: r._id,
         status: r.status,
+        refundType: r.refundType,
         refundAmount: r.refundAmount,
         cancelledAmount: r.cancelledAmount,
         refundDate: r.refundDate,
         cancelledDate: r.cancelledDate,
-        refundType: r.refundType,
+        feeTypeRefunds: r.feeTypeRefunds,
       }))
     );
   }
@@ -299,7 +412,7 @@ async function processDailyRefundBatch() {
 // Schedule the job to run daily at 10 PM
 export function startDailyRefundScheduler() {
   // '0 22 * * *' means at 22:00 (10 PM) every day
-  cron.schedule("7 20 * * *", processDailyRefundBatch, {
+  cron.schedule("51 13 * * *", processDailyRefundBatch, {
     scheduled: true,
     timezone: "Asia/Kolkata",
   });
