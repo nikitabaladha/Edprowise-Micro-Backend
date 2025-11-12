@@ -230,6 +230,7 @@ async function getTodaysPayments(schoolId) {
             installmentName: installment.installmentName,
             feeItemId: feeItem._id.toString(),
             type: "feeItem",
+            concessionAmount: feeItem.concession || 0,
           });
         }
       }
@@ -500,7 +501,7 @@ async function processDailyBatch() {
 // Schedule the job to run daily at 10 PM
 export function startDailyScheduler() {
   // '0 22 * * *' means at 22:00 (10 PM) every day
-  cron.schedule("50 13 * * *", processDailyBatch, {
+  cron.schedule("9 13 * * *", processDailyBatch, {
     scheduled: true,
     timezone: "Asia/Kolkata",
   });

@@ -186,7 +186,7 @@ async function getTodaysRefunds(schoolId) {
           allRefunds.push({
             refundId: refund._id.toString(),
             refundAmount: feeTypeAmount,
-            finalAmount: -feeTypeAmount, // Negative amount for finance module (refund)
+            finalAmount: feeTypeAmount, // Negative amount for finance module (refund)
             refundDate: effectiveDate,
             academicYear: refund.academicYear,
             paymentMode: refund.paymentMode,
@@ -197,7 +197,7 @@ async function getTodaysRefunds(schoolId) {
             originalReceiptNumber: refund.existancereceiptNumber,
             cancelledAmount: feeTypeRefund.cancelledAmount,
             receiptNumber: refund.receiptNumber,
-            // Additional fields that might be useful for finance module
+            concessionAmount: feeTypeRefund.concessionAmount,
             paidAmount: feeTypeRefund.paidAmount,
             balance: feeTypeRefund.balance,
             transactionNumber: refund.transactionNumber,
@@ -412,7 +412,7 @@ async function processDailyRefundBatch() {
 // Schedule the job to run daily at 10 PM
 export function startDailyRefundScheduler() {
   // '0 22 * * *' means at 22:00 (10 PM) every day
-  cron.schedule("51 13 * * *", processDailyRefundBatch, {
+  cron.schedule("10 13 * * *", processDailyRefundBatch, {
     scheduled: true,
     timezone: "Asia/Kolkata",
   });

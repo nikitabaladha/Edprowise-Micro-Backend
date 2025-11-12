@@ -112,7 +112,6 @@ const ReceiptSchema = new mongoose.Schema(
       enum: ["Finance", "Fees"],
       default: "Finance",
     },
-
     isRefund: {
       type: Boolean,
       default: false,
