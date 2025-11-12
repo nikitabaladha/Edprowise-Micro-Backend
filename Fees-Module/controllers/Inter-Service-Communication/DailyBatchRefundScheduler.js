@@ -411,13 +411,13 @@ async function processDailyRefundBatch() {
 
 // Schedule the job to run daily at 10 PM
 export function startDailyRefundScheduler() {
-  // '0 22 * * *' means at 22:00 (10 PM) every day
-  cron.schedule("10 13 * * *", processDailyRefundBatch, {
+  // '30 22 * * *' means at 22:30 (10:30 PM) every day
+  cron.schedule("30 22 * * *", processDailyRefundBatch, {
     scheduled: true,
     timezone: "Asia/Kolkata",
   });
 
   console.log(
-    "Daily batch Refund scheduler started - will run at 10 PM every day"
+    "Daily batch Refund scheduler started - will run at 10:30 PM every day"
   );
 }
