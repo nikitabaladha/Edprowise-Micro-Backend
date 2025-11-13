@@ -4,7 +4,6 @@ import BSPLLedger from "./BSPLLedger.js";
 import GroupLedger from "./GroupLedger.js";
 import Ledger from "./Ledger.js";
 import CounterForFinaceLedger from "./CounterForFinaceLedger.js";
-import TotalNetdeficitNetSurplus from "./TotalNetdeficitNetSurplus.js";
 
 const FinanceModuleYearSchema = new mongoose.Schema(
   {
@@ -17,11 +16,6 @@ const FinanceModuleYearSchema = new mongoose.Schema(
       required: true,
     },
     isDefaultAccountsCreated: {
-      type: Boolean,
-      default: false,
-    },
-    isDataCopiedFromPreviousYear: {
-      // Add this field
       type: Boolean,
       default: false,
     },
@@ -138,46 +132,37 @@ const DEFAULT_CHART_OF_ACCOUNTS = [
   },
 ];
 
-FinanceModuleYearSchema.methods.createDefaultAccountsIfNeeded = async function (
-  session = null
-) {
-  if (this.isDefaultAccountsCreated || this.isDataCopiedFromPreviousYear) {
-    return; // Already created or data was copied, skip
-  }
-
-  try {
-    await createDefaultChartOfAccounts(
-      this.schoolId,
-      this.financialYear,
-      session
-    );
-
-    // Mark as created but DON'T save here - the pre-save hook will handle the final save
-    this.isDefaultAccountsCreated = true;
-
-    console.log(`Default accounts created for ${this.financialYear}`);
-  } catch (err) {
-    if (err.code === 11000) {
-      console.log("Default accounts already exist, marking as created");
-      this.isDefaultAccountsCreated = true;
-      return;
+// Remove the post-save hook and create a separate method
+FinanceModuleYearSchema.methods.createDefaultAccountsIfNeeded =
+  async function () {
+    if (this.isDefaultAccountsCreated) {
+      return; // Already created, skip
     }
-    console.error("Error creating default chart of accounts:", err);
-    throw err;
-  }
-};
+
+    try {
+      await createDefaultChartOfAccounts(this.schoolId, this.financialYear);
+
+      // Mark as created
+      this.isDefaultAccountsCreated = true;
+      await this.save();
+
+      console.log(`Default accounts created for ${this.financialYear}`);
+    } catch (err) {
+      if (err.code === 11000) {
+        console.log("Default accounts already exist, marking as created");
+        this.isDefaultAccountsCreated = true;
+        await this.save();
+        return;
+      }
+      console.error("Error creating default chart of accounts:", err);
+      throw err;
+    }
+  };
 
 // Helper function to create default chart of accounts (only missing ones)
-async function createDefaultChartOfAccounts(
-  schoolId,
-  financialYear,
-  session = null
-) {
+async function createDefaultChartOfAccounts(schoolId, financialYear) {
   // Initialize counters
-  await initializeCounters(schoolId, session);
-
-  const saveOptions = session ? { session } : {};
-  let netSurplusDeficitLedgerId = null;
+  await initializeCounters(schoolId);
 
   for (const account of DEFAULT_CHART_OF_ACCOUNTS) {
     // Check if Head of Account already exists
@@ -185,45 +170,50 @@ async function createDefaultChartOfAccounts(
       schoolId,
       headOfAccountName: account.headOfAccount,
       financialYear,
-    }).session(session || null);
+    });
 
     if (!headOfAccount) {
+      // Create only if it doesn't exist
       headOfAccount = new HeadOfAccount({
         schoolId,
         headOfAccountName: account.headOfAccount,
         financialYear,
       });
-      await headOfAccount.save(saveOptions);
+      await headOfAccount.save();
     }
 
     for (const bsplLedger of account.bsplLedgers) {
+      // Check if BS & P&L Ledger already exists
       let bspl = await BSPLLedger.findOne({
         schoolId,
         headOfAccountId: headOfAccount._id,
         bSPLLedgerName: bsplLedger.name,
         financialYear,
-      }).session(session || null);
+      });
 
       if (!bspl) {
+        // Create only if it doesn't exist
         bspl = new BSPLLedger({
           schoolId,
           headOfAccountId: headOfAccount._id,
           bSPLLedgerName: bsplLedger.name,
           financialYear,
         });
-        await bspl.save(saveOptions);
+        await bspl.save();
       }
 
       for (const groupLedger of bsplLedger.groupLedgers) {
+        // Check if Group Ledger already exists
         let group = await GroupLedger.findOne({
           schoolId,
           headOfAccountId: headOfAccount._id,
           bSPLLedgerId: bspl._id,
           groupLedgerName: groupLedger.name,
           financialYear,
-        }).session(session || null);
+        });
 
         if (!group) {
+          // Create only if it doesn't exist
           group = new GroupLedger({
             schoolId,
             headOfAccountId: headOfAccount._id,
@@ -231,89 +221,27 @@ async function createDefaultChartOfAccounts(
             groupLedgerName: groupLedger.name,
             financialYear,
           });
-          await group.save(saveOptions);
+          await group.save();
         }
 
+        // Create only missing Ledgers
         for (const ledgerName of groupLedger.ledgers) {
-          const ledger = await createLedgerIfNotExists(
+          await createLedgerIfNotExists(
             schoolId,
             headOfAccount._id,
             group._id,
             bspl._id,
             ledgerName,
             financialYear,
-            account.headOfAccount,
-            session
+            account.headOfAccount
           );
-
-          if (ledgerName === "Net Surplus/(Deficit)" && ledger) {
-            netSurplusDeficitLedgerId = ledger._id;
-            console.log(
-              `Stored Net Surplus/(Deficit) ledger ID: ${netSurplusDeficitLedgerId}`
-            );
-          }
         }
       }
     }
   }
-
-  if (netSurplusDeficitLedgerId) {
-    await createTotalNetdeficitNetSurplusRecord(
-      schoolId,
-      financialYear,
-      netSurplusDeficitLedgerId,
-      session
-    );
-  }
 }
 
-// Function to create TotalNetdeficitNetSurplus record
-async function createTotalNetdeficitNetSurplusRecord(
-  schoolId,
-  financialYear,
-  ledgerId,
-  session = null
-) {
-  try {
-    const saveOptions = session ? { session } : {};
-
-    // Check if record already exists
-    const existingRecord = await TotalNetdeficitNetSurplus.findOne({
-      schoolId,
-      financialYear,
-      ledgerId,
-    }).session(session || null);
-
-    if (!existingRecord) {
-      const totalNetdeficitNetSurplus = new TotalNetdeficitNetSurplus({
-        schoolId,
-        financialYear,
-        ledgerId,
-        balanceDetails: [],
-      });
-
-      await totalNetdeficitNetSurplus.save(saveOptions);
-      console.log(
-        `Created TotalNetdeficitNetSurplus record for ledger: ${ledgerId}`
-      );
-    } else {
-      console.log(
-        `TotalNetdeficitNetSurplus record already exists for ledger: ${ledgerId}`
-      );
-    }
-  } catch (error) {
-    if (error.code === 11000) {
-      console.log(
-        `TotalNetdeficitNetSurplus record already exists (duplicate key)`
-      );
-      return;
-    }
-    console.error("Error creating TotalNetdeficitNetSurplus record:", error);
-    throw error;
-  }
-}
-
-async function initializeCounters(schoolId, session = null) {
+async function initializeCounters(schoolId) {
   const counterTypes = [
     "Assets",
     "Expenses",
@@ -326,7 +254,7 @@ async function initializeCounters(schoolId, session = null) {
     await CounterForFinaceLedger.findOneAndUpdate(
       { schoolId, headOfAccountType: type },
       { $setOnInsert: { lastLedgerCode: 0 } },
-      { upsert: true, new: true, session }
+      { upsert: true, new: true }
     );
   }
 }
@@ -338,10 +266,10 @@ async function createLedgerIfNotExists(
   bSPLLedgerId,
   ledgerName,
   financialYear,
-  headOfAccountType,
-  session = null
+  headOfAccountType
 ) {
   try {
+    // Check if ledger already exists
     const existingLedger = await Ledger.findOne({
       schoolId,
       headOfAccountId,
@@ -349,17 +277,18 @@ async function createLedgerIfNotExists(
       bSPLLedgerId,
       ledgerName,
       financialYear,
-    }).session(session || null);
+    });
 
     if (existingLedger) {
       console.log(`Ledger ${ledgerName} already exists, skipping`);
-      return existingLedger;
+      return;
     }
 
+    // Get next ledger code
     const counter = await CounterForFinaceLedger.findOneAndUpdate(
       { schoolId, headOfAccountType },
       { $inc: { lastLedgerCode: 1 } },
-      { new: true, upsert: true, session }
+      { new: true, upsert: true }
     );
 
     const baseCodes = {
@@ -375,64 +304,32 @@ async function createLedgerIfNotExists(
       baseCodes[headOfAccountType] + counter.lastLedgerCode
     ).toString();
 
+    const openingBalance = 0;
+    const balanceType = "Debit";
+    const paymentMode = "Not Defined";
+
     const newLedger = new Ledger({
       schoolId,
       headOfAccountId,
       groupLedgerId,
       bSPLLedgerId,
       ledgerName,
-      openingBalance: 0,
-      balanceType: "Debit",
-      paymentMode: "Not Defined",
+      openingBalance,
+      balanceType,
+      paymentMode,
       ledgerCode,
       financialYear,
     });
 
-    const saveOptions = session ? { session } : {};
-    await newLedger.save(saveOptions);
+    await newLedger.save();
     console.log(`Created ledger: ${ledgerName} with code: ${ledgerCode}`);
-
-    return newLedger;
   } catch (error) {
     if (error.code === 11000) {
       console.log(`Ledger ${ledgerName} already exists (duplicate key)`);
-      const existingLedger = await Ledger.findOne({
-        schoolId,
-        headOfAccountId,
-        groupLedgerId,
-        bSPLLedgerId,
-        ledgerName,
-        financialYear,
-      }).session(session || null);
-      return existingLedger;
+      return;
     }
     throw error;
   }
 }
-
-FinanceModuleYearSchema.pre("save", async function (next) {
-  // Only run if this is a new document and accounts aren't created yet AND data is not being copied
-  if (
-    this.isNew &&
-    !this.isDefaultAccountsCreated &&
-    !this.isDataCopiedFromPreviousYear
-  ) {
-    try {
-      console.log(
-        "Auto-creating default accounts for new FinanceModuleYear..."
-      );
-
-      const session = this.$session();
-      await this.createDefaultAccountsIfNeeded(session);
-
-      next();
-    } catch (error) {
-      console.error("Error creating default accounts in pre-save hook:", error);
-      next(error);
-    }
-  } else {
-    next();
-  }
-});
 
 export default mongoose.model("FinanceModuleYear", FinanceModuleYearSchema);

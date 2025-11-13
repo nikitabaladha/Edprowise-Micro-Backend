@@ -3,6 +3,7 @@ import GroupLedger from "../../models/GroupLedger.js";
 import BSPLLedger from "../../models/BSPLLedger.js";
 import HeadOfAccount from "../../models/HeadOfAccount.js";
 import OpeningClosingBalance from "../../models/OpeningClosingBalance.js";
+import TotalNetdeficitNetSurplus from "../../models/TotalNetdeficitNetSurplus.js";
 
 const copyLedgers = async (
   schoolId,
@@ -99,6 +100,8 @@ const copyLedgers = async (
   });
 
   const newLedgers = [];
+  let netSurplusDeficitLedgerId = null;
+
   for (const prevLedger of previousLedgers) {
     const prevHoa = prevHeadOfAccounts.find((hoa) =>
       hoa._id.equals(prevLedger.headOfAccountId)
@@ -131,7 +134,7 @@ const copyLedgers = async (
       balanceType = "Debit";
     }
 
-    newLedgers.push({
+    const newLedgerData = {
       schoolId,
       headOfAccountId: newHeadOfAccountId,
       groupLedgerId: newGroupLedgerId,
@@ -143,14 +146,86 @@ const copyLedgers = async (
       ledgerCode: prevLedger.ledgerCode,
       financialYear: newFinancialYear,
       parentLedgerId: prevLedger._id,
-    });
+    };
+
+    newLedgers.push(newLedgerData);
+
+    // Track if this is the Net Surplus/(Deficit) ledger
+    if (prevLedger.ledgerName === "Net Surplus/(Deficit)") {
+      console.log(
+        `Found Net Surplus/(Deficit) ledger to copy: ${prevLedger._id}`
+      );
+    }
   }
 
+  let copiedCount = 0;
   if (newLedgers.length > 0) {
-    await Ledger.insertMany(newLedgers, { session });
+    const insertedLedgers = await Ledger.insertMany(newLedgers, { session });
+    copiedCount = insertedLedgers.length;
+
+    // Find the newly created Net Surplus/(Deficit) ledger and store in TotalNetdeficitNetSurplus
+    const netSurplusLedger = insertedLedgers.find(
+      (ledger) => ledger.ledgerName === "Net Surplus/(Deficit)"
+    );
+
+    if (netSurplusLedger) {
+      await createTotalNetdeficitNetSurplusRecord(
+        schoolId,
+        newFinancialYear,
+        netSurplusLedger._id,
+        session
+      );
+    }
   }
 
-  return newLedgers.length;
+  return copiedCount;
 };
+
+async function createTotalNetdeficitNetSurplusRecord(
+  schoolId,
+  financialYear,
+  ledgerId,
+  session = null
+) {
+  try {
+    const saveOptions = session ? { session } : {};
+
+    // Check if record already exists
+    const existingRecord = await TotalNetdeficitNetSurplus.findOne({
+      schoolId,
+      financialYear,
+      ledgerId,
+    }).session(session || null);
+
+    if (!existingRecord) {
+      const totalNetdeficitNetSurplus = new TotalNetdeficitNetSurplus({
+        schoolId,
+        financialYear,
+        ledgerId,
+        balanceDetails: [], // Empty array as requested
+      });
+
+      await totalNetdeficitNetSurplus.save(saveOptions);
+      console.log(
+        `Created TotalNetdeficitNetSurplus record for copied ledger: ${ledgerId}`
+      );
+      return true;
+    } else {
+      console.log(
+        `TotalNetdeficitNetSurplus record already exists for ledger: ${ledgerId}`
+      );
+      return false;
+    }
+  } catch (error) {
+    if (error.code === 11000) {
+      console.log(
+        `TotalNetdeficitNetSurplus record already exists (duplicate key)`
+      );
+      return false;
+    }
+    console.error("Error creating TotalNetdeficitNetSurplus record:", error);
+    throw error;
+  }
+}
 
 export default copyLedgers;
