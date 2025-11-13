@@ -14,10 +14,11 @@
     "ms9": "npm --prefix Procurement-Quote-Proposal-Service start",
     "ms10": "npm --prefix Procurement-Quote-Request-Service start",
     "ms11": "npm --prefix Subscription-Service start",
-    "ms12": "npm --prefix User-And-Profile-Service start",
-    "ms13": "npm --prefix api-geteway start",
-    "ms14": "npm --prefix Fees-Module start",
-    "dev-all": "npm-run-all --parallel ms1 ms2 ms3 ms4 ms5 ms6 ms7 ms8 ms9 ms10 ms11 ms12 ms13 ms14"
+    "ms12": "npm --prefix User-And-Profile-Service start",   
+    "ms13": "npm --prefix Fees-Module start",
+    "ms14": "npm --prefix Payroll-Module start",
+    "ms15": "npm --prefix api-geteway start",
+    "dev-all": "npm-run-all --parallel ms1 ms2 ms3 ms4 ms5 ms6 ms7 ms8 ms9 ms10 ms11 ms12 ms13 ms14 ms15"
   },
   "devDependencies": {
     "npm-run-all": "^4.1.5"
