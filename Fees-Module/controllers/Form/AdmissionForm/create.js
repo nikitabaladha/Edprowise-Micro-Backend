@@ -13,7 +13,7 @@ const getFilePath = (file) => {
     : `/Documents/AdmissionForm/${file.filename}`;
 };
 
-// Helper function to check if payment data is provided
+
 const hasPaymentData = (body) => {
   const paymentFields = [
     "admissionFees",
@@ -74,8 +74,8 @@ const admissionform = async (req, res) => {
 
     const normalizedRegistrationNumber =
       registrationNumber &&
-      registrationNumber.trim() !== "" &&
-      registrationNumber.toLowerCase() !== "null"
+        registrationNumber.trim() !== "" &&
+        registrationNumber.toLowerCase() !== "null"
         ? registrationNumber.trim()
         : null;
 
@@ -131,9 +131,9 @@ const admissionform = async (req, res) => {
 
     const registeredStudent = normalizedRegistrationNumber
       ? await StudentRegistration.findOne({
-          schoolId,
-          registrationNumber: normalizedRegistrationNumber,
-        })
+        schoolId,
+        registrationNumber: normalizedRegistrationNumber,
+      })
       : null;
 
     const studentData = {

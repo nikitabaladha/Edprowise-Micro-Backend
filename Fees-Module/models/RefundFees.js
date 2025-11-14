@@ -1,137 +1,89 @@
-import mongoose from "mongoose";
-import { RegistrationPayment } from "./RegistrationForm.js";
-import { TCPayment } from "./TCForm.js";
-import { AdmissionPayment } from "./AdmissionForm.js";
-import AdmissionCopy from "./AdmissionFormCpy.js";
-import BoardExamFeePayment from "./BoardExamFeePayment.js";
-import BoardRegistrationFeePayment from "./BoardRegistrationFeePayment.js";
-import { SchoolFees } from "./SchoolFees.js";
+
+import mongoose from 'mongoose';
+import { RegistrationPayment } from './RegistrationForm.js';
+import { TCPayment } from './TCForm.js';
+import { AdmissionPayment } from './AdmissionForm.js';
+import AdmissionCopy from './AdmissionFormCpy.js';
+import BoardExamFeePayment from './BoardExamFeePayment.js';
+import BoardRegistrationFeePayment from './BoardRegistrationFeePayment.js';
+import { SchoolFees } from './SchoolFees.js';
+
 
 const { Schema } = mongoose;
+
 
 const RefundCounterSchema = new Schema({
   schoolId: { type: String, required: true, unique: true },
   refundSeq: { type: Number, default: 0 },
 });
+const RefundCounter = mongoose.model('RefundCounter', RefundCounterSchema);
 
-const RefundCounter = mongoose.model("RefundCounter", RefundCounterSchema);
 
 const feeTypeRefundSchema = new Schema({
-  feeType: {
-    type: Schema.Types.ObjectId,
-    ref: "FeesType",
-  },
-  paidAmount: {
-    type: Number,
-    min: 0,
-  },
-  concessionAmount: {
-    type: Number,
-    default: 0,
-  },
-  refundAmount: {
-    type: Number,
-    min: 0,
-  },
-  cancelledAmount: {
-    type: Number,
-    min: 0,
-  },
-
-  balance: {
-    type: Number,
-    min: 0,
-  },
+  feeType: { type: Schema.Types.ObjectId, ref: 'FeesType' },
+  paidAmount: { type: Number, min: 0 },
+  concessionAmount: { type: Number, default: 0 },
+  refundAmount: { type: Number, min: 0 },
+  cancelledAmount: { type: Number, min: 0 },
+  balance: { type: Number, min: 0 },
 });
+
+
+const onlineRefundDetailSchema = new Schema({
+  provider: { type: String, default: 'Easebuzz' },
+  merchant_refund_id: { type: String, required: true },
+
+  merchant_refund_id: { type: String, required: true },
+  easebuzz_id: { type: String, required: true },
+  refund_amount: { type: Number, required: true },
+
+
+
+  hash: String,
+  easebuzzResponse: Schema.Types.Mixed,
+  createdAt: { type: Date, default: Date.now },
+});
+
 
 const RefundSchema = new Schema(
   {
-    schoolId: {
-      type: String,
-      required: true,
-    },
-    existancereceiptNumber: {
-      type: String,
-      required: true,
-    },
-    academicYear: {
-      type: String,
-      required: true,
-    },
-    refundType: {
-      type: String,
-      required: true,
-    },
+    schoolId: { type: String, required: true },
+    existancereceiptNumber: { type: String, required: true },
+    academicYear: { type: String, required: true },
+    refundType: { type: String, required: true },
     registrationNumber: String,
     admissionNumber: String,
-    firstName: {
-      type: String,
-      required: true,
-    },
-    lastName: {
-      type: String,
-      required: true,
-    },
-    classId: {
-      type: Schema.Types.ObjectId,
-      ref: "Class",
-      required: true,
-    },
-    sectionId: {
-      type: Schema.Types.ObjectId,
-      ref: "ClassAndSection",
-    },
-    paidAmount: {
-      type: Number,
-      min: 0,
-    },
-    concessionAmount: {
-      type: Number,
-      default: 0,
-    },
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: true },
+    classId: { type: Schema.Types.ObjectId, ref: 'Class', required: true },
+    sectionId: { type: Schema.Types.ObjectId, ref: 'ClassAndSection' },
+    paidAmount: { type: Number, min: 0 },
+    concessionAmount: { type: Number, default: 0 },
     excessAmount: { type: Number, default: 0 },
     fineAmount: { type: Number, default: 0 },
-    refundAmount: {
-      type: Number,
-      min: 0,
-    },
-    cancelledAmount: {
-      type: Number,
-      min: 0,
-    },
-    balance: {
-      type: Number,
-      min: 0,
-    },
+    refundAmount: { type: Number, min: 0 },
+    cancelledAmount: { type: Number, min: 0 },
+    balance: { type: Number, min: 0 },
     feeTypeRefunds: [feeTypeRefundSchema],
-    installmentName: {
-      type: String,
-    },
-    paymentMode: {
-      type: String,
-      enum: ["Cash", "Cheque", "Online", null],
-    },
+    installmentName: String,
+    paymentMode: { type: String, enum: ['Cash', 'Cheque', 'Online', null] },
     chequeNumber: String,
     bankName: String,
     paymentDate: Date,
-    refundDate: {
-      type: Date,
-      default: Date.now,
-    },
+    refundDate: { type: Date, default: Date.now },
     receiptNumber: String,
     transactionNumber: String,
+    existanceTransactionnumber: String,
     status: {
       type: String,
-      enum: ["Cancelled", "Cheque Return", "Refund"],
+      enum: ['Cancelled', 'Cheque Return', 'Refund'],
       required: true,
     },
-    cancelledDate: {
-      type: Date,
-      default: Date.now,
-    },
-    cancelReason: { type: String },
-    chequeSpecificReason: { type: String },
-    additionalComment: { type: String },
+    cancelledDate: { type: Date, default: Date.now },
+    cancelReason: String,
+    chequeSpecificReason: String,
+    additionalComment: String,
+    onlineRefundDetails: [onlineRefundDetailSchema],
     isProcessedInFinance: {
       type: Boolean,
       default: false,
@@ -140,9 +92,13 @@ const RefundSchema = new Schema(
   { timestamps: true }
 );
 
+
 RefundSchema.index({ schoolId: 1, receiptNumber: 1 }, { unique: true });
 
-RefundSchema.pre("save", async function (next) {
+
+
+
+RefundSchema.pre('save', async function (next) {
   const maxTransactionRetries = 3;
   let attempts = 0;
 
@@ -160,14 +116,9 @@ RefundSchema.pre("save", async function (next) {
             const counter = await RefundCounter.findOneAndUpdate(
               { schoolId: this.schoolId },
               { $inc: { refundSeq: 1 } },
-              {
-                new: true,
-                upsert: true,
-                setDefaultsOnInsert: { refundSeq: 0 },
-                session,
-              }
+              { new: true, upsert: true, setDefaultsOnInsert: { refundSeq: 0 }, session }
             );
-            const padded = counter.refundSeq.toString().padStart(6, "0");
+            const padded = counter.refundSeq.toString().padStart(6, '0');
             this.receiptNumber = `CRN/${padded}`;
             break;
           } catch (err) {
@@ -180,64 +131,46 @@ RefundSchema.pre("save", async function (next) {
         }
 
         if (!this.receiptNumber) {
-          throw new Error(
-            "Failed to generate refund receiptNumber after maximum retries"
-          );
+          throw new Error('Failed to generate refund receiptNumber after maximum retries');
         }
       }
 
       let finalAmount = 0;
 
-      // Handle School Fees refund
-      if (this.refundType === "School Fees") {
+
+      if (this.refundType === 'School Fees') {
         const schoolFee = await SchoolFees.findOne({
           schoolId: this.schoolId,
           receiptNumber: this.existancereceiptNumber,
         }).session(session);
 
         if (!schoolFee) {
-          throw new Error(
-            `No School Fees payment found for receiptNumber ${this.existancereceiptNumber}`
-          );
+          throw new Error(`No School Fees payment found for receiptNumber ${this.existancereceiptNumber}`);
         }
 
         finalAmount = schoolFee.installments.reduce((sum, installment) => {
-          return (
-            sum +
-            installment.feeItems.reduce(
-              (itemSum, feeItem) => itemSum + (feeItem.paid || 0),
-              0
-            )
-          );
+          return sum + installment.feeItems.reduce((itemSum, feeItem) => itemSum + (feeItem.paid || 0), 0);
         }, 0);
 
-        if (["Cancelled", "Cheque Return"].includes(this.status)) {
-          const updatedInstallments = schoolFee.installments.map(
-            (installment) => {
-              const updatedFeeItems = installment.feeItems.map((feeItem) => {
-                const feeTypeRefund = this.feeTypeRefunds.find(
-                  (ftr) =>
-                    ftr.feeType.toString() === feeItem.feeTypeId.toString()
-                );
-                if (feeTypeRefund) {
-                  return {
-                    ...feeItem.toObject(),
-                    cancelledPaidAmount:
-                      (feeItem.cancelledPaidAmount || 0) +
-                      (feeTypeRefund.cancelledAmount || 0),
-                  };
-                }
-                return feeItem.toObject();
-              });
-              return { ...installment.toObject(), feeItems: updatedFeeItems };
-            }
-          );
+        if (['Cancelled', 'Cheque Return'].includes(this.status)) {
+          const updatedInstallments = schoolFee.installments.map((installment) => {
+            const updatedFeeItems = installment.feeItems.map((feeItem) => {
+              const feeTypeRefund = this.feeTypeRefunds.find(
+                (ftr) => ftr.feeType.toString() === feeItem.feeTypeId.toString()
+              );
+              if (feeTypeRefund) {
+                return {
+                  ...feeItem.toObject(),
+                  cancelledPaidAmount: (feeItem.cancelledPaidAmount || 0) + (feeTypeRefund.cancelledAmount || 0),
+                };
+              }
+              return feeItem.toObject();
+            });
+            return { ...installment.toObject(), feeItems: updatedFeeItems };
+          });
 
           await SchoolFees.findOneAndUpdate(
-            {
-              schoolId: this.schoolId,
-              receiptNumber: this.existancereceiptNumber,
-            },
+            { schoolId: this.schoolId, receiptNumber: this.existancereceiptNumber },
             {
               $set: {
                 installments: updatedInstallments,
@@ -252,43 +185,33 @@ RefundSchema.pre("save", async function (next) {
           );
         }
 
-        if (this.status === "Refund") {
-          const updatedInstallments = schoolFee.installments.map(
-            (installment) => {
-              const updatedFeeItems = installment.feeItems.map((feeItem) => {
-                const feeTypeRefund = this.feeTypeRefunds.find(
-                  (ftr) =>
-                    ftr.feeType.toString() === feeItem.feeTypeId.toString()
-                );
-                if (feeTypeRefund) {
-                  return {
-                    ...feeItem.toObject(),
-                    cancelledPaidAmount:
-                      (feeItem.cancelledPaidAmount || 0) +
-                      (feeTypeRefund.refundAmount || 0),
-                  };
-                }
-                return feeItem.toObject();
-              });
-              return { ...installment.toObject(), feeItems: updatedFeeItems };
-            }
-          );
+        if (this.status === 'Refund') {
+          const updatedInstallments = schoolFee.installments.map((installment) => {
+            const updatedFeeItems = installment.feeItems.map((feeItem) => {
+              const feeTypeRefund = this.feeTypeRefunds.find(
+                (ftr) => ftr.feeType.toString() === feeItem.feeTypeId.toString()
+              );
+              if (feeTypeRefund) {
+                return {
+                  ...feeItem.toObject(),
+                  cancelledPaidAmount: (feeItem.cancelledPaidAmount || 0) + (feeTypeRefund.refundAmount || 0),
+                };
+              }
+              return feeItem.toObject();
+            });
+            return { ...installment.toObject(), feeItems: updatedFeeItems };
+          });
 
-          const allRefunds = await mongoose
-            .model("Refund")
-            .find({
-              schoolId: this.schoolId,
-              existancereceiptNumber: this.existancereceiptNumber,
-              refundType: "School Fees",
-              status: "Refund",
-            })
-            .session(session);
+          const allRefunds = await mongoose.model('Refund').find({
+            schoolId: this.schoolId,
+            existancereceiptNumber: this.existancereceiptNumber,
+            refundType: 'School Fees',
+            status: 'Refund',
+          }).session(session);
 
           const totalRefundAmount =
-            allRefunds.reduce(
-              (sum, refund) => sum + (refund.refundAmount || 0),
-              0
-            ) + (this.refundAmount || 0);
+            allRefunds.reduce((sum, refund) => sum + (refund.refundAmount || 0), 0) +
+            (this.refundAmount || 0);
 
           if (totalRefundAmount > finalAmount) {
             throw new Error(
@@ -306,44 +229,33 @@ RefundSchema.pre("save", async function (next) {
             },
           };
 
-          if (
-            totalRefundAmount >= finalAmount &&
-            !schoolFee.reportStatus.includes("Refund")
-          ) {
-            updateFields.$addToSet.reportStatus = "Refund";
+          if (totalRefundAmount >= finalAmount && !schoolFee.reportStatus.includes('Refund')) {
+            updateFields.$addToSet.reportStatus = 'Refund';
           }
 
           await SchoolFees.findOneAndUpdate(
-            {
-              schoolId: this.schoolId,
-              receiptNumber: this.existancereceiptNumber,
-            },
+            { schoolId: this.schoolId, receiptNumber: this.existancereceiptNumber },
             updateFields,
             { new: true, session }
           );
         }
       }
 
-      // Handle Registration Fee refund
-      else if (this.refundType === "Registration Fee") {
+
+      else if (this.refundType === 'Registration Fee') {
         const registration = await RegistrationPayment.findOne({
           schoolId: this.schoolId,
           receiptNumber: this.existancereceiptNumber,
         }).session(session);
 
         if (!registration) {
-          throw new Error(
-            `No registration found for receiptNumber ${this.existancereceiptNumber}`
-          );
+          throw new Error(`No registration found for receiptNumber ${this.existancereceiptNumber}`);
         }
 
         finalAmount = registration.finalAmount;
 
         await RegistrationPayment.findOneAndUpdate(
-          {
-            schoolId: this.schoolId,
-            receiptNumber: this.existancereceiptNumber,
-          },
+          { schoolId: this.schoolId, receiptNumber: this.existancereceiptNumber },
           {
             $setOnInsert: { createdAt: new Date() },
             $set: { updatedAt: new Date() },
@@ -352,15 +264,9 @@ RefundSchema.pre("save", async function (next) {
           { new: true, session }
         );
 
-        if (
-          ["Cancelled", "Cheque Return"].includes(this.status) &&
-          !registration.reportStatus.includes(this.status)
-        ) {
+        if (['Cancelled', 'Cheque Return'].includes(this.status) && !registration.reportStatus.includes(this.status)) {
           await RegistrationPayment.findOneAndUpdate(
-            {
-              schoolId: this.schoolId,
-              receiptNumber: this.existancereceiptNumber,
-            },
+            { schoolId: this.schoolId, receiptNumber: this.existancereceiptNumber },
             {
               $setOnInsert: { createdAt: new Date() },
               $set: { updatedAt: new Date() },
@@ -370,42 +276,28 @@ RefundSchema.pre("save", async function (next) {
           );
         }
 
-        if (this.status === "Refund") {
-          const allRefunds = await mongoose
-            .model("Refund")
-            .find({
-              schoolId: this.schoolId,
-              existancereceiptNumber: this.existancereceiptNumber,
-              refundType: "Registration Fee",
-              status: "Refund",
-            })
-            .session(session);
+        if (this.status === 'Refund') {
+          const allRefunds = await mongoose.model('Refund').find({
+            schoolId: this.schoolId,
+            existancereceiptNumber: this.existancereceiptNumber,
+            refundType: 'Registration Fee',
+            status: 'Refund',
+          }).session(session);
 
           const totalRefundAmount =
-            allRefunds.reduce(
-              (sum, refund) => sum + (refund.refundAmount || 0),
-              0
-            ) + this.refundAmount;
+            allRefunds.reduce((sum, refund) => sum + (refund.refundAmount || 0), 0) + this.refundAmount;
 
           if (totalRefundAmount > registration.finalAmount) {
-            throw new Error(
-              "Total refund amount cannot exceed paid amount for registration"
-            );
+            throw new Error('Total refund amount cannot exceed paid amount for registration');
           }
 
-          if (
-            totalRefundAmount >= registration.finalAmount &&
-            !registration.reportStatus.includes("Refund")
-          ) {
+          if (totalRefundAmount >= registration.finalAmount && !registration.reportStatus.includes('Refund')) {
             await RegistrationPayment.findOneAndUpdate(
-              {
-                schoolId: this.schoolId,
-                receiptNumber: this.existancereceiptNumber,
-              },
+              { schoolId: this.schoolId, receiptNumber: this.existancereceiptNumber },
               {
                 $setOnInsert: { createdAt: new Date() },
                 $set: { updatedAt: new Date() },
-                $addToSet: { reportStatus: "Refund" },
+                $addToSet: { reportStatus: 'Refund' },
               },
               { new: true, session }
             );
@@ -413,26 +305,21 @@ RefundSchema.pre("save", async function (next) {
         }
       }
 
-      // Handle Transfer Certificate Fee refund
-      else if (this.refundType === "Transfer Certificate Fee") {
+
+      else if (this.refundType === 'Transfer Certificate Fee') {
         const tcForm = await TCPayment.findOne({
           schoolId: this.schoolId,
           receiptNumber: this.existancereceiptNumber,
         }).session(session);
 
         if (!tcForm) {
-          throw new Error(
-            `No Transfer Certificate Fee form found for receiptNumber ${this.existancereceiptNumber}`
-          );
+          throw new Error(`No Transfer Certificate Fee form found for receiptNumber ${this.existancereceiptNumber}`);
         }
 
         finalAmount = tcForm.finalAmount;
 
         await TCPayment.findOneAndUpdate(
-          {
-            schoolId: this.schoolId,
-            receiptNumber: this.existancereceiptNumber,
-          },
+          { schoolId: this.schoolId, receiptNumber: this.existancereceiptNumber },
           {
             $setOnInsert: { createdAt: new Date() },
             $set: { updatedAt: new Date() },
@@ -441,15 +328,9 @@ RefundSchema.pre("save", async function (next) {
           { new: true, session }
         );
 
-        if (
-          ["Cancelled", "Cheque Return"].includes(this.status) &&
-          !tcForm.reportStatus.includes(this.status)
-        ) {
+        if (['Cancelled', 'Cheque Return'].includes(this.status) && !tcForm.reportStatus.includes(this.status)) {
           await TCPayment.findOneAndUpdate(
-            {
-              schoolId: this.schoolId,
-              receiptNumber: this.existancereceiptNumber,
-            },
+            { schoolId: this.schoolId, receiptNumber: this.existancereceiptNumber },
             {
               $setOnInsert: { createdAt: new Date() },
               $set: { updatedAt: new Date() },
@@ -459,42 +340,28 @@ RefundSchema.pre("save", async function (next) {
           );
         }
 
-        if (this.status === "Refund") {
-          const allRefunds = await mongoose
-            .model("Refund")
-            .find({
-              schoolId: this.schoolId,
-              existancereceiptNumber: this.existancereceiptNumber,
-              refundType: "Transfer Certificate Fee",
-              status: "Refund",
-            })
-            .session(session);
+        if (this.status === 'Refund') {
+          const allRefunds = await mongoose.model('Refund').find({
+            schoolId: this.schoolId,
+            existancereceiptNumber: this.existancereceiptNumber,
+            refundType: 'Transfer Certificate Fee',
+            status: 'Refund',
+          }).session(session);
 
           const totalRefundAmount =
-            allRefunds.reduce(
-              (sum, refund) => sum + (refund.refundAmount || 0),
-              0
-            ) + this.refundAmount;
+            allRefunds.reduce((sum, refund) => sum + (refund.refundAmount || 0), 0) + this.refundAmount;
 
           if (totalRefundAmount > tcForm.finalAmount) {
-            throw new Error(
-              "Total refund amount cannot exceed paid amount for TC"
-            );
+            throw new Error('Total refund amount cannot exceed paid amount for TC');
           }
 
-          if (
-            totalRefundAmount >= tcForm.finalAmount &&
-            !tcForm.reportStatus.includes("Refund")
-          ) {
+          if (totalRefundAmount >= tcForm.finalAmount && !tcForm.reportStatus.includes('Refund')) {
             await TCPayment.findOneAndUpdate(
-              {
-                schoolId: this.schoolId,
-                receiptNumber: this.existancereceiptNumber,
-              },
+              { schoolId: this.schoolId, receiptNumber: this.existancereceiptNumber },
               {
                 $setOnInsert: { createdAt: new Date() },
                 $set: { updatedAt: new Date() },
-                $addToSet: { reportStatus: "Refund" },
+                $addToSet: { reportStatus: 'Refund' },
               },
               { new: true, session }
             );
@@ -502,26 +369,21 @@ RefundSchema.pre("save", async function (next) {
         }
       }
 
-      // Handle Admission Fee refund
-      else if (this.refundType === "Admission Fee") {
+
+      else if (this.refundType === 'Admission Fee') {
         const admission = await AdmissionPayment.findOne({
           schoolId: this.schoolId,
           receiptNumber: this.existancereceiptNumber,
         }).session(session);
 
         if (!admission) {
-          throw new Error(
-            `No admission form found for receiptNumber ${this.existancereceiptNumber}`
-          );
+          throw new Error(`No admission form found for receiptNumber ${this.existancereceiptNumber}`);
         }
 
         finalAmount = admission.finalAmount;
 
         await AdmissionPayment.findOneAndUpdate(
-          {
-            schoolId: this.schoolId,
-            receiptNumber: this.existancereceiptNumber,
-          },
+          { schoolId: this.schoolId, receiptNumber: this.existancereceiptNumber },
           {
             $setOnInsert: { createdAt: new Date() },
             $set: { updatedAt: new Date() },
@@ -531,10 +393,7 @@ RefundSchema.pre("save", async function (next) {
         );
 
         await AdmissionCopy.findOneAndUpdate(
-          {
-            schoolId: this.schoolId,
-            receiptNumber: this.existancereceiptNumber,
-          },
+          { schoolId: this.schoolId, receiptNumber: this.existancereceiptNumber },
           {
             $setOnInsert: { createdAt: new Date() },
             $set: { updatedAt: new Date() },
@@ -543,15 +402,9 @@ RefundSchema.pre("save", async function (next) {
           { new: true, session }
         );
 
-        if (
-          ["Cancelled", "Cheque Return"].includes(this.status) &&
-          !admission.reportStatus.includes(this.status)
-        ) {
+        if (['Cancelled', 'Cheque Return'].includes(this.status) && !admission.reportStatus.includes(this.status)) {
           await AdmissionPayment.findOneAndUpdate(
-            {
-              schoolId: this.schoolId,
-              receiptNumber: this.existancereceiptNumber,
-            },
+            { schoolId: this.schoolId, receiptNumber: this.existancereceiptNumber },
             {
               $setOnInsert: { createdAt: new Date() },
               $set: { updatedAt: new Date() },
@@ -561,10 +414,7 @@ RefundSchema.pre("save", async function (next) {
           );
 
           await AdmissionCopy.findOneAndUpdate(
-            {
-              schoolId: this.schoolId,
-              receiptNumber: this.existancereceiptNumber,
-            },
+            { schoolId: this.schoolId, receiptNumber: this.existancereceiptNumber },
             {
               $setOnInsert: { createdAt: new Date() },
               $set: { updatedAt: new Date() },
@@ -574,55 +424,38 @@ RefundSchema.pre("save", async function (next) {
           );
         }
 
-        if (this.status === "Refund") {
-          const allRefunds = await mongoose
-            .model("Refund")
-            .find({
-              schoolId: this.schoolId,
-              existancereceiptNumber: this.existancereceiptNumber,
-              refundType: "Admission Fee",
-              status: "Refund",
-            })
-            .session(session);
+        if (this.status === 'Refund') {
+          const allRefunds = await mongoose.model('Refund').find({
+            schoolId: this.schoolId,
+            existancereceiptNumber: this.existancereceiptNumber,
+            refundType: 'Admission Fee',
+            status: 'Refund',
+          }).session(session);
 
           const totalRefundAmount =
-            allRefunds.reduce(
-              (sum, refund) => sum + (refund.refundAmount || 0),
-              0
-            ) + this.refundAmount;
+            allRefunds.reduce((sum, refund) => sum + (refund.refundAmount || 0), 0) + this.refundAmount;
 
           if (totalRefundAmount > admission.finalAmount) {
-            throw new Error(
-              "Total refund amount cannot exceed paid amount for admission"
-            );
+            throw new Error('Total refund amount cannot exceed paid amount for admission');
           }
 
-          if (
-            totalRefundAmount >= admission.finalAmount &&
-            !admission.reportStatus.includes("Refund")
-          ) {
+          if (totalRefundAmount >= admission.finalAmount && !admission.reportStatus.includes('Refund')) {
             await AdmissionPayment.findOneAndUpdate(
-              {
-                schoolId: this.schoolId,
-                receiptNumber: this.existancereceiptNumber,
-              },
+              { schoolId: this.schoolId, receiptNumber: this.existancereceiptNumber },
               {
                 $setOnInsert: { createdAt: new Date() },
                 $set: { updatedAt: new Date() },
-                $addToSet: { reportStatus: "Refund" },
+                $addToSet: { reportStatus: 'Refund' },
               },
               { new: true, session }
             );
 
             await AdmissionCopy.findOneAndUpdate(
-              {
-                schoolId: this.schoolId,
-                receiptNumber: this.existancereceiptNumber,
-              },
+              { schoolId: this.schoolId, receiptNumber: this.existancereceiptNumber },
               {
                 $setOnInsert: { createdAt: new Date() },
                 $set: { updatedAt: new Date() },
-                $addToSet: { reportStatus: "Refund" },
+                $addToSet: { reportStatus: 'Refund' },
               },
               { new: true, session }
             );
@@ -630,26 +463,21 @@ RefundSchema.pre("save", async function (next) {
         }
       }
 
-      // Handle Board Exam Fee refund
-      else if (this.refundType === "Board Exam Fee") {
+
+      else if (this.refundType === 'Board Exam Fee') {
         const boardExamFee = await BoardExamFeePayment.findOne({
           schoolId: this.schoolId,
           receiptNumberBef: this.existancereceiptNumber,
         }).session(session);
 
         if (!boardExamFee) {
-          throw new Error(
-            `No board exam fee payment found for receiptNumber ${this.existancereceiptNumber}`
-          );
+          throw new Error(`No board exam fee payment found for receiptNumber ${this.existancereceiptNumber}`);
         }
 
         finalAmount = boardExamFee.amount;
 
         await BoardExamFeePayment.findOneAndUpdate(
-          {
-            schoolId: this.schoolId,
-            receiptNumberBef: this.existancereceiptNumber,
-          },
+          { schoolId: this.schoolId, receiptNumberBef: this.existancereceiptNumber },
           {
             $setOnInsert: { createdAt: new Date() },
             $set: { updatedAt: new Date() },
@@ -658,15 +486,9 @@ RefundSchema.pre("save", async function (next) {
           { new: true, session }
         );
 
-        if (
-          ["Cancelled", "Cheque Return"].includes(this.status) &&
-          !boardExamFee.reportStatus.includes(this.status)
-        ) {
+        if (['Cancelled', 'Cheque Return'].includes(this.status) && !boardExamFee.reportStatus.includes(this.status)) {
           await BoardExamFeePayment.findOneAndUpdate(
-            {
-              schoolId: this.schoolId,
-              receiptNumberBef: this.existancereceiptNumber,
-            },
+            { schoolId: this.schoolId, receiptNumberBef: this.existancereceiptNumber },
             {
               $setOnInsert: { createdAt: new Date() },
               $set: { updatedAt: new Date() },
@@ -676,42 +498,28 @@ RefundSchema.pre("save", async function (next) {
           );
         }
 
-        if (this.status === "Refund") {
-          const allRefunds = await mongoose
-            .model("Refund")
-            .find({
-              schoolId: this.schoolId,
-              existancereceiptNumber: this.existancereceiptNumber,
-              refundType: "Board Exam Fee",
-              status: "Refund",
-            })
-            .session(session);
+        if (this.status === 'Refund') {
+          const allRefunds = await mongoose.model('Refund').find({
+            schoolId: this.schoolId,
+            existancereceiptNumber: this.existancereceiptNumber,
+            refundType: 'Board Exam Fee',
+            status: 'Refund',
+          }).session(session);
 
           const totalRefundAmount =
-            allRefunds.reduce(
-              (sum, refund) => sum + (refund.refundAmount || 0),
-              0
-            ) + this.refundAmount;
+            allRefunds.reduce((sum, refund) => sum + (refund.refundAmount || 0), 0) + this.refundAmount;
 
           if (totalRefundAmount > boardExamFee.amount) {
-            throw new Error(
-              "Total refund amount cannot exceed paid amount for board exam fee"
-            );
+            throw new Error('Total refund amount cannot exceed paid amount for board exam fee');
           }
 
-          if (
-            totalRefundAmount >= boardExamFee.amount &&
-            !boardExamFee.reportStatus.includes("Refund")
-          ) {
+          if (totalRefundAmount >= boardExamFee.amount && !boardExamFee.reportStatus.includes('Refund')) {
             await BoardExamFeePayment.findOneAndUpdate(
-              {
-                schoolId: this.schoolId,
-                receiptNumberBef: this.existancereceiptNumber,
-              },
+              { schoolId: this.schoolId, receiptNumberBef: this.existancereceiptNumber },
               {
                 $setOnInsert: { createdAt: new Date() },
                 $set: { updatedAt: new Date() },
-                $addToSet: { reportStatus: "Refund" },
+                $addToSet: { reportStatus: 'Refund' },
               },
               { new: true, session }
             );
@@ -719,26 +527,21 @@ RefundSchema.pre("save", async function (next) {
         }
       }
 
-      // Handle Board Registration Fee refund
-      else if (this.refundType === "Board Registration Fee") {
+
+      else if (this.refundType === 'Board Registration Fee') {
         const boardRegistrationFee = await BoardRegistrationFeePayment.findOne({
           schoolId: this.schoolId,
           receiptNumberBrf: this.existancereceiptNumber,
         }).session(session);
 
         if (!boardRegistrationFee) {
-          throw new Error(
-            `No board registration fee payment found for receiptNumber ${this.existancereceiptNumber}`
-          );
+          throw new Error(`No board registration fee payment found for receiptNumber ${this.existancereceiptNumber}`);
         }
 
         finalAmount = boardRegistrationFee.amount;
 
         await BoardRegistrationFeePayment.findOneAndUpdate(
-          {
-            schoolId: this.schoolId,
-            receiptNumberBrf: this.existancereceiptNumber,
-          },
+          { schoolId: this.schoolId, receiptNumberBrf: this.existancereceiptNumber },
           {
             $setOnInsert: { createdAt: new Date() },
             $set: { updatedAt: new Date() },
@@ -747,15 +550,9 @@ RefundSchema.pre("save", async function (next) {
           { new: true, session }
         );
 
-        if (
-          ["Cancelled", "Cheque Return"].includes(this.status) &&
-          !boardRegistrationFee.reportStatus.includes(this.status)
-        ) {
+        if (['Cancelled', 'Cheque Return'].includes(this.status) && !boardRegistrationFee.reportStatus.includes(this.status)) {
           await BoardRegistrationFeePayment.findOneAndUpdate(
-            {
-              schoolId: this.schoolId,
-              receiptNumberBrf: this.existancereceiptNumber,
-            },
+            { schoolId: this.schoolId, receiptNumberBrf: this.existancereceiptNumber },
             {
               $setOnInsert: { createdAt: new Date() },
               $set: { updatedAt: new Date() },
@@ -765,42 +562,28 @@ RefundSchema.pre("save", async function (next) {
           );
         }
 
-        if (this.status === "Refund") {
-          const allRefunds = await mongoose
-            .model("Refund")
-            .find({
-              schoolId: this.schoolId,
-              existancereceiptNumber: this.existancereceiptNumber,
-              refundType: "Board Registration Fee",
-              status: "Refund",
-            })
-            .session(session);
+        if (this.status === 'Refund') {
+          const allRefunds = await mongoose.model('Refund').find({
+            schoolId: this.schoolId,
+            existancereceiptNumber: this.existancereceiptNumber,
+            refundType: 'Board Registration Fee',
+            status: 'Refund',
+          }).session(session);
 
           const totalRefundAmount =
-            allRefunds.reduce(
-              (sum, refund) => sum + (refund.refundAmount || 0),
-              0
-            ) + this.refundAmount;
+            allRefunds.reduce((sum, refund) => sum + (refund.refundAmount || 0), 0) + this.refundAmount;
 
           if (totalRefundAmount > boardRegistrationFee.amount) {
-            throw new Error(
-              "Total refund amount cannot exceed paid amount for board registration fee"
-            );
+            throw new Error('Total refund amount cannot exceed paid amount for board registration fee');
           }
 
-          if (
-            totalRefundAmount >= boardRegistrationFee.amount &&
-            !boardRegistrationFee.reportStatus.includes("Refund")
-          ) {
+          if (totalRefundAmount >= boardRegistrationFee.amount && !boardRegistrationFee.reportStatus.includes('Refund')) {
             await BoardRegistrationFeePayment.findOneAndUpdate(
-              {
-                schoolId: this.schoolId,
-                receiptNumberBrf: this.existancereceiptNumber,
-              },
+              { schoolId: this.schoolId, receiptNumberBrf: this.existancereceiptNumber },
               {
                 $setOnInsert: { createdAt: new Date() },
                 $set: { updatedAt: new Date() },
-                $addToSet: { reportStatus: "Refund" },
+                $addToSet: { reportStatus: 'Refund' },
               },
               { new: true, session }
             );
@@ -811,29 +594,19 @@ RefundSchema.pre("save", async function (next) {
       }
 
       if (this.balance < 0) {
-        throw new Error("Balance cannot be negative");
+        throw new Error('Balance cannot be negative');
       }
 
-      if (this.paymentMode === "Online" && !this.transactionNumber) {
-        this.transactionNumber = `TRA${Math.floor(
-          10000 + Math.random() * 90000
-        )}`;
+      if (this.paymentMode === 'Online' && !this.transactionNumber) {
+        this.transactionNumber = `TRA${Math.floor(10000 + Math.random() * 90000)}`;
       }
 
-      if (
-        (this.paymentMode === "Cash" || this.paymentMode === "Cheque") &&
-        !this.paymentDate
-      ) {
+      if ((this.paymentMode === 'Cash' || this.paymentMode === 'Cheque') && !this.paymentDate) {
         this.paymentDate = new Date();
       }
 
-      if (
-        this.paymentMode === "Cheque" &&
-        (!this.chequeNumber || !this.bankName)
-      ) {
-        throw new Error(
-          "Cheque Number and Bank Name are required for Cheque payment"
-        );
+      if (this.paymentMode === 'Cheque' && (!this.chequeNumber || !this.bankName)) {
+        throw new Error('Cheque Number and Bank Name are required for Cheque payment');
       }
 
       await session.commitTransaction();
@@ -843,19 +616,13 @@ RefundSchema.pre("save", async function (next) {
       await session.abortTransaction();
       session.endSession();
       attempts++;
-      if (err.code === 112 || err.message.includes("Write conflict")) {
+      if (err.code === 112 || err.message.includes('Write conflict')) {
         if (attempts < maxTransactionRetries) {
-          console.log(
-            `Retrying transaction (attempt ${
-              attempts + 1
-            }) due to write conflict`
-          );
+          console.log(`Retrying transaction (attempt ${attempts + 1}) due to write conflict`);
           continue;
         }
         return next(
-          new Error(
-            `Failed to save refund request after ${maxTransactionRetries} retries: ${err.message}`
-          )
+          new Error(`Failed to save refund request after ${maxTransactionRetries} retries: ${err.message}`)
         );
       }
       return next(new Error(`Failed to save refund request: ${err.message}`));
@@ -863,4 +630,6 @@ RefundSchema.pre("save", async function (next) {
   }
 });
 
-export default mongoose.model("Refund", RefundSchema);
+export default mongoose.model('Refund', RefundSchema);
+
+

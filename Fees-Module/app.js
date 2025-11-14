@@ -7,6 +7,7 @@ import connectDB from "./config/db.js";
 import routes from "./routes/index.js";
 import configureServer from "../shared/config/server-config.js";
 
+// Nikita's code start
 import { startDailyScheduler } from "../Fees-Module/controllers/Inter-Service-Communication/DailyBatchScheduler.js";
 import { startDailyRefundScheduler } from "../Fees-Module/controllers/Inter-Service-Communication/DailyBatchRefundScheduler.js";
 
@@ -34,6 +35,9 @@ app.get("/health", (req, res) => {
 
 // Start server
 const PORT = process.env.FEES_MODULE_PORT;
+
+
+// Nikita's code start
 
 startDailyScheduler();
 startDailyRefundScheduler();

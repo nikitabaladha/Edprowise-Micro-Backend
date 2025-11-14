@@ -6,22 +6,28 @@ import {
   getSchoolFees,
   getSchoolFeesStatus,
   getSchoolFeesStatusbyadm,
+
+
   getAdmissionForms,
   createBoardRegistrationFeesPayment,
   getboardregsitartionstatus,
+
   getAdmissionFormsBordExam,
   createBoardExamFeesPayment,
   getboardexamstatus,
+
   getrefunddata,
   createrefund,
   getcreaterefund,
   deleterefund,
   getreaminbalance,
   getrefunddataforledger,
+
   updateboardexamstatus,
   updateboardregsiatrtionstatus,
   updateschoolfeesstatus,
   updatestatusbyadmno,
+
   getschoolfeesreceiptbyschholidandreceiptno,
   getSchoolFeesforreceipt,
   getboardregistartiondata,
@@ -31,8 +37,12 @@ import {
   getrefundandcancelledbyreceiptnumber,
   getCRNbyreceiptnumber,
   getregistrationreceiptbyschholidandreceiptno,
-  getexamreceiptbyschholidandreceiptno,
+  getexamreceiptbyschholidandreceiptno
+
+
 } from "../controllers/FeeReceipts/index.js";
+
+
 
 const router = express.Router();
 
@@ -73,7 +83,7 @@ router.get(
 router.get(
   "/get-school-fees-receipts",
   roleBasedMiddleware("Admin", "School"),
-  getSchoolFeesforreceipt
+    getSchoolFeesforreceipt
 );
 
 router.get(
@@ -81,6 +91,8 @@ router.get(
   roleBasedMiddleware("Admin", "School"),
   getschoolfeesreceiptbyschholidandreceiptno
 );
+
+
 
 //----------------------BoardRegistrationFees--------------------//
 
@@ -122,7 +134,7 @@ router.delete(
 router.get(
   "/get-board-registration-payment-data/:schoolId/:receiptNumberBrf(.+)",
   roleBasedMiddleware("Admin", "School"),
-  getregistrationreceiptbyschholidandreceiptno
+   getregistrationreceiptbyschholidandreceiptno
 );
 
 //----------------------BoardExamFees--------------------//
@@ -130,13 +142,13 @@ router.get(
 router.get(
   "/admission-forms-board-exam/:schoolId/:academicYear/:masterDefineClass/:section",
   roleBasedMiddleware("Admin", "School"),
-  getAdmissionFormsBordExam
+  getAdmissionFormsBordExam,
 );
 
 router.get(
   "/get-board-exam-fee-payments/:schoolId/:academicYear",
   roleBasedMiddleware("Admin", "School"),
-  getboardexamdata
+   getboardexamdata
 );
 
 router.post(
@@ -164,8 +176,9 @@ router.delete(
 router.get(
   "/get-board-exam-payment-data/:schoolId/:receiptNumberBef(.+)",
   roleBasedMiddleware("Admin", "School"),
-  getexamreceiptbyschholidandreceiptno
+   getexamreceiptbyschholidandreceiptno
 );
+
 
 //----------------------Refund-------------------//
 
@@ -178,8 +191,10 @@ router.get(
 router.get(
   "/get-all-fees-refund-ledeger/:schoolId/:academicYear",
   roleBasedMiddleware("Admin", "School"),
-  getrefunddataforledger
+getrefunddataforledger
 );
+
+
 
 router.post(
   "/create-cancelled-refund",
@@ -207,13 +222,14 @@ router.get(
 router.get(
   "/get-all-cancelled-refund/:schoolId/:existancereceiptNumber(.+)",
   roleBasedMiddleware("Admin", "School"),
-  getrefundandcancelledbyreceiptnumber
+ getrefundandcancelledbyreceiptnumber
 );
 
 router.get(
   "/get-all-crn-no/:schoolId/:receiptNumber(.+)",
   roleBasedMiddleware("Admin", "School"),
-  getCRNbyreceiptnumber
+   getCRNbyreceiptnumber
 );
+
 
 export default router;

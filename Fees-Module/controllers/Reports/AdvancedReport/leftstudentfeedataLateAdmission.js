@@ -12,8 +12,8 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
   session.startTransaction();
 
   try {
-    const { schoolId, academicYear, classes, sections, installment } =
-      req.query;
+    const { schoolId, academicYear, classes, sections, installment } = req.query;
+
 
     if (!schoolId || !academicYear) {
       await session.abortTransaction();
@@ -25,6 +25,7 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
 
     const today = new Date();
 
+
     const students = await AdmissionForm.find({ schoolId, academicYear })
       .lean()
       .session(session);
@@ -32,15 +33,11 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
     if (!students.length) {
       await session.abortTransaction();
       session.endSession();
-      return res
-        .status(404)
-        .json({ message: "No students found for the school" });
+      return res.status(404).json({ message: "No students found for the school" });
     }
 
-    const classAndSections = await ClassAndSection.find({
-      schoolId,
-      academicYear,
-    })
+
+    const classAndSections = await ClassAndSection.find({ schoolId, academicYear })
       .lean()
       .session(session);
 
@@ -56,17 +53,15 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
       });
     });
 
+
     const filteredClassIds = classes
-      ? Object.keys(classMap).filter((id) =>
-          classes.split(",").includes(classMap[id])
-        )
+      ? Object.keys(classMap).filter((id) => classes.split(',').includes(classMap[id]))
       : Object.keys(classMap);
 
     const filteredSectionIds = sections
-      ? Object.keys(sectionMap).filter((id) =>
-          sections.split(",").includes(sectionMap[id])
-        )
+      ? Object.keys(sectionMap).filter((id) => sections.split(',').includes(sectionMap[id]))
       : Object.keys(sectionMap);
+
 
     const feeTypes = await FeesType.find({ schoolId, academicYear })
       .lean()
@@ -84,6 +79,7 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
 
     const result = [];
 
+
     for (const student of students) {
       const admissionNumber = student.AdmissionNumber;
       const academicHistory = student.academicHistory?.find(
@@ -94,12 +90,14 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
 
       const { masterDefineClass, section } = academicHistory;
 
+ 
       if (
         !filteredClassIds.includes(masterDefineClass.toString()) ||
         !filteredSectionIds.includes(section.toString())
       ) {
         continue;
       }
+
 
       const feesStructures = await FeesStructure.find({
         schoolId,
@@ -112,6 +110,7 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
 
       if (!feesStructures.length) continue;
 
+ 
       const allPaidFeesData = await SchoolFees.find({
         schoolId,
         studentAdmissionNumber: admissionNumber,
@@ -120,25 +119,28 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
         .lean()
         .session(session);
 
+
       const firstAdmissionPayment = await AdmissionPayment.findOne({
         studentId: student._id,
         schoolId,
         academicYear,
-        status: "Paid",
+        status: 'Paid',
       })
         .sort({ paymentDate: 1 })
         .lean()
         .session(session);
 
+
       const refunds = await Refund.find({
         schoolId,
         admissionNumber,
         academicYear,
-        refundType: "School Fees",
-        status: { $in: ["Refund", "Cancelled", "Cheque Return"] },
+        refundType: 'School Fees',
+        status: { $in: ['Refund', 'Cancelled', 'Cheque Return'] },
       })
         .lean()
         .session(session);
+
 
       const paymentsByInstallment = allPaidFeesData
         .flatMap((payment) =>
@@ -156,10 +158,9 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
           return acc;
         }, {});
 
+
       const allInstallments = feesStructures.flatMap((s) => s.installments);
-      const uniqueInstallmentNames = [
-        ...new Set(allInstallments.map((i) => i.name)),
-      ];
+      const uniqueInstallmentNames = [...new Set(allInstallments.map((i) => i.name))];
 
       const sortedInstallments = uniqueInstallmentNames.sort((a, b) => {
         const dueA = allInstallments.find((i) => i.name === a)?.dueDate;
@@ -167,20 +168,16 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
         return dueA && dueB ? new Date(dueA) - new Date(dueB) : 0;
       });
 
-      const targetInstallments = installment
-        ? [installment]
-        : sortedInstallments;
+      const targetInstallments = installment ? [installment] : sortedInstallments;
 
+   
       let firstFullyPaidIndex = -1;
       for (let i = 0; i < sortedInstallments.length; i++) {
         const instName = sortedInstallments[i];
         const structureInst = allInstallments.find((i) => i.name === instName);
         if (!structureInst) continue;
 
-        let totalDue = 0,
-          totalPaid = 0,
-          totalConcession = 0,
-          totalRefund = 0;
+        let totalDue = 0, totalPaid = 0, totalConcession = 0, totalRefund = 0;
 
         for (const fee of structureInst.fees) totalDue += fee.amount || 0;
 
@@ -227,14 +224,11 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
         if (!structureInst || !structureInst.dueDate) continue;
 
         let feeTypeDetails = [];
-        let totalFeesDue = 0,
-          totalFeesPaid = 0,
-          totalConcession = 0;
+        let totalFeesDue = 0, totalFeesPaid = 0, totalConcession = 0;
 
         // Initialize fee types
         for (const fee of structureInst.fees) {
-          const feeTypeName =
-            feeTypeMap[fee.feesTypeId?.toString()] || "Unknown";
+          const feeTypeName = feeTypeMap[fee.feesTypeId?.toString()] || "Unknown";
           feeTypeDetails.push({
             feeType: feeTypeName,
             dueAmount: fee.amount || 0,
@@ -251,8 +245,7 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
         const payments = paymentsByInstallment[instName] || [];
         for (const p of payments) {
           for (const item of p.feeItems) {
-            const feeTypeName =
-              feeTypeMap[item.feesTypeId?.toString()] || "Unknown";
+            const feeTypeName = feeTypeMap[item.feesTypeId?.toString()] || "Unknown";
             const ft = feeTypeDetails.find((f) => f.feeType === feeTypeName);
             if (ft) {
               ft.paidAmount += item.paid || 0;
@@ -271,15 +264,13 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
         for (const r of relevantRefunds) {
           const refundItems = r.installmentName
             ? [{ ...r, feesTypeId: null }]
-            : r.feeTypeRefunds || [];
+            : (r.feeTypeRefunds || []);
 
           for (const item of refundItems) {
-            const feeTypeName =
-              feeTypeMap[item.feesTypeId?.toString()] || "Unknown";
+            const feeTypeName = feeTypeMap[item.feesTypeId?.toString()] || "Unknown";
             const ft = feeTypeDetails.find((f) => f.feeType === feeTypeName);
             if (ft) {
-              ft.refundAmount +=
-                (item.refundAmount || 0) + (item.cancelledAmount || 0);
+              ft.refundAmount += (item.refundAmount || 0) + (item.cancelledAmount || 0);
               ft.refundConcession += item.concessionAmount || 0;
             }
           }
@@ -289,7 +280,7 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
         for (const ft of feeTypeDetails) {
           ft.paidAmount = Math.max(0, ft.paidAmount - ft.refundAmount);
           ft.concession = Math.max(0, ft.concession - ft.refundConcession);
-          ft.balance = ft.dueAmount - ft.concession - ft.paidAmount;
+          ft.balance = (ft.dueAmount - ft.concession) - ft.paidAmount;
           totalFeesPaid += ft.paidAmount;
           totalConcession += ft.concession;
         }
@@ -327,25 +318,18 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
           acc.totalBalance += inst.balance;
           return acc;
         },
-        {
-          totalFeesDue: 0,
-          totalFeesPaid: 0,
-          totalConcession: 0,
-          totalBalance: 0,
-        }
+        { totalFeesDue: 0, totalFeesPaid: 0, totalConcession: 0, totalBalance: 0 }
       );
 
       result.push({
         admissionNumber,
-        studentName: `${student.firstName} ${student.lastName || ""}`.trim(),
+        studentName: `${student.firstName} ${student.lastName || ''}`.trim(),
         className: classMap[masterDefineClass] || masterDefineClass,
         sectionName: sectionMap[section] || section,
         academicYear,
-        TCStatus: student.TCStatus || "Active",
+        TCStatus: student.TCStatus || 'Active',
         admissionPaymentDate: firstAdmissionPayment
-          ? new Date(firstAdmissionPayment.paymentDate).toLocaleDateString(
-              "en-GB"
-            )
+          ? new Date(firstAdmissionPayment.paymentDate).toLocaleDateString("en-GB")
           : null,
         installments: unpaidInstallments,
         totals,
@@ -357,39 +341,28 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
       await session.abortTransaction();
       session.endSession();
       return res.status(404).json({
-        message:
-          "No students found with unpaid/partially paid earlier installments",
+        message: "No students found with unpaid/partially paid earlier installments",
       });
     }
 
     // Filter Options
-    const classOptions = Array.from(new Set(Object.values(classMap))).map(
-      (name) => ({
-        value: name,
-        label: name,
-      })
-    );
+    const classOptions = Array.from(new Set(Object.values(classMap))).map((name) => ({
+      value: name,
+      label: name,
+    }));
 
-    const sectionOptions = Array.from(new Set(Object.values(sectionMap))).map(
-      (name) => ({
-        value: name,
-        label: name,
-      })
-    );
+    const sectionOptions = Array.from(new Set(Object.values(sectionMap))).map((name) => ({
+      value: name,
+      label: name,
+    }));
 
     const installmentOptions = Array.from(
-      new Set(
-        result.flatMap((r) => r.installments.map((i) => i.installmentName))
-      )
+      new Set(result.flatMap((r) => r.installments.map((i) => i.installmentName)))
     ).map((name) => ({ value: name, label: name }));
 
     const paymentModeOptions = Array.from(
       new Set(
-        (
-          await SchoolFees.find({ schoolId, academicYear })
-            .lean()
-            .session(session)
-        )
+        (await SchoolFees.find({ schoolId, academicYear }).lean().session(session))
           .map((f) => f.paymentMode)
           .filter(Boolean)
       )
@@ -413,9 +386,7 @@ export const LateAdmissionUnpaidEarlierInstallments = async (req, res) => {
     console.error("Error in LateAdmissionUnpaidEarlierInstallments:", error);
     await session.abortTransaction();
     session.endSession();
-    return res
-      .status(500)
-      .json({ message: "Server error", error: error.message });
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 

@@ -5,6 +5,8 @@ import { admissionFileUpload } from "../UploadFiles/AdmissionForm.js";
 import { concessionFileUpload } from "../UploadFiles/Concession.js";
 import { tcFileUpload } from "../UploadFiles/TCForm.js";
 
+
+
 import {
   createRegistrationForm,
   getRegistrationsBySchoolId,
@@ -18,6 +20,10 @@ import {
   getstudentbystudentidandreceiptnumber,
   handlePaymentSuccess,
   handlePaymentFailure,
+  registrationWithOnlinePayment,
+  getRegistrationById,
+  creatregistrationpaymentLink,
+
   createAdmissionForm,
   getAdmissionFormsBySchoolId,
   deleteAdmissionFormById,
@@ -28,11 +34,15 @@ import {
   getAdmissionFormsByAcdemicHistoryYear,
   updatebyAcdemicHistory,
   updateTCinactiveStatus,
-  getDataForStudentLedger,
+  getDataForStudentLedger ,
   getstudentforcount,
   getbySchoolIdandYearCpy,
   createadmissionpayment,
   getadmissionbystudentidandreceiptnumber,
+  handleAdmissionPaymentFailure,
+  handleAdmissionPaymentSuccess,
+
+
   createTCForm,
   getTCForm,
   deleteTCFormById,
@@ -41,28 +51,47 @@ import {
   getTCStatus,
   creattcpayment,
   gettcstudentbystudentidandreceiptnumber,
+  handleTCPaymentFailure,
+  handleTCPaymentSuccess,
+
   createConcessionForm,
   getConcessionFormsBySchoolId,
   deleteConcessionFormById,
   updateConcessionForm,
   getbyadmissionId,
   updateConcessionStatus,
-  getConcessionStatus,
+  getConcessionStatus
+
+
 } from "../controllers/Form/index.js";
+
 
 const router = express.Router();
 
+
 router.post(
   "/create-registartion-form",
-  roleBasedMiddleware("Admin", "School"),
-  studentFileUpload,
+  roleBasedMiddleware("Admin", "School","Tempstudent"), studentFileUpload,
   createRegistrationForm
 );
+
+router.post(
+  "/create-registartion-form-olinepayment",
+  roleBasedMiddleware("Admin", "School","Tempstudent"), studentFileUpload,
+   registrationWithOnlinePayment
+);
+
 
 router.get(
   "/get-registartion-form/:schoolId/:academicYear",
   roleBasedMiddleware("Admin", "School"),
-  getRegistrationsBySchoolIdandyear
+  getRegistrationsBySchoolIdandyear,
+);
+
+router.get(
+  "/get-registartion-form-byid/:schoolId/:academicYear/:id",
+  roleBasedMiddleware("Admin", "School","Tempstudent"),
+  getRegistrationById
 );
 
 router.get(
@@ -79,8 +108,7 @@ router.delete(
 
 router.put(
   "/update-registartion-form/:id",
-  roleBasedMiddleware("Admin", "School"),
-  studentFileUpload,
+  roleBasedMiddleware("Admin", "School","Tempstudent"), studentFileUpload,
   updateRegistrationForm
 );
 
@@ -98,15 +126,26 @@ router.post(
 
 router.post(
   "/create-registration-payments/:studentId",
-  roleBasedMiddleware("Admin", "School"),
-  creatregistrationpayment
+  roleBasedMiddleware("Admin", "School","Tempstudent"),
+    creatregistrationpayment,
 );
+
+router.post(
+  "/create-registration-payments-link/:studentId",
+  roleBasedMiddleware("Admin", "School",),
+   creatregistrationpaymentLink,
+);
+
+
+
 
 router.get(
   "/get-registration-data/:studentId/:receiptNumber(.+)",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin", "School","Tempstudent"),
   getstudentbystudentidandreceiptnumber
 );
+
+
 
 router.put(
   "/update-registartion-status/:id",
@@ -120,16 +159,17 @@ router.get(
   getRegistrationStatus
 );
 
-router.post("/payment/success", handlePaymentSuccess);
+router.post('/payment/success',handlePaymentSuccess);
 
-router.post("/payment/failure", handlePaymentFailure);
+router.post('/payment/failure',handlePaymentFailure);
+
+
 
 //------------------------------------Admission Form-------------------------------------------------------------//
 
 router.post(
   "/create-admission-form",
-  roleBasedMiddleware("Admin", "School"),
-  admissionFileUpload,
+  roleBasedMiddleware("Admin", "School"), admissionFileUpload,
   createAdmissionForm
 );
 
@@ -142,7 +182,7 @@ router.get(
 router.get(
   "/get-admission-form-for-ledger/:schoolId",
   roleBasedMiddleware("Admin", "School"),
-  getDataForStudentLedger
+getDataForStudentLedger
 );
 
 router.get(
@@ -157,6 +197,8 @@ router.get(
   getbySchoolIdandYearCpy
 );
 
+
+
 router.delete(
   "/delete-admission-form/:id",
   roleBasedMiddleware("Admin", "School"),
@@ -165,8 +207,7 @@ router.delete(
 
 router.put(
   "/update-admission-form/:id",
-  roleBasedMiddleware("Admin", "School"),
-  admissionFileUpload,
+  roleBasedMiddleware("Admin", "School"), admissionFileUpload,
   updateAdmissionForm
 );
 
@@ -182,6 +223,8 @@ router.put(
   updateTCinactiveStatus
 );
 
+
+
 router.get(
   "/get-admission-status/:id",
   roleBasedMiddleware("Admin", "School"),
@@ -196,34 +239,39 @@ router.get(
 
 router.put(
   "/update-admission-formby-acdemichistory/:id",
-  roleBasedMiddleware("Admin", "School"),
-  admissionFileUpload,
+  roleBasedMiddleware("Admin", "School"), admissionFileUpload,
   updatebyAcdemicHistory
 );
 
 router.get(
   "/get-admission-form-for-count/:schoolId/:academicYear",
   roleBasedMiddleware("Admin", "School"),
-  getstudentforcount
+getstudentforcount
 );
 
 router.post(
   "/create-admission-payments/:studentId",
   roleBasedMiddleware("Admin", "School"),
-  createadmissionpayment
+    createadmissionpayment
 );
 
 router.get(
   "/get-admission-data/:studentId/:receiptNumber(.+)",
   roleBasedMiddleware("Admin", "School"),
-  getadmissionbystudentidandreceiptnumber
+   getadmissionbystudentidandreceiptnumber
 );
+
+ 
+router.post('/payment/admission/success', handleAdmissionPaymentSuccess);
+router.post('/payment/admission/failure', handleAdmissionPaymentFailure);
+
+
+
 
 //------------------------------------TC Form-------------------------------------------------------------//
 router.post(
   "/create-TC-form",
-  roleBasedMiddleware("Admin", "School"),
-  tcFileUpload,
+  roleBasedMiddleware("Admin", "School"), tcFileUpload,
   createTCForm
 );
 
@@ -241,8 +289,7 @@ router.delete(
 
 router.put(
   "/update-TC-form/:id",
-  roleBasedMiddleware("Admin", "School"),
-  tcFileUpload,
+  roleBasedMiddleware("Admin", "School"), tcFileUpload,
   updateTCForm
 );
 router.put(
@@ -260,21 +307,24 @@ router.get(
 router.post(
   "/create-tc-payment/:tcFormId",
   roleBasedMiddleware("Admin", "School"),
-  creattcpayment
+    creattcpayment,
 );
 
 router.get(
   "/get-tc-data/:tcFormId/:receiptNumber(.+)",
   roleBasedMiddleware("Admin", "School"),
-  gettcstudentbystudentidandreceiptnumber
+    gettcstudentbystudentidandreceiptnumber
 );
+
+router.post('/payment/tc/success', handleTCPaymentSuccess);
+router.post('/payment/tc/failure', handleTCPaymentFailure);
+
 
 //--------------------------------------Concession Form --------------------------------------------------//
 
 router.post(
   "/create-Concession-form",
-  roleBasedMiddleware("Admin", "School"),
-  concessionFileUpload,
+  roleBasedMiddleware("Admin", "School"), concessionFileUpload,
   createConcessionForm
 );
 
@@ -292,8 +342,7 @@ router.delete(
 
 router.put(
   "/update-concession-form/:id",
-  roleBasedMiddleware("Admin", "School"),
-  concessionFileUpload,
+  roleBasedMiddleware("Admin", "School"), concessionFileUpload,
   updateConcessionForm
 );
 

@@ -10,18 +10,13 @@ export const FeesReconStudentWise = async (req, res) => {
     const { schoolId, academicYear } = req.query;
     if (!schoolId || !academicYear) {
       return res.status(400).json({
-        message: "schoolId and academicYear are required",
+        message: 'schoolId and academicYear are required',
       });
     }
 
-    const students = await AdmissionForm.find({
-      schoolId,
-      academicYear,
-    }).lean();
+    const students = await AdmissionForm.find({ schoolId, academicYear }).lean();
     if (!students.length) {
-      return res
-        .status(404)
-        .json({ message: "No students found for the school" });
+      return res.status(404).json({ message: "No students found for the school" });
     }
 
     const classAndSections = await ClassAndSection.find({ schoolId }).lean();
@@ -62,23 +57,24 @@ export const FeesReconStudentWise = async (req, res) => {
         schoolId,
         classId: masterDefineClass,
         sectionIds: { $in: [section] },
-        academicYear: academicYear,
+        academicYear: academicYear
       }).lean();
 
       if (!feesStructures.length) continue;
 
       const concessionForm = await ConcessionFormModel.findOne({
         AdmissionNumber: { $regex: `^${admissionNumber}$`, $options: "i" },
-        academicYear: academicYear,
+        academicYear: academicYear
       }).lean();
 
       const allPaidFeesData = await SchoolFees.find({
         schoolId,
         studentAdmissionNumber: admissionNumber,
-        academicYear,
+        academicYear
       }).lean();
 
       const installments = [];
+
 
       const allStructureInstallments = feesStructures
         .flatMap((structure) => structure.installments)
@@ -90,9 +86,8 @@ export const FeesReconStudentWise = async (req, res) => {
         )
         .filter(Boolean);
 
-      const allInstallments = [
-        ...new Set([...allStructureInstallments, ...paidInstallments]),
-      ];
+      const allInstallments = [...new Set([...allStructureInstallments, ...paidInstallments])];
+
 
       const paymentsByInstallment = allPaidFeesData
         .flatMap((payment) =>
@@ -117,12 +112,14 @@ export const FeesReconStudentWise = async (req, res) => {
           return acc;
         }, {});
 
+
       for (const instName of allInstallments) {
         const structureInst = feesStructures
           .flatMap((s) => s.installments)
           .find((i) => i.name === instName);
 
         if (!structureInst) continue;
+
 
         const dueDateRaw = structureInst.dueDate;
         const dueDate = dueDateRaw
@@ -132,18 +129,22 @@ export const FeesReconStudentWise = async (req, res) => {
         const dueDateObj = dueDateRaw ? new Date(dueDateRaw) : null;
         dueDateObj?.setHours(0, 0, 0, 0);
 
+
         let initialFeesDue = 0;
         for (const f of structureInst.fees) initialFeesDue += f.amount || 0;
 
         let currentFeesDue = initialFeesDue;
         const instPayments = paymentsByInstallment[instName] || [];
 
+
         const hasAnyPayment = instPayments.length > 0;
         const isFutureDue = dueDateObj && dueDateObj > today;
 
         if (isFutureDue && !hasAnyPayment) {
+
           continue;
         }
+
 
         if (!hasAnyPayment) {
           let concession = 0;
@@ -183,6 +184,7 @@ export const FeesReconStudentWise = async (req, res) => {
           continue;
         }
 
+
         const sortedEntries = instPayments
           .map((p) => ({ ...p, sortDate: new Date(p.paymentDate) }))
           .sort((a, b) => a.sortDate - b.sortDate);
@@ -205,6 +207,7 @@ export const FeesReconStudentWise = async (req, res) => {
             feesPaid += fi.paid || 0;
             cancelled += fi.cancelledPaidAmount || 0;
           }
+
 
           if (cancelled === 0 && concessionForm?.concessionDetails?.length) {
             for (const fee of structureInst.fees) {
@@ -251,10 +254,9 @@ export const FeesReconStudentWise = async (req, res) => {
         }
       }
 
+
       if (installments.length > 0) {
-        const uniqInst = [
-          ...new Set(installments.map((i) => i.installmentName)),
-        ];
+        const uniqInst = [...new Set(installments.map((i) => i.installmentName))];
         let totalFeesDue = 0,
           totalFeesPaid = 0,
           totalCancelled = 0,
@@ -267,10 +269,7 @@ export const FeesReconStudentWise = async (req, res) => {
           totalFeesDue += first.feesDue;
           totalFeesPaid += entries.reduce((s, i) => s + i.feesPaid, 0);
           totalCancelled += entries.reduce((s, i) => s + i.cancelled, 0);
-          totalConcession += entries.reduce(
-            (s, i) => s + (i.concession || 0),
-            0
-          );
+          totalConcession += entries.reduce((s, i) => s + (i.concession || 0), 0);
           totalBalance += entries[entries.length - 1].balance;
         }
 
@@ -298,6 +297,7 @@ export const FeesReconStudentWise = async (req, res) => {
         .json({ message: "No fee data found for the given academic year" });
     }
 
+
     const classOptions = Array.from(new Set(Object.values(classMap))).map(
       (n) => ({ value: n, label: n })
     );
@@ -306,15 +306,15 @@ export const FeesReconStudentWise = async (req, res) => {
     );
     const installmentOptions = Array.from(
       new Set(
-        result.flatMap((i) =>
-          i.installments.map((inst) => inst.installmentName)
-        )
+        result.flatMap((i) => i.installments.map((inst) => inst.installmentName))
       )
     ).map((i) => ({ value: i, label: i }));
 
     const paymentModeOptions = Array.from(
       new Set(
-        (await SchoolFees.find({ schoolId, academicYear }).lean())
+        (
+          await SchoolFees.find({ schoolId, academicYear }).lean()
+        )
           .map((f) => f.paymentMode)
           .filter(Boolean)
       )

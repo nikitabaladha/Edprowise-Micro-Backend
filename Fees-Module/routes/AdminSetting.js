@@ -7,264 +7,283 @@ import {
   getFeeTypebyYear,
   deleteFeesType,
   updateFeesType,
+
   createMasterDefineShift,
   getAllMasterDefineShift,
   updateMasterDefineShift,
   deleteMasterDefineShift,
   getshiftbyyear,
+
   createClassAndSection,
   getClassAndSection,
   getClassAndSectionsbyyear,
   deleteClassAndSection,
   updateClassAndSection,
+
   createFeesStructure,
   getFeesStructure,
   deleteFeesStructure,
   updateFeesStructure,
   getFeesTypeInstallments,
-  createPrefix,
+
+  createPrefix, 
   getPrefixes,
   deletPrefix,
+
   createAdmissionPrefix,
   getAdmissionPrefix,
   deletAdmissionPrefix,
+
   createFine,
   getFinesBySchoolId,
   deleteFineById,
+
   createOneTimeFees,
   getOneTimeFeesBySchoolId,
   deleteOneTimeFees,
   updateOneTimeFees,
   getAllBySchoolAndClass,
   getAllBySchoolClassAndSection,
+
   createBoardRegistrationFees,
   getBoardRegistrationFees,
   deleteBoardRegistrationFees,
   updateBoardRegistrationFees,
   getBySchoolClassAndSectionandyear,
+
   createBoardExamFees,
   getBoardExamFees,
   deleteBoardExamFees,
   updateBoardExamFees,
   getexamBySchoolClassAndSectionandyear,
+
   getAdmissionFormsByYearClassnsection,
   promotestudent,
   promoteStudentsBulk,
   deleteAcademicHistoryById,
   updateAcademicHistoryById,
-  getbySchoolIdandYearonlyActive,
+   getbySchoolIdandYearonlyActive
 } from "../controllers/AdminSetting/index.js";
+
 
 const router = express.Router();
 
 //----------------------Fess Type--------------------//
 router.post(
   "/create-fess-type",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   createFeesType
 );
 router.put(
   "/update-fess-type/:id",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   updateFeesType
 );
 
 router.get(
   "/getall-fess-type/:schoolId",
-  roleBasedMiddleware("Admin", "School"),
-  getAllFeesType
+  roleBasedMiddleware("Admin","School"),
+  getAllFeesType,
 );
 
 router.get(
   "/getall-fess-type-year/:schoolId/year/:academicYear",
   roleBasedMiddleware("Admin", "School"),
-  getFeeTypebyYear
+ getFeeTypebyYear
 );
+
 
 router.delete(
   "/delete-fees-type/:id",
-  roleBasedMiddleware("Admin", "School"),
-  deleteFeesType
+  roleBasedMiddleware("Admin","School"),
+  deleteFeesType,
 );
 
 //---------------------------------------------------MasterDefineShift------------------------//
 router.post(
   "/master-define-shift",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   createMasterDefineShift
 );
 router.get(
   "/master-define-shift/:schoolId",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin", "School","Tempstudent"),
   getAllMasterDefineShift
 );
 router.get(
   "/master-define-shift-year/:schoolId/year/:academicYear",
-  roleBasedMiddleware("Admin", "School"),
-  getshiftbyyear
+  roleBasedMiddleware("Admin", "School","Tempstudent"),
+   getshiftbyyear
 );
 router.put(
   "/master-define-shift/:id",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   updateMasterDefineShift
 );
 router.delete(
   "/master-define-shift/:id",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   deleteMasterDefineShift
 );
 
 //-------------------------------------------------create-class-and-section----------------------------//
 router.post(
   "/create-class-and-section",
-  roleBasedMiddleware("Admin", "School"),
-  createClassAndSection
+  roleBasedMiddleware("Admin","School"),
+ createClassAndSection
 );
 
 router.get(
   "/get-class-and-section/:schoolId",
-  roleBasedMiddleware("Admin", "School"),
-  getClassAndSection
+  roleBasedMiddleware("Admin","School","Tempstudent"),
+ getClassAndSection
 );
 
 router.get(
   "/get-class-and-section-year/:schoolId/year/:academicYear",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin", "School","Tempstudent"),
   getClassAndSectionsbyyear
 );
 
 router.delete(
   "/delete-class-and-section/:id",
-  roleBasedMiddleware("Admin", "School"),
-  deleteClassAndSection
+  roleBasedMiddleware("Admin","School"),
+ deleteClassAndSection
 );
 
 router.put(
   "/update-class-and-section/:id",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   updateClassAndSection
 );
 
 //------------------------------------------fees-structure----------------------------------//
 router.post(
   "/create-fees-structure",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   createFeesStructure
 );
 
 router.get(
   "/get-fees-structure/:schoolId/:academicYear",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   getFeesStructure
 );
 
 router.delete(
   "/delete-fees-structure/:id",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   deleteFeesStructure
 );
 
 router.put(
   "/update-fees-structure/:id",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   updateFeesStructure
 );
 
 router.get(
   "/fetch-viva-installments",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   getFeesTypeInstallments
 );
 
 //----------------------------------------- Registartion Prefix Setting---------------------------------------//
 router.post(
   "/create-prefix",
-  roleBasedMiddleware("Admin", "School"),
-  createPrefix
+  roleBasedMiddleware("Admin","School"),
+  createPrefix 
 );
 
 router.get(
   "/get-prefix/:schoolId/year/:academicYear",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   getPrefixes
 );
 
 router.delete(
   "/delete-prefix/:id",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   deletPrefix
 );
+
 
 //----------------------------------------- Admission Prefix Setting---------------------------------------//
 router.post(
   "/create-admission-prefix",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   createAdmissionPrefix
 );
 
 router.get(
   "/get-admission-prefix/:schoolId/year/:academicYear",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   getAdmissionPrefix
 );
 
 router.delete(
   "/delete-admission-prefix/:id",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   deletAdmissionPrefix
 );
 
 //----------------------------------------- Fine---------------------------------------//
-router.post("/create-fine", roleBasedMiddleware("Admin", "School"), createFine);
+router.post(
+  "/create-fine",
+  roleBasedMiddleware("Admin","School"),
+  createFine
+);
 
 router.get(
   "/get-fine/school/:schoolId/year/:academicYear",
-  roleBasedMiddleware("Admin", "School"),
-  getFinesBySchoolId
+  roleBasedMiddleware("Admin","School"),
+getFinesBySchoolId
 );
 
 router.delete(
   "/delete-fine/:id",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   deleteFineById
 );
+
 
 //----------------------------------------- One Time Fees---------------------------------------//
 router.post(
   "/create-one-time-fees",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   createOneTimeFees
 );
 
 router.get(
   "/get-one-time-fees/:schoolId/:academicYear",
-  roleBasedMiddleware("Admin", "School"),
-  getOneTimeFeesBySchoolId
+  roleBasedMiddleware("Admin","School"),
+   getOneTimeFeesBySchoolId
 );
 
 router.delete(
   "/delete-one-time-fees/:id",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   deleteOneTimeFees
 );
 
 router.put(
   "/update-one-time-fees/:id",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   updateOneTimeFees
 );
 
 router.get(
   "/get-one-time-feesbyIds/:schoolId/:classId/:academicYear",
-  roleBasedMiddleware("Admin", "School"),
-  getAllBySchoolAndClass
+  roleBasedMiddleware("Admin","School","Tempstudent"),
+  getAllBySchoolAndClass 
 );
 
 router.get(
   "/get-one-time-feesBysectionIds/:schoolId/:classId/:sectionId/:academicYear",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   getAllBySchoolClassAndSection
 );
+
 
 //------------------------------------------board-registration-fees----------------------------------//
 router.post(
@@ -280,10 +299,13 @@ router.get(
 );
 
 router.get(
-  "/get-board-registration-fees-byIds/:schoolId/:academicYear/:classId/:sectionId?",
+   "/get-board-registration-fees-byIds/:schoolId/:academicYear/:classId/:sectionId?",
   roleBasedMiddleware("Admin", "School"),
-  getBySchoolClassAndSectionandyear
+ getBySchoolClassAndSectionandyear
 );
+
+
+
 
 router.delete(
   "/delete-board-registration-fees/:id",
@@ -323,22 +345,23 @@ router.put(
 );
 
 router.get(
-  "/get-board-exam-fees-byIds/:schoolId/:academicYear/:classId/:sectionId?",
+   "/get-board-exam-fees-byIds/:schoolId/:academicYear/:classId/:sectionId?",
   roleBasedMiddleware("Admin", "School"),
-  getexamBySchoolClassAndSectionandyear
+ getexamBySchoolClassAndSectionandyear
 );
+
 
 //------------------------------------------promotion----------------------------------//
 
 router.post(
   "/promote-student",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   promotestudent
 );
 
 router.post(
   "/promote-students-bulk",
-  roleBasedMiddleware("Admin", "School"),
+  roleBasedMiddleware("Admin","School"),
   promoteStudentsBulk
 );
 
@@ -350,20 +373,21 @@ router.get(
 
 router.get(
   "/get-admission-form-by-year-classnsection/:schoolId/:academicYear",
-  roleBasedMiddleware("Admin", "School"),
-  getAdmissionFormsByYearClassnsection
+  roleBasedMiddleware("Admin","School"),
+getAdmissionFormsByYearClassnsection
 );
 
 router.delete(
   "/delete-promotion/:academicHistoryId",
-  roleBasedMiddleware("Admin", "School"),
-  deleteAcademicHistoryById
+  roleBasedMiddleware("Admin","School"),
+deleteAcademicHistoryById
 );
+
 
 router.put(
   "/update-promotion/:academicHistoryId",
-  roleBasedMiddleware("Admin", "School"),
-  updateAcademicHistoryById
+  roleBasedMiddleware("Admin","School"),
+updateAcademicHistoryById
 );
 
 export default router;

@@ -10,29 +10,54 @@ export const getBoardRegistrationFees = async (req, res) => {
   session.startTransaction();
 
   try {
-    const { schoolId, academicYear } = req.query;
-    if (!schoolId || !academicYear) {
-      return res.status(400).json({
-        message: "schoolId and academicYear are required",
-      });
-    }
-    const schoolIdString = schoolId.trim();
+        const { schoolId, academicYear,startdate,enddate } = req.query;
+           if (!schoolId ) {
+             return res.status(400).json({
+               message: 'schoolId  are required',
+             });
+           }
+           const schoolIdString = schoolId.trim();
+       
+          //  const academicYearData = await FeesManagementYear.findOne({ schoolId: schoolIdString, academicYear });
+          //  if (!academicYearData) {
+          //    return res.status(400).json({
+          //      message: `Academic year ${academicYear} not found for schoolId ${schoolIdString}`,
+          //    });
+          //  }
+          //  const { startDate, endDate } = academicYearData;
 
-    const academicYearData = await FeesManagementYear.findOne({
-      schoolId: schoolIdString,
-      academicYear,
-    });
-    if (!academicYearData) {
-      return res.status(400).json({
-        message: `Academic year ${academicYear} not found for schoolId ${schoolIdString}`,
-      });
-    }
-    const { startDate, endDate } = academicYearData;
 
+           let academicYearData;
+                 if (academicYear) {
+                   academicYearData = await FeesManagementYear.findOne({
+                     schoolId: schoolIdString,
+                     academicYear: academicYear.trim(),
+                   });
+                 } else {
+                   academicYearData = await FeesManagementYear.findOne({ schoolId: schoolIdString });
+                 }
+             
+                 if (!academicYearData) {
+                   return res.status(400).json({
+                     message: `Academic year not found for schoolId ${schoolIdString}`,
+                   });
+                 }
+             
+             
+                 let filterStartDate, filterEndDate;
+                 if (startdate && enddate) {
+                   filterStartDate = new Date(startdate);
+                   filterEndDate = new Date(new Date(enddate).setHours(23, 59, 59, 999));
+                 } else {
+                   filterStartDate = new Date(academicYearData.startDate);
+                   filterEndDate = new Date(new Date(academicYearData.endDate).setHours(23, 59, 59, 999));
+                 }
+
+   
     const paymentDataList = await BoardRegistrationFeePayment.find({
       schoolId,
       // academicYear,
-      paymentDate: { $gte: startDate, $lte: endDate },
+       paymentDate: { $gte: filterStartDate, $lte: filterEndDate },
       paymentMode: { $ne: "null" },
       status: { $ne: "Pending" },
     })
@@ -46,31 +71,24 @@ export const getBoardRegistrationFees = async (req, res) => {
       });
     }
 
-    const classDataList = await ClassAndSection.find({ schoolId })
-      .lean()
-      .session(session);
-    const classMap = new Map(
-      classDataList.map((cls) => [cls._id.toString(), cls.className])
-    );
+ 
+    const classDataList = await ClassAndSection.find({ schoolId,}).lean().session(session);
+    const classMap = new Map(classDataList.map((cls) => [cls._id.toString(), cls.className]));
     const sectionMap = new Map();
     classDataList.forEach((cls) => {
       cls.sections.forEach((sec) => {
-        sectionMap.set(sec._id.toString(), {
-          className: cls.className,
-          sectionName: sec.name,
-        });
+        sectionMap.set(sec._id.toString(), { className: cls.className, sectionName: sec.name });
       });
     });
 
     const combinedDetails = [];
     const receiptNumbers = [];
 
+
     for (const payment of paymentDataList) {
       const admission = payment.admissionId;
       if (!admission) {
-        console.warn(
-          `AdmissionForm not found for payment with ID ${payment._id}`
-        );
+        console.warn(`AdmissionForm not found for payment with ID ${payment._id}`);
         continue;
       }
 
@@ -78,11 +96,8 @@ export const getBoardRegistrationFees = async (req, res) => {
         (entry) => entry.academicYear === payment.academicYear
       );
 
-      const classId =
-        historyEntry?.masterDefineClass?.toString() ||
-        payment.classId?.toString();
-      const sectionId =
-        historyEntry?.section?.toString() || payment.sectionId?.toString();
+      const classId = historyEntry?.masterDefineClass?.toString() || payment.classId?.toString();
+      const sectionId = historyEntry?.section?.toString() || payment.sectionId?.toString();
 
       let className = "-";
       let sectionName = "-";
@@ -95,13 +110,12 @@ export const getBoardRegistrationFees = async (req, res) => {
         className = classMap.get(classId) || "-";
       }
 
+
       const boardReg = await BoardRegistrationFee.findOne({
         schoolId,
         // academicYear,
         sectionIds: { $in: [sectionId] },
-      })
-        .lean()
-        .session(session);
+      }).lean().session(session);
 
       const feesDue = boardReg ? parseFloat(boardReg.amount || "0") : 0;
 
@@ -117,30 +131,23 @@ export const getBoardRegistrationFees = async (req, res) => {
         className,
         sectionName,
         boardRegFeesDate: payment.paymentDate
-          ? new Date(payment.paymentDate)
-              .toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              })
-              .replace(/\//g, "-")
+          ? new Date(payment.paymentDate).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            }).replace(/\//g, "-")
           : "-",
         boardRegFeesCancelledDate: payment.cancelledDate
-          ? new Date(payment.cancelledDate)
-              .toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              })
-              .replace(/\//g, "-")
+          ? new Date(payment.cancelledDate).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            }).replace(/\//g, "-")
           : "-",
         boardRegFeesPaymentMode: payment.paymentMode || "-",
         boardRegFeesDue: feesDue.toString(),
         boardRegFeesConcession: payment.concessionAmount?.toString() || "0",
-        boardRegFeesPaid:
-          payment.status === "Paid"
-            ? payment.finalAmount?.toString() || "0"
-            : "0",
+        boardRegFeesPaid: payment.status === "Paid" ? payment.finalAmount?.toString() || "0" : "0",
         boardRegFeesChequeNumber: payment.chequeNumber || "-",
         boardRegFeesBankName: payment.bankName || "-",
         boardRegFeesTransactionNo: payment.transactionId || "-",
@@ -156,28 +163,17 @@ export const getBoardRegistrationFees = async (req, res) => {
       }
     }
 
+
     if (receiptNumbers.length > 0) {
       const refunds = await Refund.find({
         schoolId,
-        $or: [
-          {
-            $and: [
-              { status: "Refund" },
-              { refundDate: { $gte: startDate, $lte: endDate } },
-            ],
-          },
-          {
-            $and: [
-              { status: { $in: ["Cancelled", "Cheque Return"] } },
-              { cancelledDate: { $gte: startDate, $lte: endDate } },
-            ],
-          },
+          $or: [
+          { $and: [{ status: 'Refund' }, { refundDate: { $gte:filterStartDate, $lte: filterEndDate } }] },
+          { $and: [{ status: { $in: ['Cancelled', 'Cheque Return'] } }, { cancelledDate: { $gte:filterStartDate, $lte: filterEndDate } }] }
         ],
         refundType: "Board Registration Fee",
         existancereceiptNumber: { $in: receiptNumbers },
-      })
-        .lean()
-        .session(session);
+      }).lean().session(session);
 
       const refundDetails = await Promise.all(
         refunds.map(async (refund) => {
@@ -188,9 +184,7 @@ export const getBoardRegistrationFees = async (req, res) => {
               schoolId,
               // academicYear,
               _id: refund.classId,
-            })
-              .lean()
-              .session(session);
+            }).lean().session(session);
             if (classData) {
               className = classData.className || "-";
               if (refund.sectionId) {
@@ -206,21 +200,17 @@ export const getBoardRegistrationFees = async (req, res) => {
             recordType: "Refund",
             boardRegFeesDate:
               refund.status === "Refund" && refund.refundDate
-                ? new Date(refund.refundDate)
-                    .toLocaleDateString("en-GB", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })
-                    .replace(/\//g, "-")
+                ? new Date(refund.refundDate).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  }).replace(/\//g, "-")
                 : refund.cancelledDate
-                ? new Date(refund.cancelledDate)
-                    .toLocaleDateString("en-GB", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })
-                    .replace(/\//g, "-")
+                ? new Date(refund.cancelledDate).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  }).replace(/\//g, "-")
                 : "-",
             academicYear: refund.academicYear || "-",
             admissionNumber: refund.admissionNumber || "-",
@@ -232,15 +222,12 @@ export const getBoardRegistrationFees = async (req, res) => {
             boardRegFeesStatus: [refund.status] || ["-"],
             boardRegFeesPaymentMode: refund.paymentMode || "-",
             boardRegFeesReceiptNo: refund.receiptNumber || "-",
-            boardRegFeesDue:
-              -(refund.paidAmount + refund.concessionAmount)?.toString() || "0",
+            boardRegFeesDue:-(refund.paidAmount+refund.concessionAmount)?.toString() || '0',
             // boardRegFeesPaid: refund.paidAmount?.toString() || "0",
-            boardRegFeesRefundAmount:
-              refund.refundAmount > 0
-                ? -refund.refundAmount.toString()
-                : -refund.cancelledAmount?.toString() || "0",
-            boardRegFeesCancelledAmount:
-              -refund.cancelledAmount?.toString() || "0",
+            boardRegFeesRefundAmount: refund.refundAmount > 0
+              ? -(refund.refundAmount).toString()
+              : -(refund.cancelledAmount)?.toString() || "0",
+            boardRegFeesCancelledAmount: -(refund.cancelledAmount)?.toString() || "0",
             boardRegFeesChequeNumber: refund.chequeNumber || "-",
             boardRegFeesBankName: refund.bankName || "-",
             boardRegFeesTransactionNo: refund.transactionNumber || "-",
@@ -252,6 +239,7 @@ export const getBoardRegistrationFees = async (req, res) => {
       combinedDetails.push(...refundDetails);
     }
 
+    
     const paymentCounts = combinedDetails.reduce((acc, detail) => {
       const admissionNo = detail.admissionNumber;
       acc[admissionNo] = (acc[admissionNo] || 0) + 1;

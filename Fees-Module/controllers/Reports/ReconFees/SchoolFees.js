@@ -12,15 +12,12 @@ export const getAllStudentFeesDue = async (req, res) => {
     const { schoolId, academicYear } = req.query;
     if (!schoolId || !academicYear) {
       return res.status(400).json({
-        message: "schoolId and academicYear are required",
+        message: 'schoolId and academicYear are required',
       });
     }
     const schoolIdString = schoolId.trim();
 
-    const academicYearData = await FeesManagementYear.findOne({
-      schoolId: schoolIdString,
-      academicYear,
-    });
+    const academicYearData = await FeesManagementYear.findOne({ schoolId: schoolIdString, academicYear });
     if (!academicYearData) {
       return res.status(400).json({
         message: `Academic year ${academicYear} not found for schoolId ${schoolIdString}`,
@@ -30,9 +27,7 @@ export const getAllStudentFeesDue = async (req, res) => {
 
     const students = await AdmissionForm.find({ schoolId }).lean();
     if (!students.length) {
-      return res
-        .status(404)
-        .json({ message: "No students found for the school" });
+      return res.status(404).json({ message: "No students found for the school" });
     }
 
     const classAndSections = await ClassAndSection.find({ schoolId }).lean();
@@ -47,17 +42,14 @@ export const getAllStudentFeesDue = async (req, res) => {
       return acc;
     }, {});
 
-    const feeTypes = await FeesType.find({ schoolId }).lean();
+    const feeTypes = await FeesType.find({ schoolId}).lean();
     const feeTypeMap = feeTypes.reduce((acc, type) => {
       acc[type._id.toString()] = type.feesTypeName;
       return acc;
     }, {});
 
     const result = [];
-    const allFeeTypes = feeTypes
-      .map((type) => type.feesTypeName)
-      .filter(Boolean)
-      .sort();
+    const allFeeTypes = feeTypes.map((type) => type.feesTypeName).filter(Boolean).sort();
 
     for (const student of students) {
       const admissionNumber = student.AdmissionNumber;
@@ -73,14 +65,14 @@ export const getAllStudentFeesDue = async (req, res) => {
         schoolId,
         classId: masterDefineClass,
         sectionIds: { $in: [section] },
-        academicYear: student.academicYear,
+       academicYear:student.academicYear
       }).lean();
 
       if (!feesStructures.length) continue;
 
       const concessionForm = await ConcessionFormModel.findOne({
         AdmissionNumber: { $regex: `^${admissionNumber}$`, $options: "i" },
-        academicYear: student.academicYear,
+        academicYear:student.academicYear
       }).lean();
 
       const allPaidFeesData = await SchoolFees.find({
@@ -93,29 +85,19 @@ export const getAllStudentFeesDue = async (req, res) => {
         schoolId,
         admissionNumber,
         $or: [
-          {
-            $and: [
-              { status: "Refund" },
-              { refundDate: { $gte: startDate, $lte: endDate } },
-            ],
-          },
-          {
-            $and: [
-              { status: { $in: ["Cancelled", "Cheque Return"] } },
-              { cancelledDate: { $gte: startDate, $lte: endDate } },
-            ],
-          },
+          { $and: [{ status: 'Refund' }, { refundDate: { $gte: startDate, $lte: endDate } }] },
+          { $and: [{ status: { $in: ['Cancelled', 'Cheque Return'] } }, { cancelledDate: { $gte: startDate, $lte: endDate } }] }
         ],
-        refundType: "School Fees",
+        refundType: 'School Fees',
       }).lean();
 
       const installments = [];
 
       // Group payments by installment
       const paymentsByInstallment = allPaidFeesData
-        .flatMap((payment) =>
+        .flatMap((payment) => 
           payment.installments.map((inst) => ({
-            type: "Paid",
+            type: 'Paid',
             installmentName: inst.installmentName,
             paymentDate: payment.paymentDate,
             paymentMode: payment.paymentMode || "-",
@@ -136,20 +118,14 @@ export const getAllStudentFeesDue = async (req, res) => {
       const refundEntries = refunds.map((refund) => ({
         type: refund.status,
         installmentName: refund.installmentName,
-        date:
-          refund.status === "Refund" ? refund.refundDate : refund.cancelledDate,
-        refundAmount: refund.status === "Refund" ? refund.refundAmount || 0 : 0,
-        cancelledAmount:
-          refund.status === "Cancelled" ? refund.cancelledAmount || 0 : 0,
-        chequeReturnAmount:
-          refund.status === "Cheque Return" ? refund.cancelledAmount || 0 : 0,
+        date: refund.status === 'Refund' ? refund.refundDate : refund.cancelledDate,
+        refundAmount: refund.status === 'Refund' ? refund.refundAmount || 0 : 0,
+        cancelledAmount: refund.status === 'Cancelled' ? refund.cancelledAmount || 0 : 0,
+        chequeReturnAmount: refund.status === 'Cheque Return' ? refund.cancelledAmount || 0 : 0,
         paymentMode: refund.paymentMode,
         receiptNumber: refund.receiptNumber,
-        paidAmount: refund.feeTypeRefunds.reduce(
-          (sum, ftr) => sum + (ftr.paidAmount || 0),
-          0
-        ),
-        feeTypeRefunds: refund.feeTypeRefunds || [],
+        paidAmount: refund.feeTypeRefunds.reduce((sum, ftr) => sum + (ftr.paidAmount || 0), 0),
+        feeTypeRefunds: refund.feeTypeRefunds || [], 
       }));
 
       for (const instName in paymentsByInstallment) {
@@ -160,7 +136,7 @@ export const getAllStudentFeesDue = async (req, res) => {
         if (!structureInst) continue;
 
         let initialFeesDue = 0;
-        const feeTypesBreakdownBase = {};
+        const feeTypesBreakdownBase = {}; 
         for (const fee of structureInst.fees) {
           const feeTypeId = fee.feesTypeId.toString();
           const feeTypeName = feeTypeMap[feeTypeId] || "Unknown";
@@ -177,9 +153,8 @@ export const getAllStudentFeesDue = async (req, res) => {
 
         let currentFeesDue = initialFeesDue;
         const instPayments = paymentsByInstallment[instName];
-        const instRefunds = refundEntries.filter(
-          (r) => r.installmentName === instName
-        );
+        const instRefunds = refundEntries.filter((r) => r.installmentName === instName);
+
 
         const allEntries = [
           ...instPayments.map((p) => ({
@@ -192,7 +167,7 @@ export const getAllStudentFeesDue = async (req, res) => {
           })),
         ].sort((a, b) => a.sortDate - b.sortDate);
 
-        let concessionApplied = false;
+        let concessionApplied = false; 
 
         for (const entry of allEntries) {
           let feesPaid = 0;
@@ -209,14 +184,10 @@ export const getAllStudentFeesDue = async (req, res) => {
           let receiptNumber = entry.receiptNumber || null;
 
           // Clone base breakdown for this entry
-          const feeTypesBreakdown = JSON.parse(
-            JSON.stringify(feeTypesBreakdownBase)
-          );
+          const feeTypesBreakdown = JSON.parse(JSON.stringify(feeTypesBreakdownBase));
 
-          if (entry.type === "Paid") {
-            paymentDate = new Date(entry.paymentDate).toLocaleDateString(
-              "en-GB"
-            );
+          if (entry.type === 'Paid') {
+            paymentDate = new Date(entry.paymentDate).toLocaleDateString("en-GB");
             for (const feeItem of entry.feeItems) {
               const feeTypeId = feeItem.feeTypeId.toString();
               const feeTypeName = feeTypeMap[feeTypeId] || "Unknown";
@@ -225,10 +196,7 @@ export const getAllStudentFeesDue = async (req, res) => {
               feeTypesBreakdown[feeTypeName].paid += paid;
             }
 
-            if (
-              !concessionApplied &&
-              concessionForm?.concessionDetails?.length
-            ) {
+            if (!concessionApplied && concessionForm?.concessionDetails?.length) {
               for (const fee of structureInst.fees) {
                 const feeTypeId = fee.feesTypeId.toString();
                 const feeTypeName = feeTypeMap[feeTypeId] || "Unknown";
@@ -247,11 +215,9 @@ export const getAllStudentFeesDue = async (req, res) => {
             }
 
             if (entry.cancelledDate) {
-              cancelledDate = new Date(entry.cancelledDate).toLocaleDateString(
-                "en-GB"
-              );
+              cancelledDate = new Date(entry.cancelledDate).toLocaleDateString("en-GB");
             }
-          } else if (entry.type === "Refund") {
+          } else if (entry.type === 'Refund') {
             refund = entry.refundAmount;
             feesPaid = entry.paidAmount || 0;
             refundDate = new Date(entry.date).toLocaleDateString("en-GB");
@@ -259,12 +225,12 @@ export const getAllStudentFeesDue = async (req, res) => {
               const feeTypeId = ftr.feeType.toString();
               const feeTypeName = feeTypeMap[feeTypeId] || "Unknown";
               const refAmount = ftr.refundAmount || 0;
-              refund += refAmount;
+              refund += refAmount; 
               feeTypesBreakdown[feeTypeName].refund += refAmount;
-              feeTypesBreakdown[feeTypeName].paid = ftr.paidAmount || 0;
+              feeTypesBreakdown[feeTypeName].paid = ftr.paidAmount || 0; 
               feeTypesBreakdown[feeTypeName].balance = ftr.balance || 0;
             }
-          } else if (entry.type === "Cancelled") {
+          } else if (entry.type === 'Cancelled') {
             cancelled = entry.cancelledAmount;
             feesPaid = entry.paidAmount || 0;
             cancelledDate = new Date(entry.date).toLocaleDateString("en-GB");
@@ -272,25 +238,25 @@ export const getAllStudentFeesDue = async (req, res) => {
               const feeTypeId = ftr.feeType.toString();
               const feeTypeName = feeTypeMap[feeTypeId] || "Unknown";
               const cancAmount = ftr.cancelledAmount || 0;
-              const concessionamt = ftr.concessionAmount || 0;
+              const concessionamt=ftr.concessionAmount ||0;
               cancelled += cancAmount;
-              concession += concessionamt;
+              concession +=concessionamt;
               feeTypesBreakdown[feeTypeName].cancelled += cancAmount;
               feeTypesBreakdown[feeTypeName].concession += concessionamt;
               feeTypesBreakdown[feeTypeName].paid = ftr.paidAmount || 0;
               feeTypesBreakdown[feeTypeName].balance = ftr.balance || 0;
             }
-          } else if (entry.type === "Cheque Return") {
+          } else if (entry.type === 'Cheque Return') {
             chequeReturn = entry.chequeReturnAmount;
             feesPaid = entry.paidAmount || 0;
             chequeReturnDate = new Date(entry.date).toLocaleDateString("en-GB");
             for (const ftr of entry.feeTypeRefunds) {
               const feeTypeId = ftr.feeType.toString();
               const feeTypeName = feeTypeMap[feeTypeId] || "Unknown";
-              const chqAmount = ftr.cancelledAmount || 0;
-              const concessionamt = ftr.concessionAmount || 0;
+              const chqAmount = ftr.cancelledAmount || 0; 
+              const concessionamt=ftr.concessionAmount ||0;
               chequeReturn += chqAmount;
-              concession += concessionamt;
+              concession +=concessionamt;
               feeTypesBreakdown[feeTypeName].chequeReturn += chqAmount;
               feeTypesBreakdown[feeTypeName].concession += concessionamt;
               feeTypesBreakdown[feeTypeName].paid = ftr.paidAmount || 0;
@@ -299,12 +265,7 @@ export const getAllStudentFeesDue = async (req, res) => {
           }
 
           const balance =
-            currentFeesDue -
-            feesPaid -
-            concession +
-            refund +
-            cancelled +
-            chequeReturn;
+            currentFeesDue - feesPaid - concession + refund + cancelled + chequeReturn;
 
           installments.push({
             type: entry.type,
@@ -323,7 +284,7 @@ export const getAllStudentFeesDue = async (req, res) => {
             cancelled,
             chequeReturn,
             balance,
-            feeTypes: feeTypesBreakdown,
+            feeTypes: feeTypesBreakdown, 
           });
 
           currentFeesDue = balance;
@@ -331,9 +292,7 @@ export const getAllStudentFeesDue = async (req, res) => {
       }
 
       if (installments.length > 0) {
-        const uniqueInstallments = [
-          ...new Set(installments.map((inst) => inst.installmentName)),
-        ];
+        const uniqueInstallments = [...new Set(installments.map((inst) => inst.installmentName))];
         let totalFeesDue = 0;
         let totalFeesPaid = 0;
         let totalConcession = 0;
@@ -343,37 +302,20 @@ export const getAllStudentFeesDue = async (req, res) => {
         let totalBalance = 0;
 
         for (const instName of uniqueInstallments) {
-          const instEntries = installments.filter(
-            (inst) => inst.installmentName === instName
-          );
+          const instEntries = installments.filter((inst) => inst.installmentName === instName);
           const firstEntry = instEntries[0];
           totalFeesDue += firstEntry.feesDue;
-          totalFeesPaid += instEntries.reduce(
-            (sum, inst) => sum + inst.feesPaid,
-            0
-          );
-          totalConcession += instEntries.reduce(
-            (sum, inst) => sum + inst.concession,
-            0
-          );
-          totalRefund += instEntries.reduce(
-            (sum, inst) => sum + inst.refund,
-            0
-          );
-          totalCancelled += instEntries.reduce(
-            (sum, inst) => sum + inst.cancelled,
-            0
-          );
-          totalChequeReturn += instEntries.reduce(
-            (sum, inst) => sum + inst.chequeReturn,
-            0
-          );
+          totalFeesPaid += instEntries.reduce((sum, inst) => sum + inst.feesPaid, 0);
+          totalConcession += instEntries.reduce((sum, inst) => sum + inst.concession, 0);
+          totalRefund += instEntries.reduce((sum, inst) => sum + inst.refund, 0);
+          totalCancelled += instEntries.reduce((sum, inst) => sum + inst.cancelled, 0);
+          totalChequeReturn += instEntries.reduce((sum, inst) => sum + inst.chequeReturn, 0);
           totalBalance += instEntries[instEntries.length - 1].balance;
         }
 
         result.push({
           admissionNumber,
-          studentName: `${student.firstName} ${student.lastName || ""}`,
+          studentName: `${student.firstName} ${student.lastName || ''}`,
           className: classMap[masterDefineClass] || masterDefineClass,
           sectionName: sectionMap[section] || section,
           academicYear,
@@ -392,35 +334,23 @@ export const getAllStudentFeesDue = async (req, res) => {
     }
 
     if (!result.length) {
-      return res.status(404).json({
-        message: "No paid fee data found for the given academic year",
-      });
+      return res.status(404).json({ message: "No paid fee data found for the given academic year" });
     }
 
-    const classOptions = Array.from(new Set(Object.values(classMap))).map(
-      (name) => ({
-        value: name,
-        label: name,
-      })
-    );
-    const sectionOptions = Array.from(new Set(Object.values(sectionMap))).map(
-      (name) => ({
-        value: name,
-        label: name,
-      })
-    );
+    const classOptions = Array.from(new Set(Object.values(classMap))).map((name) => ({
+      value: name,
+      label: name,
+    }));
+    const sectionOptions = Array.from(new Set(Object.values(sectionMap))).map((name) => ({
+      value: name,
+      label: name,
+    }));
     const installmentOptions = Array.from(
-      new Set(
-        result.flatMap((item) =>
-          item.installments.map((inst) => inst.installmentName)
-        )
-      )
+      new Set(result.flatMap((item) => item.installments.map((inst) => inst.installmentName)))
     ).map((inst) => ({ value: inst, label: inst }));
     const paymentModeOptions = Array.from(
       new Set(
-        (await SchoolFees.find({ schoolId }).lean())
-          .map((fee) => fee.paymentMode)
-          .filter((mode) => mode && mode !== "-")
+        (await SchoolFees.find({ schoolId }).lean()).map((fee) => fee.paymentMode).filter(mode => mode && mode !== '-')
       )
     ).map((mode) => ({ value: mode, label: mode }));
 
@@ -435,9 +365,10 @@ export const getAllStudentFeesDue = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching student fees due:", error);
+    console.error('Error fetching student fees due:', error);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 export default getAllStudentFeesDue;

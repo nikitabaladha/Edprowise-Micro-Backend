@@ -253,6 +253,10 @@ const BoardExamFeePaymentSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    isProcessedInFinance: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

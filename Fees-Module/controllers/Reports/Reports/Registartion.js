@@ -3,45 +3,61 @@ import Refund from "../../../models/RefundFees.js";
 import { RegistrationPayment } from "../../../models/RegistrationForm.js";
 import FeesManagementYear from "../../../models/FeesManagementYear.js";
 
+
 export const getAllRegistrationFees = async (req, res) => {
   try {
-    const { schoolId, academicYear } = req.query;
-    if (!schoolId || !academicYear) {
+    const { schoolId, academicYear,startdate,enddate } = req.query;
+    if (!schoolId ) {
       return res.status(400).json({
-        message: "schoolId and academicYear are required",
+        message: 'schoolId  are required',
       });
     }
     const schoolIdString = schoolId.trim();
 
-    const academicYearData = await FeesManagementYear.findOne({
-      schoolId: schoolIdString,
-      academicYear,
-    });
+ 
+
+let academicYearData;
+    if (academicYear) {
+      academicYearData = await FeesManagementYear.findOne({
+        schoolId: schoolIdString,
+        academicYear: academicYear.trim(),
+      });
+    } else {
+      academicYearData = await FeesManagementYear.findOne({ schoolId: schoolIdString });
+    }
+
     if (!academicYearData) {
       return res.status(400).json({
-        message: `Academic year ${academicYear} not found for schoolId ${schoolIdString}`,
+        message: `Academic year not found for schoolId ${schoolIdString}`,
       });
     }
-    const { startDate, endDate } = academicYearData;
-    const targetAcademicYear = academicYear;
 
+
+    let filterStartDate, filterEndDate;
+    if (startdate && enddate) {
+      filterStartDate = new Date(startdate);
+      filterEndDate = new Date(new Date(enddate).setHours(23, 59, 59, 999));
+    } else {
+      filterStartDate = new Date(academicYearData.startDate);
+      filterEndDate = new Date(new Date(academicYearData.endDate).setHours(23, 59, 59, 999));
+    }
     const paymentDataList = await RegistrationPayment.find({
       schoolId,
-      paymentDate: { $gte: startDate, $lte: endDate },
-      paymentMode: { $ne: "null" },
-      status: { $ne: "Pending" },
+      // paymentDate: { $gte: startDate, $lte: endDate },
+     paymentDate: { $gte: filterStartDate, $lte: filterEndDate },
+      paymentMode: { $ne: 'null' },
+      status: 'Paid'  
     })
-      .populate("studentId")
+      .populate('studentId')
       .lean();
 
     if (!paymentDataList.length) {
-      return res.status(404).json({
-        message: `No payment data found for academic year ${targetAcademicYear}`,
-      });
+      return res.status(404).json({ message: `No payment data found for academic year` });
     }
 
     const combinedDetails = [];
     const receiptNumbers = [];
+
 
     for (const payment of paymentDataList) {
       const student = payment.studentId;
@@ -53,6 +69,7 @@ export const getAllRegistrationFees = async (req, res) => {
       const classId = student.masterDefineClass || null;
       const sectionId = student.section || null;
       let className = "-";
+
 
       if (classId && sectionId) {
         const classData = await ClassAndSection.findOne({
@@ -76,27 +93,22 @@ export const getAllRegistrationFees = async (req, res) => {
         studentId: payment.studentId._id.toString(),
         firstName: student.firstName || "-",
         lastName: student.lastName || "-",
-        registrationNumber:
-          payment.registrationNumber || student.registrationNumber || "-",
-        academicYear: payment.academicYear,
+        registrationNumber: payment.registrationNumber || student.registrationNumber || "-",
+        academicYear:payment.academicYear,
         className,
         regFeesDate: payment.paymentDate
-          ? new Date(payment.paymentDate)
-              .toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              })
-              .replace(/\//g, "-")
+          ? new Date(payment.paymentDate).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          }).replace(/\//g, "-")
           : "-",
         regFeesCancelledDate: payment.cancelledDate
-          ? new Date(payment.cancelledDate)
-              .toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              })
-              .replace(/\//g, "-")
+          ? new Date(payment.cancelledDate).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          }).replace(/\//g, "-")
           : "-",
         regFeesPaymentMode: payment.paymentMode || "-",
         regFeesDue: payment.registrationFee?.toString() || "0",
@@ -104,9 +116,7 @@ export const getAllRegistrationFees = async (req, res) => {
         regFeesPaid: payment.finalAmount?.toString() || "0",
         regFeesChequeNumber: payment.chequeNumber || "-",
         regFeesBankName: payment.bankName || "-",
-        regFeesTransactionNo: payment.chequeNumber
-          ? payment.chequeNumber
-          : payment.transactionNumber || "-",
+        regFeesTransactionNo: payment.chequeNumber ? payment.chequeNumber : payment.transactionNumber || "-",
         regFeesReceiptNo: payment.receiptNumber || "-",
         regFeesStatus: payment.status || "-",
         regFeesrefundAmount: "0",
@@ -119,24 +129,15 @@ export const getAllRegistrationFees = async (req, res) => {
       }
     }
 
+
     if (receiptNumbers.length > 0) {
       const refunds = await Refund.find({
         schoolId,
-        refundType: "Registration Fee",
+        refundType: 'Registration Fee',
         $or: [
-          {
-            $and: [
-              { status: "Refund" },
-              { refundDate: { $gte: startDate, $lte: endDate } },
-            ],
-          },
-          {
-            $and: [
-              { status: { $in: ["Cancelled", "Cheque Return"] } },
-              { cancelledDate: { $gte: startDate, $lte: endDate } },
-            ],
-          },
-        ],
+          { $and: [{ status: 'Refund' }, { refundDate: { $gte:filterStartDate, $lte: filterEndDate } }] },
+          { $and: [{ status: { $in: ['Cancelled', 'Cheque Return'] } }, { cancelledDate: { $gte:filterStartDate, $lte: filterEndDate } }] }
+        ]
       }).lean();
 
       const refundDetails = await Promise.all(
@@ -153,23 +154,19 @@ export const getAllRegistrationFees = async (req, res) => {
           return {
             recordType: "Refund",
             regFeesDate:
-              refund.status === "Refund" && refund.refundDate
-                ? new Date(refund.refundDate)
-                    .toLocaleDateString("en-GB", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })
-                    .replace(/\//g, "-")
+              refund.status === 'Refund' && refund.refundDate
+                ? new Date(refund.refundDate).toLocaleDateString('en-GB', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                }).replace(/\//g, '-')
                 : refund.cancelledDate
-                ? new Date(refund.cancelledDate)
-                    .toLocaleDateString("en-GB", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })
-                    .replace(/\//g, "-")
-                : "-",
+                  ? new Date(refund.cancelledDate).toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                  }).replace(/\//g, '-')
+                  : '-',
             academicYear: refund.academicYear || "-",
             registrationNumber: refund.registrationNumber || "-",
             firstName: refund.firstName || "-",
@@ -178,14 +175,13 @@ export const getAllRegistrationFees = async (req, res) => {
             regFeesStatus: refund.status || "-",
             regFeesPaymentMode: refund.paymentMode || "-",
             regFeesReceiptNo: refund.receiptNumber || "-",
-            regFeesDue:
-              -(refund.paidAmount + refund.concessionAmount)?.toString() || "0",
+            regFeesDue: -(refund.paidAmount+refund.concessionAmount)?.toString() || "0",
             // regFeesPaid: refund.paidAmount?.toString() || "0",
-            regFeesConcession: -refund.concessionAmount?.toString() || "0",
-            regFeesrefundAmount:
-              refund.refundAmount > 0
-                ? -refund.refundAmount.toString()
-                : -refund.cancelledAmount?.toString() || "",
+            regFeesConcession: -(refund.concessionAmount?.toString()) || '0',
+            regFeesrefundAmount: refund.refundAmount > 0
+              ? -(refund.refundAmount).toString()
+              :-(refund.cancelledAmount)?.toString() || "",
+
 
             // regFeesrefundAmount: refund.refundAmount?.toString() || "0",
             // regFeescancelledAmount: refund.cancelledAmount?.toString() || "0",
@@ -200,6 +196,7 @@ export const getAllRegistrationFees = async (req, res) => {
       combinedDetails.push(...refundDetails);
     }
 
+ 
     const paymentCounts = combinedDetails.reduce((acc, detail) => {
       const regNo = detail.registrationNumber;
       acc[regNo] = (acc[regNo] || 0) + 1;
@@ -209,7 +206,7 @@ export const getAllRegistrationFees = async (req, res) => {
 
     res.status(200).json({
       combinedDetails,
-      paymentCount: paymentDataList.length,
+      paymentCount: paymentDataList.length, 
     });
   } catch (error) {
     console.error("Error fetching registration fees data:", error);
