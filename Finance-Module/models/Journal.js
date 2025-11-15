@@ -78,6 +78,27 @@ const JournalSchema = new mongoose.Schema(
     reasonOfDisapprove: {
       type: String,
     },
+    sourceModule: {
+      type: String,
+      enum: ["Finance", "Fees"],
+      default: "Finance",
+    },
+    isRefund: {
+      type: Boolean,
+      default: false,
+    },
+    refundType: {
+      type: String,
+      enum: [
+        "Registration",
+        "Admission",
+        "TC",
+        "Board Registration",
+        "Board Exam",
+        "School Fees",
+      ],
+      default: null,
+    },
   },
   {
     timestamps: true,

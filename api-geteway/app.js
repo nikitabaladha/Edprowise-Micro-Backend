@@ -30,7 +30,9 @@ const SERVICE_TARGETS = {
 
   bankdetailsAndPaymentService: process.env.BANKDETAILS_AND_PAYMENT_SERVICE_URL,
 
-  financeModule: process.env.FINANCE_MODULE_URL,
+  financeModule: process.env.FINANCE_MODULE_SERVICE_URL,
+  feesModule: process.env.FEES_MODULE_SERVICE_URL,
+  payrollModule: process.env.PAYROLL_MODULE_SERVICE_URL,
 };
 
 // Route specific API prefixes
@@ -129,6 +131,22 @@ app.use(
   })
 );
 
+app.use(
+  "/api/feesModule",
+  proxy(SERVICE_TARGETS.feesModule, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/api/feesModule", "/api"),
+  })
+);
+
+app.use(
+  "/api/payrollModule",
+  proxy(SERVICE_TARGETS.user, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/api/payrollModule", "/api"),
+  })
+);
+
 // ======================================
 
 app.use(
@@ -224,6 +242,21 @@ app.use(
   proxy(SERVICE_TARGETS.financeModule, {
     proxyReqPathResolver: (req) =>
       req.originalUrl.replace("/financeModule", ""),
+  })
+);
+
+app.use(
+  "/feesModule",
+  proxy(SERVICE_TARGETS.feesModule, {
+    proxyReqPathResolver: (req) => req.originalUrl.replace("/feesModule", ""),
+  })
+);
+
+app.use(
+  "/payrollModule",
+  proxy(SERVICE_TARGETS.feesModule, {
+    proxyReqPathResolver: (req) =>
+      req.originalUrl.replace("/payrollModule", ""),
   })
 );
 

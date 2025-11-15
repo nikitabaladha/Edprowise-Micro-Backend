@@ -28,6 +28,10 @@ import sellersByProducts from "./sellersByProducts.js";
 import searchSchools from "./searchSchools.js";
 import searchSellers from "./searchSellers.js";
 
+//Shantanu Changes
+
+import updateStudentSignupTemp from "./updateStudentSignupTemp.js";
+
 export {
   checkEmailExists,
   requiredFieldFromSchoolProfile,
@@ -49,4 +53,5 @@ export {
   sellersByProducts,
   searchSchools,
   searchSellers,
+  updateStudentSignupTemp
 };

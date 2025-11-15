@@ -1,3 +1,5 @@
+// Finance-Module/routes/index.js
+
 import FinanceModuleYearRoutes from "./FinanceModuleYear.js";
 import ledgerRoutes from "./Ledger.js";
 import vendorRoutes from "./Vendor.js";
@@ -15,6 +17,8 @@ import OpeningClosingBalanceRoutes from "./OpeningClosingBalance.js";
 import CustomizeEntryRoutes from "./CustomizeEntry.js";
 import FinancialStatementRoutes from "./FinancialStatement.js";
 import AuditorDocumentRoutes from "./AuditorDocument.js";
+
+import InterServiceCommunication from "./inter-service-communication.js";
 
 export default (app) => {
   app.use("/api", ledgerRoutes);
@@ -35,4 +39,6 @@ export default (app) => {
   app.use("/api", OpeningClosingBalanceRoutes);
   app.use("/api", FinancialStatementRoutes);
   app.use("/api", AuditorDocumentRoutes);
+
+  app.use("/api", InterServiceCommunication);
 };

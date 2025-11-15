@@ -21,6 +21,7 @@ import {
   sellersByProducts,
   searchSchools,
   searchSellers,
+  updateStudentSignupTemp 
 } from "../controllers/Inter-Service-Communication/index.js";
 
 const router = express.Router();
@@ -76,5 +77,7 @@ router.get("/sellers-by-products", sellersByProducts);
 router.get("/search-schools", searchSchools);
 
 router.get("/search-sellers", searchSellers);
+
+router.put("/update-student-signup-temp", updateStudentSignupTemp);
 
 export default router;

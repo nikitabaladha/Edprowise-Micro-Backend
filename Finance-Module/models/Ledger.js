@@ -1,3 +1,5 @@
+// Finance-Module/models/Ledger.js
+
 import mongoose from "mongoose";
 
 const LedgerSchema = new mongoose.Schema(
@@ -68,10 +70,5 @@ LedgerSchema.index(
   },
   { unique: true }
 );
-
-// nikita
-// Nikita@1200
-// 1234567890
-// nikita1996@gmail.com
 
 export default mongoose.model("Ledger", LedgerSchema);
