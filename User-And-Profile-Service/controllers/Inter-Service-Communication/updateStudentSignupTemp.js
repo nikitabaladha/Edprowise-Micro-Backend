@@ -1,26 +1,26 @@
 // Edprowise-Micro-Backend/User-And-Profile-Service/controllers/Inter-Service-Communication/updateStudentSignupTemp.js
- 
+
 import TempStudent from "../../models/StudentSignupTemp.js";
- 
+
 async function updateStudentSignupTemp(req, res) {
   try {
     const { schoolId } = req.query;
     const updateData = req.body;
- 
-    if (!schoolId ) {
+
+    if (!schoolId) {
       return res.status(400).json({
         hasError: true,
         message: "'schoolId'  are required in query.",
       });
     }
- 
+
     if (!updateData || Object.keys(updateData).length === 0) {
       return res.status(400).json({
         hasError: true,
         message: "Update data must be provided in request body.",
       });
     }
- 
+
     // Exact equivalent of findOneAndUpdate
     const updatedTemp = await TempStudent.findOneAndUpdate(
       {
@@ -30,14 +30,14 @@ async function updateStudentSignupTemp(req, res) {
       { $set: { registrationFormId: updateData.registrationFormId } },
       { new: true, runValidators: true }
     );
- 
+
     if (!updatedTemp) {
       return res.status(404).json({
         hasError: true,
         message: `No TempStudent found for schoolId=${schoolId} & email=${updateData.email}`,
       });
     }
- 
+
     return res.status(200).json({
       hasError: false,
       message: "Student Signup Temp updated successfully.",
@@ -52,6 +52,5 @@ async function updateStudentSignupTemp(req, res) {
     });
   }
 }
- 
+
 export default updateStudentSignupTemp;
- 
