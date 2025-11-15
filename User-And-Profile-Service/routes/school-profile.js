@@ -19,7 +19,7 @@ router.put(
 
 router.get(
   "/school-profile/:schoolId",
-  roleBasedMiddleware("School", "Admin"),
+  // roleBasedMiddleware("School", "Admin"),
   getById
 );
 router.post(

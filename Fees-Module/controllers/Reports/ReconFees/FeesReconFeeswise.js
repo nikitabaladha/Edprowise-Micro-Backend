@@ -1,13 +1,19 @@
-import FeesStructure from "../../../models/FeesStructure.js";
-import AdmissionForm from "../../../models/AdmissionForm.js";
-import OneTimeFees from "../../../models/OneTimeFees.js";
-import StudentRegistration from "../../../models/RegistrationForm.js";
-import BoardRegistrationFees from "../../../models/BoardRegistrationFees.js";
-import BoardExamFees from "../../../models/BoardExamFee.js";
-import ClassAndSection from "../../../models/Class&Section.js";
-import TCForm from "../../../models/TCForm.js";
-import { SchoolFees } from "../../../models/SchoolFees.js";
-import FeesManagementYear from "../../../models/FeesManagementYear.js";
+import FeesStructure from '../../../models/FeesStructure.js';
+import AdmissionForm from '../../../models/AdmissionForm.js';
+import OneTimeFees from '../../../models/OneTimeFees.js';
+import StudentRegistration from '../../../models/RegistrationForm.js';
+import { AdmissionPayment } from '../../../models/AdmissionForm.js';
+import { RegistrationPayment } from '../../../models/RegistrationForm.js';
+import { TCPayment } from '../../../models/TCForm.js';
+import BoardRegistrationFees from '../../../models/BoardRegistrationFeePayment.js';
+import BoardExamFees from '../../../models/BoardExamFeePayment.js';
+import ClassAndSection from '../../../models/Class&Section.js';
+import TCForm from '../../../models/TCForm.js';
+import { SchoolFees } from '../../../models/SchoolFees.js';
+import FeesManagementYear from '../../../models/FeesManagementYear.js';
+import Refund from '../../../models/RefundFees.js';
+
+
 
 const getFeesReconCombined = async (req, res) => {
   try {
@@ -246,6 +252,7 @@ const getFeesReconCombined = async (req, res) => {
   const RegistrationPaymentStructures = await RegistrationPayment.find({ 
   schoolId, 
   paymentDate: { $gte: startDate, $lte: endDate },
+    status: { $nin: ["Failed", "Pending"] }  
 }).lean();
 
 let RegistrationPaymenttotal = 0; 
@@ -256,9 +263,12 @@ RegistrationPaymentStructures.forEach(struct => {
   RegistrationPaymenttotal += (finalAmount + concessionAmount);
 });
 
+console.log("Total Registration Payment Amount:", RegistrationPaymenttotal);
+
 const AdmissionStructures = await AdmissionPayment.find({ 
   schoolId, 
   paymentDate: { $gte: startDate, $lte: endDate },
+    status: { $nin: ["Failed", "Pending"] }  
 }).lean();
 
 let AdmissionTotal = 0;
@@ -272,6 +282,7 @@ AdmissionStructures.forEach(struct => {
 const TransferCertificateStructures = await TCPayment.find({ 
   schoolId, 
   paymentDate: { $gte: startDate, $lte: endDate },
+    status: { $nin: ["Failed", "Pending"] }  
 }).lean();
 
 let TransferCertificateTotal = 0;
@@ -288,6 +299,7 @@ TransferCertificateStructures.forEach(struct => {
       schoolId, 
       // academicYear 
      paymentDate: { $gte: startDate, $lte: endDate },
+       status: { $nin: ["Failed", "Pending"] }  
     }).lean();
     let boardRegTotal = 0;
     boardRegStructures.forEach(struct => {
@@ -303,6 +315,7 @@ TransferCertificateStructures.forEach(struct => {
            schoolId, 
       // academicYear 
      paymentDate: { $gte: startDate, $lte: endDate },
+       status: { $nin: ["Failed", "Pending"] }  
        }).lean();
     let boardExamTotal = 0;
     boardExamStructures.forEach(struct => {
@@ -361,16 +374,22 @@ const refunds = await Refund.find({
   ]
 }).lean();
 
+
 const refundSummary = refunds.reduce((acc, refund) => {
   const { refundType, refundAmount = 0, cancelledAmount = 0, concessionAmount = 0 } = refund;
+
+  console.log("refund type",refundType)
 
   if (!acc[refundType]) {
     acc[refundType] = { refundAmount: 0, cancelledAmount: 0, concessionAmount: 0 };
   }
 
+
   acc[refundType].refundAmount += refundAmount;
   acc[refundType].cancelledAmount += cancelledAmount;
   acc[refundType].concessionAmount += concessionAmount;
+
+    console.log("refund amount",refundAmount)
 
   return acc;
 }, {});

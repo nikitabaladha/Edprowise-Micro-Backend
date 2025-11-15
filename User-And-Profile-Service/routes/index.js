@@ -9,6 +9,7 @@ import SellerUserRoutes from "./seller-user.js";
 import EdprowiseProfileRoutes from "./edprowiseProfile.js";
 import AdminUserRoutes from "./admin.js";
 import NewAdminRoutes from "./NewAdmin.js";
+import TempStudentSignup from "./tempstudent.js";
 
 import InterServiceCommunication from "./inter-service-communication.js";
 
@@ -24,4 +25,5 @@ export default (app) => {
   app.use("/api", AdminUserRoutes);
   app.use("/api", NewAdminRoutes);
   app.use("/api", InterServiceCommunication);
+  app.use("/api", TempStudentSignup);
 };
