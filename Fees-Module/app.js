@@ -10,7 +10,7 @@ import configureServer from "../shared/config/server-config.js";
 // Nikita's code start
 import { startDailyScheduler } from "../Fees-Module/controllers/Inter-Service-Communication/DailyBatchScheduler.js";
 import { startDailyRefundScheduler } from "../Fees-Module/controllers/Inter-Service-Communication/DailyBatchRefundScheduler.js";
-
+// Nikita's code end
 dotenv.config();
 
 const app = express();
@@ -36,11 +36,12 @@ app.get("/health", (req, res) => {
 // Start server
 const PORT = process.env.FEES_MODULE_PORT;
 
-
 // Nikita's code start
 
 startDailyScheduler();
 startDailyRefundScheduler();
+
+// Nikita's code end
 
 app.listen(PORT, () => {
   console.log(`${process.env.SERVICE_NAME} running on port ${PORT}`);
